@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Creator</title>
+</head>
+
+<body>
+    <button class="btn btn-success" id="generate-button2">Generate</button>
+
+    <div class="options form-group">
+        <label class="form-switch">
+            <input id="generate-option-harmonize" type="checkbox">
+            <i class="form-icon"></i> Harmonize
+        </label>
+    </div>
+
+    <textarea name="" id="result" rows="21"></textarea>
+    
+</body>
+
+<script
+    src="https://code.jquery.com/jquery-3.6.0.min.js"
+    integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+    crossorigin="anonymous">
+</script>
+
+<script src="./letters_resource.js"></script>
+
+<script>
+
+    const engine = {
+        alternatingTypes: false,
+        setAlterNatingTypes(value) {
+            this.alternatingTypes = value
+        },
+        randomNumber(max, min) {
+            if(!min) {
+                min = 0
+            }
+            max = max - min - 1
+            return Math.ceil(Math.random() * max + min)
+        },
+        chooseNextLetter(letterObj, word, letterCount) {
+
+            if(!letterObj) {
+                filterNumber = this.randomNumber(resource_letters.lettersMax)
+                const lettersFiltered = resource_letters.letters.filter( (o) => {return o.count >= filterNumber})
+                randomIndex = this.randomNumber(lettersFiltered.length)
+                return lettersFiltered[randomIndex]
+            }
+
+            let goodLetterFound = false
+            let attempts = 0
+            while(!goodLetterFound && attempts < 100) {
+                attempts++
+                filterNumber = this.randomNumber(Math.round(letterObj.followingLettersMax * 0.4))
+                filterNumber++
+                const followingLettersFiltered = letterObj.followingLetters.filter( (o) => {return o.count >= filterNumber})
+
+                randomIndex = this.randomNumber(followingLettersFiltered.length)
+                const followingLetterObj = followingLettersFiltered[randomIndex]
+                const nextLetter = resource_letters.letters.find((o)=> {return o.letter == followingLetterObj.letter})
+                if( (word.length == 1 || this.alternatingTypes) && attempts < 99) {
+                    if(word[word.length-1].type == nextLetter.type) {
+                        continue
+                    }
+                }
+                // if the previous two letters are from the same type
+                if(word.length > 2 && word[word.length-2].type == nextLetter.type && word[word.length-1].type == nextLetter.type) {
+                    continue
+                }
+                // if we just generated the last letter, but this letter never appears at the end of a letter, we skip
+                if(letterCount == word.length && !followingLetterObj.atTheEnd) {
+                    console.log("Word:",word.map((w)=> w.letter).join(''),followingLetterObj.letter)
+                    continue
+                }
+                return nextLetter
+            } 
+        },
+        generateWord(letterCountMax, letterCountMin) {
+            // select resource by weight
+
+            let letterObj = null
+            let word = []
+            const letterCount = this.randomNumber(letterCountMax, letterCountMin)
+            for (let index = 0; index <= letterCount; index++) {
+                letterObj = this.chooseNextLetter(letterObj, word, letterCount)
+                word.push(letterObj)
+            }
+            return word.map((w)=> w.letter).join('')
+        },
+    }
+
+    function generateWords() {
+        const generateHarmonized = $('#generate-option-harmonize').is(":checked")
+        engine.setAlterNatingTypes(generateHarmonized)
+        let words = ''
+        for (let index = 0; index < 20; index++) {
+            words += engine.generateWord(3, 7) + "\n"
+        }
+        
+        $('#result').text(words)
+    }
+
+    document.querySelector('#generate-button2').addEventListener('click',function(){
+        generateWords()
+    })
+    generateWords()
+
+</script>
+
+<!-- <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css"> -->
+<!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css"> -->
+
+<link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
+<!-- <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre-exp.min.css"> -->
+
+<style>
+
+    body {
+        font-size: 1.6em;
+        max-width: 30rem;
+        min-width: 10rem;
+        width: 100%;
+    }
+    .options {
+        margin: 0.4rem;
+        font-size: 1rem;
+    }
+    textarea,button {
+            
+        margin: 1rem;
+        padding: 0.4rem;
+        display: block;
+    }
+    /* form {
+        width: 60rem;
+    } */
+    textarea, button {
+        margin: 0.3rem;
+        padding: 0.6rem;
+    }
+    textarea {
+        width: calc(100% - 0.6rem);
+        padding: 1rem;
+        font-size: 1rem;
+        line-height: 2rem;
+    }
+
+</style>
+</html>
