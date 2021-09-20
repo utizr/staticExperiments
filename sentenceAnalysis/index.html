@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Sentence Analysis</title>
+	<link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
+	<script src="https://d3js.org/d3.v4.js"></script>
+</head>
+<body>
+    <textarea id="input" rows="21"></textarea>
+    <button class="btn btn-success" id="generate-button">Generate</button>
+	<div id="manuscript-graph"></div>
+</body>
+
+<style>
+	body {
+		background-color: #1f1f1f;
+	}
+	#manuscript-graph {
+		margin: 10px;
+	}
+	textarea,button {
+		margin: 1rem;
+		padding: 0.4rem;
+		display: block;
+		color: #bcc3ce;
+		background-color: #1f1f1f;
+	}
+	/* form {
+		width: 60rem;
+	} */
+	textarea, button {
+		margin: 0.3rem;
+		padding: 0.6rem;
+	}
+	textarea {
+		width: calc(100% - 0.6rem);
+		padding: 0.8rem;
+		font-size: 0.7rem;
+		line-height: 1rem;
+	}
+
+</style>
+
+<script>
+
+	const engine = {
+		svg: null,
+		manuscript: '',
+		sentenceHeight: 3,
+		letterWidth: 3,
+		sentenceMargin: 1,
+		paragraphs: [
+			[
+				"This is the first line.",
+				"This is some more stuff that comes just below.",
+				"And the end.",
+				"This is some more stuff that comes just below, and even a line after it.",
+				"This is some jdfjefefef more stuff that comes just below, and even a line after it.",
+				"This is some more stuff that comes just below, and even a line after it.",
+				"This is some more stuff that comes just below, and even a line after it.",
+				"This is some more stuff that comes just below, and even a line after it.",
+
+			],
+			[
+				"This is the first line.",
+				"This is some more stuff that comes just below.",
+				"This is some more stuff that comes just below, and even a line after it.",
+				"And the end.",
+				"This is some more stuff that comes just below, and even a line after it.",
+
+			],
+		],
+		splitParagraphToSentences(paragraph) {
+
+			paragraph = paragraph.replace(/!/g,".").replace(/\?/g,".").trim()
+			let paragraphType = this.getSentenceType(paragraph)
+			if(paragraphType == 'prose') {
+				sentences = paragraph.split(".")
+				sentencesResult = []
+				for(let sentence of sentences) {
+					sentence = sentence.trim()
+					if(sentence.length) {
+						sentencesResult.push({sentence:sentence,type:paragraphType})
+					}
+				}
+				return sentencesResult
+			}
+			if(paragraphType == 'dialog') {
+				const dialogSign = paragraph[0]
+				paragraph = paragraph.substring(1).trim()
+				const paragraphParts = paragraph.split(dialogSign)
+				sentencesResult = []
+				for(let paragraphPart of paragraphParts) {
+					sentences = paragraphPart.split(".")
+					for(let sentence of sentences) {
+						sentence = sentence.trim()
+						if(sentence.length) {
+							sentencesResult.push({sentence:sentence,type:paragraphType})
+						}
+					}
+					paragraphType = paragraphType == 'dialog' ? 'prose' : 'dialog'
+				}
+				return sentencesResult
+			}
+
+		},
+		getSentenceType(sentence) {
+			return sentence[0] == '-' || sentence[0] == '–' ? 'dialog' : 'prose'
+		},
+		initText(text) {
+			this.manuscript = text
+			text = text.replace(/\n{2,}/g, "\n")
+			paragraphs = text.split("\n")
+			this.paragraphs = []
+			for(let paragraph of paragraphs) {
+
+				const sentences = this.splitParagraphToSentences(paragraph)
+				this.paragraphs.push(sentences)
+			}
+		},
+		numberOfSentences() {
+			let count = 0
+			for(const paragraph of this.paragraphs) {
+				count += paragraph.length
+			}
+			return count
+		},
+		maxLineLength() {
+			let max = 0
+			for(const paragraph of this.paragraphs) {
+				for(const sentence of paragraphs) {
+					max = sentence.length > max ? sentence.length : max
+				}
+			}
+			return max
+		},
+		createSvg() {
+			if(this.svg) {
+				this.svg.remove()
+			}
+			const lineHeight = this.sentenceHeight + this.sentenceMargin
+			const height = this.numberOfSentences() * lineHeight + this.paragraphs.length * lineHeight
+			const width = this.maxLineLength() * this.sentenceHeight
+			this.svg = d3.select("#manuscript-graph").append("svg").attr("width", width).attr("height", height)
+		},
+		addSentence(sentence, type, index) {
+			const color = type == 'prose' ? '#69a3b2' : 'orange'
+			this.svg.append('rect')
+				.attr('x', 0)
+				.attr('y', index * (this.sentenceHeight + this.sentenceMargin))
+				.attr('width', sentence.length * this.letterWidth)
+				.attr('height', this.sentenceHeight)
+				.attr('fill', color)
+		},
+		addSentences() {
+			let lineNumber = 0
+			for(const paragraph of this.paragraphs) {
+				for (let index = 0; index < paragraph.length; index++) {
+					const sentenceObj = paragraph[index]
+					this.addSentence(sentenceObj.sentence, sentenceObj.type, lineNumber)
+					lineNumber++
+				}
+				lineNumber++
+			}
+		}
+	}
+
+	document.querySelector('#generate-button').addEventListener('click',function(){
+		const text = document.querySelector("#input").value
+		engine.initText(text)
+		engine.createSvg()
+		engine.addSentences()
+	})
+	</script>
+
+</html>
