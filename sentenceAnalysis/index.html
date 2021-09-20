@@ -12,6 +12,7 @@
     <textarea id="input" rows="21"></textarea>
     <button class="btn btn-success" id="generate-button">Generate</button>
 	<div id="manuscript-graph"></div>
+	<div id="tooltip-container"></div>
 </body>
 
 <style>
@@ -41,6 +42,19 @@
 		font-size: 0.7rem;
 		line-height: 1rem;
 	}
+	#generate-button {
+		background: #4f7b7c;
+		border-color: #4f7b7c;
+	}
+	#tooltip-container {
+		color: white;
+		font-size: 14px;
+		background: #4f7b7c;
+		padding: 6px;
+		border-radius: 3px;
+		visibility: hidden;
+		margin: 5px;
+	}
 
 </style>
 
@@ -49,36 +63,22 @@
 	const engine = {
 		svg: null,
 		manuscript: '',
-		sentenceHeight: 3,
-		letterWidth: 3,
+		sentenceHeight: 4,
+		letterWidth: 4,
 		sentenceMargin: 1,
-		paragraphs: [
-			[
-				"This is the first line.",
-				"This is some more stuff that comes just below.",
-				"And the end.",
-				"This is some more stuff that comes just below, and even a line after it.",
-				"This is some jdfjefefef more stuff that comes just below, and even a line after it.",
-				"This is some more stuff that comes just below, and even a line after it.",
-				"This is some more stuff that comes just below, and even a line after it.",
-				"This is some more stuff that comes just below, and even a line after it.",
-
-			],
-			[
-				"This is the first line.",
-				"This is some more stuff that comes just below.",
-				"This is some more stuff that comes just below, and even a line after it.",
-				"And the end.",
-				"This is some more stuff that comes just below, and even a line after it.",
-
-			],
-		],
+		paragraphs: [],
 		splitParagraphToSentences(paragraph) {
 
-			paragraph = paragraph.replace(/!/g,".").replace(/\?/g,".").trim()
+			// some trickery to add an extra ascii char at the end of sentences, so that we can split by them
+			paragraph = paragraph
+				.replace(/!( |$)/g,"!°$1")
+				.replace(/\?( |$)/g,"?°$1")
+				.replace(/\.( |$)/g,".°$1")
+				// .replace(/\. /g,'.° ').replace(/\.$/g,".°")
+				.trim()
 			let paragraphType = this.getSentenceType(paragraph)
 			if(paragraphType == 'prose') {
-				sentences = paragraph.split(".")
+				sentences = paragraph.split('°')
 				sentencesResult = []
 				for(let sentence of sentences) {
 					sentence = sentence.trim()
@@ -90,11 +90,12 @@
 			}
 			if(paragraphType == 'dialog') {
 				const dialogSign = paragraph[0]
-				paragraph = paragraph.substring(1).trim()
+				paragraph = paragraph.substring(1)
 				const paragraphParts = paragraph.split(dialogSign)
 				sentencesResult = []
 				for(let paragraphPart of paragraphParts) {
-					sentences = paragraphPart.split(".")
+					paragraphPart = dialogSign + paragraphPart
+					sentences = paragraphPart.split('°')
 					for(let sentence of sentences) {
 						sentence = sentence.trim()
 						if(sentence.length) {
@@ -145,17 +146,44 @@
 			const height = this.numberOfSentences() * lineHeight + this.paragraphs.length * lineHeight
 			const width = this.maxLineLength() * this.sentenceHeight
 			this.svg = d3.select("#manuscript-graph").append("svg").attr("width", width).attr("height", height)
+
+			this.tooltip = d3.select("#tooltip-container")
+				.style("position", "absolute")
+				.style("visibility", "hidden")
+				// .text("I'm a circle!")
 		},
 		addSentence(sentence, type, index) {
 			const color = type == 'prose' ? '#69a3b2' : 'orange'
+			const me = this
 			this.svg.append('rect')
 				.attr('x', 0)
 				.attr('y', index * (this.sentenceHeight + this.sentenceMargin))
 				.attr('width', sentence.length * this.letterWidth)
 				.attr('height', this.sentenceHeight)
 				.attr('fill', color)
+				.attr('class', 'tooltip')
+				.attr("data-tooltip", "Lorem ipsum dolor sit amet")
+				.on("mouseover", function() {d3.select(this).attr('fill','white'); return me.tooltip.style("visibility", "visible");})
+				.on("mousemove", function() {
+					console.log("document.body.scrollHeight",document.body.scrollHeight)
+					me.tooltip.text(sentence)
+					if(window.innerWidth - event.pageX > 500) {
+						me.tooltip.style("left",(event.pageX+20)+"px").style("right","auto")
+					} else {
+						me.tooltip.style("right","0px").style("left","auto")
+					}
+					if(window.scrollY + window.innerHeight - event.pageY > 140) {
+						me.tooltip.style("top",(event.pageY+20)+"px").style("bottom","auto")
+					} else {
+						me.tooltip.style("top",(event.pageY - 80)+"px").style("bottom","auto")
+						// me.tooltip.style("bottom","0px").style("top","auto")
+					}
+					return //me.tooltip.text(sentence).style("top", (event.pageY+20)+"px").style("left",(event.pageX+20)+"px");
+				})
+				.on("mouseout", function() {d3.select(this).attr('fill',color); return me.tooltip.style("visibility", "hidden");})
 		},
 		addSentences() {
+			console.log("this.paragraphs #{this.paragraphs}",this.paragraphs)
 			let lineNumber = 0
 			for(const paragraph of this.paragraphs) {
 				for (let index = 0; index < paragraph.length; index++) {
