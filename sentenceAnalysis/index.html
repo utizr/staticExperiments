@@ -74,8 +74,9 @@
 				.replace(/!( |$)/g,"!°$1")
 				.replace(/\?( |$)/g,"?°$1")
 				.replace(/\.( |$)/g,".°$1")
-				// .replace(/\. /g,'.° ').replace(/\.$/g,".°")
 				.trim()
+
+			console.log('apragraph',paragraph)
 			let paragraphType = this.getSentenceType(paragraph)
 			if(paragraphType == 'prose') {
 				sentences = paragraph.split('°')
