@@ -76,7 +76,6 @@
 				.replace(/\.( |$)/g,".°$1")
 				.trim()
 
-			console.log('apragraph',paragraph)
 			let paragraphType = this.getSentenceType(paragraph)
 			if(paragraphType == 'prose') {
 				sentences = paragraph.split('°')
@@ -166,7 +165,6 @@
 				.attr("data-tooltip", "Lorem ipsum dolor sit amet")
 				.on("mouseover", function() {d3.select(this).attr('fill','white'); return me.tooltip.style("visibility", "visible");})
 				.on("mousemove", function() {
-					console.log("document.body.scrollHeight",document.body.scrollHeight)
 					me.tooltip.text(sentence)
 					if(window.innerWidth - event.pageX > 500) {
 						me.tooltip.style("left",(event.pageX+20)+"px").style("right","auto")
@@ -184,7 +182,6 @@
 				.on("mouseout", function() {d3.select(this).attr('fill',color); return me.tooltip.style("visibility", "hidden");})
 		},
 		addSentences() {
-			console.log("this.paragraphs #{this.paragraphs}",this.paragraphs)
 			let lineNumber = 0
 			for(const paragraph of this.paragraphs) {
 				for (let index = 0; index < paragraph.length; index++) {
