@@ -91,7 +91,7 @@
 			if(paragraphType == 'dialog') {
 				const dialogSign = paragraph[0]
 				paragraph = paragraph.substring(1)
-				const paragraphParts = paragraph.split(dialogSign)
+				const paragraphParts = paragraph.split(dialogSign+' ')
 				sentencesResult = []
 				for(let paragraphPart of paragraphParts) {
 					paragraphPart = dialogSign + paragraphPart
