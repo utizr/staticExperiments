@@ -90,11 +90,13 @@
 			}
 			if(paragraphType == 'dialog') {
 				const dialogSign = paragraph[0]
-				paragraph = paragraph.substring(1)
-				const paragraphParts = paragraph.split(dialogSign+' ')
+
+				// paragraph = paragraph.substring(1)
+				const re = new RegExp(`(?<!^)${dialogSign}( |,)`,'g')
+				paragraph = paragraph.replace(re,`╩${dialogSign}$1`)
+				const paragraphParts = paragraph.split('╩')
 				sentencesResult = []
 				for(let paragraphPart of paragraphParts) {
-					paragraphPart = dialogSign + paragraphPart
 					sentences = paragraphPart.split('°')
 					for(let sentence of sentences) {
 						sentence = sentence.trim()
