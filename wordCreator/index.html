@@ -9,7 +9,9 @@
 </head>
 
 <body>
-    <button class="btn btn-success" id="generate-button2">Generate</button>
+    <button class="btn btn-success" id="generate-words-button">Generate Words</button>
+    <button class="btn btn-success" id="generate-male-names-button">Generate Male Names</button>
+    <button class="btn btn-success" id="generate-female-names-button">Generate Male Names</button>
 
     <div class="options form-group">
         <label class="form-switch">
@@ -29,10 +31,10 @@
 </script>
 
 <script src="./letters_resource.js"></script>
+<script src="./name_resources.js"></script>
 
 <script>
-
-    const engine = {
+    const engineWordCreator = {
         alternatingTypes: false,
         setAlterNatingTypes(value) {
             this.alternatingTypes = value
@@ -57,7 +59,7 @@
             let attempts = 0
             while(!goodLetterFound && attempts < 100) {
                 attempts++
-                filterNumber = this.randomNumber(Math.round(letterObj.followingLettersMax * 0.4))
+                filterNumber = this.randomNumber(Math.round(letterObj.followingLettersMax * 0.3))
                 filterNumber++
                 const followingLettersFiltered = letterObj.followingLetters.filter( (o) => {return o.count >= filterNumber})
 
@@ -95,20 +97,81 @@
         },
     }
 
+    const engineNameCreator = {
+        type: 'male',
+        harmonized: false,
+        setType(type) {
+            this.type = type
+        },
+        setHarmonize(harmonized) {
+            this.harmonized = harmonized
+        },
+        
+        randomNumber(max, min) {
+            if(!min) {
+                min = 0
+            }
+            max = max - min - 1
+            return Math.ceil(Math.random() * max + min)
+        },
+        getRandomName(resource) {
+            const randomNumber = this.randomNumber(resource.length)
+            return resource[randomNumber]
+        },
+        generateFirstName() {
+            let resource = null
+            if(this.harmonized) {
+                resource = this.type == 'male' ? name_resources.mostCommonMaleNames : name_resources.mostCommonFemaleNames
+            } else {
+                resource = this.type == 'male' ? name_resources.namesMale : name_resources.namesFemale
+            }
+            return this.getRandomName(resource)
+        },
+        generateLastName() {
+            const resource = name_resources.lastNames
+            return this.getRandomName(resource)
+        },
+        generateName(){
+            return this.generateLastName() + " " + this.generateFirstName()
+        }
+    }
+
     function generateWords() {
         const generateHarmonized = $('#generate-option-harmonize').is(":checked")
-        engine.setAlterNatingTypes(generateHarmonized)
+        engineWordCreator.setAlterNatingTypes(generateHarmonized)
         let words = ''
         for (let index = 0; index < 20; index++) {
-            words += engine.generateWord(3, 7) + "\n"
+            words += engineWordCreator.generateWord(3, 7) + "\n"
         }
         
         $('#result').text(words)
     }
 
-    document.querySelector('#generate-button2').addEventListener('click',function(){
+    function generateNames(type) {
+        const generateHarmonized = $('#generate-option-harmonize').is(":checked")
+        engineNameCreator.setType(type)
+        engineNameCreator.setHarmonize(generateHarmonized)
+        let names = ''
+        for (let index = 0; index < 20; index++) {
+            names += engineNameCreator.generateName() + "\n"
+        }
+        
+        $('#result').text(names)
+    }
+
+
+    document.querySelector('#generate-words-button').addEventListener('click',function(){
         generateWords()
     })
+
+    document.querySelector('#generate-male-names-button').addEventListener('click',function(){
+        generateNames('male')
+    })
+
+    document.querySelector('#generate-female-names-button').addEventListener('click',function(){
+        generateNames('female')
+    })
+
     generateWords()
 
 </script>
