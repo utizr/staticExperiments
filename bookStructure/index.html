@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+
+  <!-- csss framework documentation -->
+  <!-- https://purecss.io/grids/ -->
+
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Structure</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/grids-responsive-min.css" />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
+    <script src="https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"></script>
+</head>
+
+
+  <style>
+    /* :root {
+      --paragraph_bg1_gray: #282828;
+      --paragraph_color1_gray: #a3a3a3;
+
+      --paragraph_bg1: #99ad30;
+      --paragraph_color1: #000000;
+      --body_background_color: #4a4a4a;
+    } */
+    :root {
+      --paragraph_bg1_gray: #282828;
+      --paragraph_color1_gray: #a3a3a3;
+
+      --paragraph_bg1: #f3cf69;
+      --paragraph_color1: #000000;
+      --paragraph_bg2: #69edf3;
+      --paragraph_color2: #000000;
+      --paragraph_bg3: #f77fb0;
+      --paragraph_color3: #000000;
+      --paragraph_bg4: #7f93f7;
+      --paragraph_color4: #000000;
+      --paragraph_bg5: #7ff7a4;
+      --paragraph_color5: #000000;
+      
+      --body_background_color: #f7f7f7;
+      --container-color: #ffffff;
+    }
+    body {
+      background-color: var(--body_background_color);
+      padding: 30px;
+    }
+    .lilbox-container {
+      margin: 0px 6px;
+      padding: 6px 6px;
+      box-shadow: rgba(0, 0, 0, 0.02) 0px 1px 3px 0px, rgba(27, 31, 35, 0.15) 0px 0px 0px 1px;
+      min-height: 75px;
+      background-color: var(--container-color);
+    }
+    #paragraph-template-container {
+      padding-bottom: 30px;
+    }
+    #paragraph-template-container .lilbox {
+      display: inline-block;
+      width: 80px;
+    }
+    .lilbox {
+      border-radius: 6px;
+      margin: 12px;
+      padding: 15px;
+
+      font-family: Georgia;
+      font-size: 1.1em;
+      box-shadow: rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;
+    }
+    .lilbox p {
+      margin:0;
+      padding:0;
+    }
+    .lilbox-container .lilbox p {
+      margin:0 24px;
+    }
+    .lilbox.v1 {
+      background-color:var(--paragraph_bg1);
+      color: var(--paragraph_color1);
+    }
+    .lilbox.v2 {
+      background-color:var(--paragraph_bg2);
+      color: var(--paragraph_color2);
+    }
+    .lilbox.v3 {
+      background-color:var(--paragraph_bg3);
+      color: var(--paragraph_color3);
+    }
+    .lilbox.v4 {
+      background-color:var(--paragraph_bg4);
+      color: var(--paragraph_color4);
+    }
+    .lilbox.v5 {
+      background-color:var(--paragraph_bg5);
+      color: var(--paragraph_color5);
+    }
+    .ghost {
+      box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px, rgba(0, 0, 0, 0.23) 0px 6px 6px;
+    }
+  
+  </style>
+
+  <body>
+
+
+    <div id="paragraph-template-container">
+      <div class="lilbox v1">
+        <p contenteditable="true">Gusztáv</p>
+      </div>
+      <div class="lilbox v2">
+        <p contenteditable="true">Marci</p>
+      </div>
+      <div class="lilbox v3">
+        <p contenteditable="true">Julia</p>
+      </div>
+      <div class="lilbox v4">
+        <p contenteditable="true">Albert</p>
+      </div>
+      <div class="lilbox v5">
+        <p contenteditable="true">Hugo</p>
+      </div>
+    </div>
+    <div class="pure-g">
+      <div class=" pure-u-1 pure-u-lg-1-3">
+        <h3>ACT 1</h3>
+        <div id="sort-test" class="lilbox-container">
+          <!-- <div class="lilbox v1">1 chapter</div> 
+          <div class="lilbox v1">2 chapter</div> 
+          <div class="lilbox v1">3 chapter</div>  -->
+        </div>
+      </div>
+      <div class=" pure-u-1 pure-u-lg-1-3">
+        <h3>ACT 2</h3>
+        <div class="lilbox-container">
+          <!-- <div class="lilbox v1">4 chapter</div> 
+          <div class="lilbox v1">5 chapter</div> 
+          <div class="lilbox v1">6 chapter</div>  -->
+        </div>
+      </div>
+      <div class=" pure-u-1 pure-u-lg-1-3">
+        <h3>ACT 3</h3>
+        <div class="lilbox-container">
+          <!-- <div class="lilbox v1">7 chapter</div> 
+          <div class="lilbox v1">8 chapter</div> 
+          <div class="lilbox v1">9 chapter</div>  -->
+        </div>
+      </div>
+  </div>
+
+  <script>
+
+  const templateContainer = document.getElementById('paragraph-template-container');
+  
+  Sortable.create(templateContainer, {
+    name: 'template',
+    group: {
+        name: 'shared',
+        pull: 'clone',
+        put: false
+    },
+    animation: 300,
+    ghostClass: 'ghost',
+  });
+
+  const els = document.getElementsByClassName('lilbox-container');
+  for (const el of els) {
+    Sortable.create(el, {
+      name: 'bar',
+      group: 'shared',
+      animation: 300,
+      ghostClass: 'ghost',
+    });
+  }
+
+  const boxes = document.getElementsByClassName('lilbox');
+
+  for (const box of boxes) {
+    box.addEventListener('input', updateValue);
+  }
+
+  function updateValue(e) {
+    // console.log(e.target.innerHTML);
+  }
+
+  </script>
+  </body>
+
+</html>
