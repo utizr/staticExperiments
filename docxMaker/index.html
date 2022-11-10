@@ -100,7 +100,7 @@
           resultObjs.push(
             new docx.TextRun({
               text: pPart.text,
-              size: 26,
+              size: 24,
               font: "Times New Roman",
               italics: pPart.type == 'italics'
             })
@@ -113,11 +113,11 @@
       result = parseParagraphChildrenParts("Some weird text with //some italic text// in it.")
       console.log("result",result)
 
-      function createParagraph(text) {
+      function createParagraph(text, index) {
           paragraphParts = parseParagraphChildrenParts(text)
           return new docx.Paragraph({
             indent: {
-              firstLine: 250,
+              firstLine: index == 0 ? 0 : 250,
             },
             spacing: {
                 line: 400,
@@ -131,8 +131,8 @@
         text = text.replace(/\n{2,}/g, "\n")
         paragraphs = text.split("\n")
         paragraphsDocx = []
-        for(let paragraph of paragraphs) {
-          paragraphsDocx.push(createParagraph(paragraph))
+        for(let [index, paragraph] of paragraphs.entries()) {
+          paragraphsDocx.push(createParagraph(paragraph,index))
         }
         const doc = new docx.Document({
           sections: [{
