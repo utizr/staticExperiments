@@ -154,44 +154,21 @@
 
   <script>
 
-  const templateContainer = document.getElementById('paragraph-template-container');
-  
-  Sortable.create(templateContainer, {
-    name: 'template',
-    group: {
-        name: 'shared',
-        pull: 'clone',
-        put: false
-    },
-    animation: 300,
-    ghostClass: 'ghost',
-  });
 
-  const els = document.getElementsByClassName('lilbox-container');
-  for (const el of els) {
-    Sortable.create(el, {
-      name: 'bar',
-      group: 'shared',
-      animation: 300,
-      ghostClass: 'ghost',
-      delay: 70, // time in milliseconds to define when the sorting should start
-      delayOnTouchOnly: true, // only delay if user is using touch
-    });
+  function setupBoxes() {
+    const boxes = document.getElementsByClassName('lilbox');
+    for (const box of boxes) {
+      box.addEventListener('input', updateValue);
+    }
+    const boxTexts = document.getElementsByClassName('lilbox-text');
+
+    for (const box of boxTexts) {
+      box.addEventListener('click', textClick);
+      box.addEventListener('blur', textBlur);
+    }
   }
 
-  const boxes = document.getElementsByClassName('lilbox');
-
-  for (const box of boxes) {
-    box.addEventListener('input', updateValue);
-  }
-
-  const boxTexts = document.getElementsByClassName('lilbox-text');
-
-  for (const box of boxTexts) {
-    box.addEventListener('click', textClick);
-    box.addEventListener('blur', textBlur);
-  }
-
+  // handlers
   function updateValue(e) {
     // console.log(e.target.innerHTML);
   }
@@ -213,6 +190,45 @@
   function textBlur(e) {
     e.target.contentEditable = "false";
   }
+
+  
+  // INI:
+  setupBoxes()
+
+  const templateContainer = document.getElementById('paragraph-template-container');
+  
+  Sortable.create(templateContainer, {
+    name: 'template',
+    group: {
+        name: 'shared',
+        pull: 'clone',
+        put: false
+    },
+    animation: 300,
+    ghostClass: 'ghost',
+    delay: 70, // time in milliseconds to define when the sorting should start
+    delayOnTouchOnly: true, // only delay if user is using touch
+    // Element dragging ended
+    onEnd: function (/**Event*/evt) {
+      setupBoxes()
+    },
+  });
+
+  const els = document.getElementsByClassName('lilbox-container');
+  for (const el of els) {
+    Sortable.create(el, {
+      name: 'bar',
+      group: 'shared',
+      animation: 300,
+      ghostClass: 'ghost',
+      delay: 70, // time in milliseconds to define when the sorting should start
+      delayOnTouchOnly: true, // only delay if user is using touch
+      onEnd: function (/**Event*/evt) {
+      setupBoxes()
+    },
+    });
+  }
+
   </script>
   </body>
 
