@@ -10,11 +10,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Book Structure</title>
 
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css" integrity="sha384-X38yfunGUhNzHpBaEBsWLO+A0HDYOQi8ufWDkZ0k9e0eXz/tH3II7uKZ9msv++Ls" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/grids-responsive-min.css" />
+    <link rel="stylesheet" href="/css/pure-min.css">
+    <link rel="stylesheet" href="/css/grids-responsive-min.css" />
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
-    <script src="https://raw.githack.com/SortableJS/Sortable/master/Sortable.js"></script>
+    <script src="/js/sortable.js"></script>
 </head>
 
 
@@ -61,12 +61,12 @@
     }
     #paragraph-template-container .lilbox {
       display: inline-block;
-      width: 80px;
+      width: 86px;
     }
     .lilbox {
       border-radius: 6px;
       margin: 12px;
-      padding: 15px;
+      padding: 0 4px;
 
       font-family: Georgia;
       font-size: 1.1em;
@@ -74,28 +74,31 @@
     }
     .lilbox p {
       margin:0;
+      padding: 12px 12px;
+    }
+    .lilbox-container .lilbox {
       padding:0;
     }
     .lilbox-container .lilbox p {
-      margin:0 24px;
+      margin:0;
     }
-    .lilbox.v1 {
+    .lilbox[data-version="v1"]  {
       background-color:var(--paragraph_bg1);
       color: var(--paragraph_color1);
     }
-    .lilbox.v2 {
+    .lilbox[data-version="v2"] {
       background-color:var(--paragraph_bg2);
       color: var(--paragraph_color2);
     }
-    .lilbox.v3 {
+    .lilbox[data-version="v3"] {
       background-color:var(--paragraph_bg3);
       color: var(--paragraph_color3);
     }
-    .lilbox.v4 {
+    .lilbox[data-version="v4"] {
       background-color:var(--paragraph_bg4);
       color: var(--paragraph_color4);
     }
-    .lilbox.v5 {
+    .lilbox[data-version="v5"] {
       background-color:var(--paragraph_bg5);
       color: var(--paragraph_color5);
     }
@@ -107,53 +110,212 @@
 
   <body>
 
+    <div id="page">
 
-    <div id="paragraph-template-container">
-      <div class="lilbox v1">
-        <p class="lilbox-text" contenteditable="false">Gusztáv</p>
+      <div id="paragraph-template-container">
+        <div class="lilbox" data-type="box" data-version="v1" data-text="Gusztáv">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Gusztáv</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v2" data-text="Marci">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Marci</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v3" data-text="Julia">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Julia</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v4" data-text="Albert">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Albert</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v5" data-text="Hugo">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Hugo</p>
+        </div>
       </div>
-      <div class="lilbox v2">
-        <p class="lilbox-text" contenteditable="false">Marci</p>
+  
+      <div data-type="box-container" class="pure-g">
+        <div data-type="box-section" data-title="ACT 1" class="pure-u-1 pure-u-lg-1-3">
+          <h3>ACT 1</h3>
+          <div id="sort-test" class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
+        <div data-type="box-section" data-title="ACT 2" class="pure-u-1 pure-u-lg-1-3">
+          <h3>ACT 2</h3>
+          <div class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
+        <div data-type="box-section" data-title="ACT 3" class="pure-u-1 pure-u-lg-1-3">
+          <h3>ACT 3</h3>
+          <div class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
       </div>
-      <div class="lilbox v3">
-        <p class="lilbox-text" contenteditable="false">Julia</p>
-      </div>
-      <div class="lilbox v4">
-        <p class="lilbox-text" contenteditable="false">Albert</p>
-      </div>
-      <div class="lilbox v5">
-        <p class="lilbox-text" contenteditable="false">Hugo</p>
-      </div>
+
     </div>
-    <div class="pure-g">
-      <div class=" pure-u-1 pure-u-lg-1-3">
-        <h3>ACT 1</h3>
-        <div id="sort-test" class="lilbox-container">
-          <!-- <div class="lilbox v1">1 chapter</div> 
-          <div class="lilbox v1">2 chapter</div> 
-          <div class="lilbox v1">3 chapter</div>  -->
-        </div>
-      </div>
-      <div class=" pure-u-1 pure-u-lg-1-3">
-        <h3>ACT 2</h3>
-        <div class="lilbox-container">
-          <!-- <div class="lilbox v1">4 chapter</div> 
-          <div class="lilbox v1">5 chapter</div> 
-          <div class="lilbox v1">6 chapter</div>  -->
-        </div>
-      </div>
-      <div class=" pure-u-1 pure-u-lg-1-3">
-        <h3>ACT 3</h3>
-        <div class="lilbox-container">
-          <!-- <div class="lilbox v1">7 chapter</div> 
-          <div class="lilbox v1">8 chapter</div> 
-          <div class="lilbox v1">9 chapter</div>  -->
-        </div>
-      </div>
-  </div>
+
 
   <script>
 
+
+  // getting base elements:
+  const pageContainer = document.getElementById('page');
+  let templateContainer = document.getElementById('paragraph-template-container');
+  let boxContainer = document.querySelector('[data-type="box-container"]');
+
+  let pageDataTemplate = {
+    "templates": [
+      {
+        "type": "box",
+        "version": "v1",
+        "text": "Gusztáv"
+      },
+      {
+        "type": "box",
+        "version": "v2",
+        "text": "Marci"
+      },
+      {
+        "type": "box",
+        "version": "v3",
+        "text": "Julia"
+      },
+      {
+        "type": "box",
+        "version": "v4",
+        "text": "Albert"
+      },
+      {
+        "type": "box",
+        "version": "v5",
+        "text": "Hugo"
+      }
+    ],
+    "content": [
+      {
+        "type": "section",
+        "title": "ACT 1",
+        "content": []
+      },
+      {
+        "type": "section",
+        "title": "ACT 2",
+        "content": []
+      },
+      {
+        "type": "section",
+        "title": "ACT 3",
+        "content": []
+      }
+    ]
+  }
+  let pageData = null
+
+  // templates
+
+  function htmlToElements(html) {
+    var template = document.createElement('template');
+    template.innerHTML = html;
+    return template.content.childNodes;
+  }
+
+  function templateContent(content) {
+    result = ''
+    for (const item of content) {
+      switch (item.type) {
+        case 'box':
+          result += templateBox(item.text, item.version)
+          break;
+        case 'section':
+          result += templateSection(item.title, item.content)
+          break;
+        default:
+          break;
+      }
+    }
+    return result
+  }
+
+  function templateBox(text, version) {
+    return `
+    <div class="lilbox" data-type="box" data-version="${version}" data-text="${text}">
+      <p class="lilbox-text" data-type="box-content" contenteditable="false">${text}</p>
+    </div>\n
+    `
+  }
+
+  function templateSection(title, content) {
+    const sectionTop = `
+      <div data-type="box-section" data-title="${title}" class="pure-u-1 pure-u-lg-1-3">
+        <h3>${title}</h3>
+        <div class="lilbox-container">
+          <!-- boxes come here  -->
+  
+    `
+    const sectionBottom = `
+        </div>
+      </div>
+    `
+
+    return sectionTop + templateContent(content) + sectionBottom
+  }
+
+  // functions
+  function getBoxVersion(className) {
+    const regex = /v(\d+)/;
+    const result = className.match(regex); // ["are", index: 3, input: "We are what we believe we are.", groups: undefined]
+    return result[0]
+  }
+
+  function saveState() {
+    const result = {templates:[], content: []}
+    let boxes = templateContainer.querySelectorAll('[data-type="box"]');
+    for (const box of boxes) {
+      const text = box.dataset.text;
+      const version = box.dataset.version;
+      result.templates.push({type: 'box', version, text})
+    }
+    const sections = boxContainer.querySelectorAll('[data-type="box-section"]');
+    for (const section of sections) {
+      const sectionData = {type: 'section', title: '', content: []}
+      sectionData.title = section.dataset.title;
+
+      let boxes = section.querySelectorAll('[data-type="box"]');
+      for (const box of boxes) {
+        const text = box.dataset.text;
+        const version = box.dataset.version;
+        sectionData.content.push({type: 'box', version, text})
+      }
+
+      result.content.push(sectionData)
+    }
+    pageData = result
+    console.log("result",result)
+  }
+
+  function loadState() {
+    const templateTop = `
+      <div id="paragraph-template-container">
+          <!-- boxes come here  -->
+    `
+    const templateBottom = `
+      </div>
+    `
+
+    const boxContainerTop = `
+      <div data-type="box-container" class="pure-g">
+        <!-- sections come here  -->
+    `
+    const boxContainerBottom = `
+      </div>
+    `
+    const pageContent =  templateTop + templateContent(pageData.templates) + templateBottom + boxContainerTop + templateContent(pageData.content) + boxContainerBottom;
+
+    pageContainer.innerHTML = pageContent;
+    templateContainer = document.getElementById('paragraph-template-container');
+    boxContainer = document.querySelector('[data-type="box-container"]');
+    setupBoxes();
+    setupDragAndDrop();
+  }
 
   function setupBoxes() {
     const boxes = document.getElementsByClassName('lilbox');
@@ -165,6 +327,40 @@
     for (const box of boxTexts) {
       box.addEventListener('click', textClick);
       box.addEventListener('blur', textBlur);
+    }
+  }
+  function setupDragAndDrop() {
+  
+    Sortable.create(templateContainer, {
+      name: 'template',
+      group: {
+          name: 'shared',
+          pull: 'clone',
+          put: false
+      },
+      animation: 300,
+      ghostClass: 'ghost',
+      delay: 70, // time in milliseconds to define when the sorting should start
+      delayOnTouchOnly: true, // only delay if user is using touch
+      // Element dragging ended
+      onEnd: function (/**Event*/evt) {
+        setupBoxes()
+      },
+    });
+
+    const els = document.getElementsByClassName('lilbox-container');
+    for (const el of els) {
+      Sortable.create(el, {
+        name: 'bar',
+        group: 'shared',
+        animation: 300,
+        ghostClass: 'ghost',
+        delay: 70, // time in milliseconds to define when the sorting should start
+        delayOnTouchOnly: true, // only delay if user is using touch
+        onEnd: function (/**Event*/evt) {
+          setupBoxes()
+        },
+      });
     }
   }
 
@@ -188,46 +384,21 @@
     selection.addRange(range);//make the range you have just created the visible selection
   }
   function textBlur(e) {
+    const box = e.target.parentElement;
+    if(e.target.innerHTML.trim() == '') {
+      box.remove();
+      return
+    }
     e.target.contentEditable = "false";
+    box.dataset.text = e.target.innerHTML;
   }
 
   
   // INI:
   setupBoxes()
+  setupDragAndDrop()
 
-  const templateContainer = document.getElementById('paragraph-template-container');
-  
-  Sortable.create(templateContainer, {
-    name: 'template',
-    group: {
-        name: 'shared',
-        pull: 'clone',
-        put: false
-    },
-    animation: 300,
-    ghostClass: 'ghost',
-    delay: 70, // time in milliseconds to define when the sorting should start
-    delayOnTouchOnly: true, // only delay if user is using touch
-    // Element dragging ended
-    onEnd: function (/**Event*/evt) {
-      setupBoxes()
-    },
-  });
 
-  const els = document.getElementsByClassName('lilbox-container');
-  for (const el of els) {
-    Sortable.create(el, {
-      name: 'bar',
-      group: 'shared',
-      animation: 300,
-      ghostClass: 'ghost',
-      delay: 70, // time in milliseconds to define when the sorting should start
-      delayOnTouchOnly: true, // only delay if user is using touch
-      onEnd: function (/**Event*/evt) {
-      setupBoxes()
-    },
-    });
-  }
 
   </script>
   </body>
