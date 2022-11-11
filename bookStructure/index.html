@@ -110,19 +110,19 @@
 
     <div id="paragraph-template-container">
       <div class="lilbox v1">
-        <p contenteditable="true">Gusztáv</p>
+        <p class="lilbox-text" contenteditable="false">Gusztáv</p>
       </div>
       <div class="lilbox v2">
-        <p contenteditable="true">Marci</p>
+        <p class="lilbox-text" contenteditable="false">Marci</p>
       </div>
       <div class="lilbox v3">
-        <p contenteditable="true">Julia</p>
+        <p class="lilbox-text" contenteditable="false">Julia</p>
       </div>
       <div class="lilbox v4">
-        <p contenteditable="true">Albert</p>
+        <p class="lilbox-text" contenteditable="false">Albert</p>
       </div>
       <div class="lilbox v5">
-        <p contenteditable="true">Hugo</p>
+        <p class="lilbox-text" contenteditable="false">Hugo</p>
       </div>
     </div>
     <div class="pure-g">
@@ -183,10 +183,34 @@
     box.addEventListener('input', updateValue);
   }
 
+  const boxTexts = document.getElementsByClassName('lilbox-text');
+
+  for (const box of boxTexts) {
+    box.addEventListener('click', textClick);
+    box.addEventListener('blur', textBlur);
+  }
+
   function updateValue(e) {
     // console.log(e.target.innerHTML);
   }
 
+  function textClick(e) {
+    const elem = e.target; 
+    if(elem.contentEditable == "true") {
+      return;
+    }
+    elem.contentEditable = "true";
+    elem.focus();
+    const range = document.createRange();//Create a range (a range is a like the selection but invisible)
+    range.selectNodeContents(elem);//Select the entire contents of the element with the range
+    range.collapse(false);//collapse the range to the end point. false means collapse to end rather than the start
+    selection = window.getSelection();//get the selection object (allows you to change selection)
+    selection.removeAllRanges();//remove any selections already made
+    selection.addRange(range);//make the range you have just created the visible selection
+  }
+  function textBlur(e) {
+    e.target.contentEditable = "false";
+  }
   </script>
   </body>
 
