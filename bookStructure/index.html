@@ -63,6 +63,12 @@
       display: inline-block;
       width: 86px;
     }
+
+    #button-reset {
+      position: absolute;
+      top: 0;
+      right:0;
+    }
     .lilbox {
       border-radius: 6px;
       margin: 12px;
@@ -110,6 +116,7 @@
 
   <body>
 
+    <button id="button-reset" class="button-small pure-button">Reset</button>
     <div id="page">
 
       <div id="paragraph-template-container">
@@ -161,6 +168,9 @@
   const pageContainer = document.getElementById('page');
   let templateContainer = document.getElementById('paragraph-template-container');
   let boxContainer = document.querySelector('[data-type="box-container"]');
+
+  const buttonReset = document.getElementById("button-reset");
+
 
   let pageDataTemplate = {
     "templates": [
@@ -289,10 +299,19 @@
       result.content.push(sectionData)
     }
     pageData = result
-    console.log("result",result)
+    localStorage.setItem("pageData", JSON.stringify(pageData))
+    console.log("state saved")
   }
 
-  function loadState() {
+  function loadState(state) {
+    
+    if(state) {
+      pageData = state;
+    } else {
+      const savedPageData = localStorage.getItem("pageData");
+      pageData = savedPageData ? JSON.parse(savedPageData) : pageData;
+    }
+
     const templateTop = `
       <div id="paragraph-template-container">
           <!-- boxes come here  -->
@@ -345,6 +364,7 @@
       // Element dragging ended
       onEnd: function (/**Event*/evt) {
         setupBoxes()
+        saveState()
       },
     });
 
@@ -359,6 +379,7 @@
         delayOnTouchOnly: true, // only delay if user is using touch
         onEnd: function (/**Event*/evt) {
           setupBoxes()
+          saveState()
         },
       });
     }
@@ -387,18 +408,25 @@
     const box = e.target.parentElement;
     if(e.target.innerHTML.trim() == '') {
       box.remove();
+      saveState();
       return
     }
     e.target.contentEditable = "false";
     box.dataset.text = e.target.innerHTML;
+    saveState();
   }
 
+  function resetState() {
+    loadState(pageDataTemplate)
+    saveState();
+  }
   
   // INI:
   setupBoxes()
   setupDragAndDrop()
 
-
+  loadState()
+  buttonReset.addEventListener('click', resetState);
 
   </script>
   </body>
