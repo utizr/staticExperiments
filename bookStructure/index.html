@@ -256,19 +256,22 @@
   }
 
   function templateContent(content) {
-    result = ''
-    for (const item of content) {
+    let result = ''
+    let length = content.length
+    
+    
+    content.forEach(item  => {
       switch (item.type) {
         case 'box':
           result += templateBox(item.text, item.version)
           break;
         case 'section':
-          result += templateSection(item.title, item.content)
+          result += templateSection(item.title, item.content, length)
           break;
         default:
           break;
       }
-    }
+    });
     return result
   }
 
@@ -280,20 +283,38 @@
     `
   }
 
-  function templateSection(title, content) {
+  function templateSection(title, content, length) {
+
+    let result = '';
+    let sectionSize = 'lg';
+    if(length < 4) {
+      sectionSize = 'md'
+    }
+    if(length > 4) {
+      sectionSize = 'xl'
+    }
+
+    // const sectionContainerSize = length;
+    const sectionFactor = length
+
+    const breakIntoTwoColumns = length < 4 ? '' : 'pure-u-md-1-2'
+
+
     const sectionTop = `
-      <div data-type="box-section" data-title="${title}" class="pure-u-1 pure-u-lg-1-3">
+      <div data-type="box-section" data-title="${title}" class="pure-u-1 ${breakIntoTwoColumns} pure-u-${sectionSize}-1-${sectionFactor}">
         <h3>${title}</h3>
         <div class="lilbox-container">
           <!-- boxes come here  -->
-  
     `
     const sectionBottom = `
         </div>
       </div>
     `
-
-    return sectionTop + templateContent(content) + sectionBottom
+    result += sectionTop;
+    result += templateContent(content);
+    result += sectionBottom;
+  
+    return result
   }
 
   // functions
