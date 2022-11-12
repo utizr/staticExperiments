@@ -31,17 +31,20 @@
       --paragraph_bg1_gray: #282828;
       --paragraph_color1_gray: #a3a3a3;
 
-      --paragraph_bg1: #f3cf69;
-      --paragraph_color1: #000000;
-      --paragraph_bg2: #69edf3;
-      --paragraph_color2: #000000;
-      --paragraph_bg3: #f77fb0;
-      --paragraph_color3: #000000;
-      --paragraph_bg4: #7f93f7;
-      --paragraph_color4: #000000;
-      --paragraph_bg5: #7ff7a4;
-      --paragraph_color5: #000000;
-      
+      --paragraph_bg1: #fff18a;
+      --paragraph_color1: #463700;
+      --paragraph_bg2: #91dadd;
+      --paragraph_color2: #043952;
+      --paragraph_bg3: #f995e4;
+      --paragraph_color3: #600255;
+      --paragraph_bg4: #9c8aff;
+      --paragraph_color4: #16295e;
+      --paragraph_bg5: #60e789;
+      --paragraph_color5: #014817;
+      --paragraph_bg6: #ffab12;
+      --paragraph_color6: #373802;
+      --paragraph_bg7: #ff6363;
+      --paragraph_color7: #fff6f6;
       --body_background_color: #f7f7f7;
       --container-color: #ffffff;
     }
@@ -108,6 +111,14 @@
       background-color:var(--paragraph_bg5);
       color: var(--paragraph_color5);
     }
+    .lilbox[data-version="v6"] {
+      background-color:var(--paragraph_bg6);
+      color: var(--paragraph_color6);
+    }
+    .lilbox[data-version="v7"] {
+      background-color:var(--paragraph_bg7);
+      color: var(--paragraph_color7);
+    }
     .ghost {
       box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px, rgba(0, 0, 0, 0.23) 0px 6px 6px;
     }
@@ -134,6 +145,12 @@
         </div>
         <div class="lilbox" data-type="box" data-version="v5" data-text="Hugo">
           <p class="lilbox-text" data-type="box-content" contenteditable="false">Hugo</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v6" data-text="Bob">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Bob</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v7" data-text="Lily">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Lily</p>
         </div>
       </div>
   
@@ -198,6 +215,16 @@
         "type": "box",
         "version": "v5",
         "text": "Hugo"
+      },
+      {
+        "type": "box",
+        "version": "v6",
+        "text": "Bob"
+      },
+      {
+        "type": "box",
+        "version": "v7",
+        "text": "Lily"
       }
     ],
     "content": [
