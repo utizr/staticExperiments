@@ -45,6 +45,8 @@
       --paragraph_color6: #373802;
       --paragraph_bg7: #ff6363;
       --paragraph_color7: #fff6f6;
+      --paragraph_bg8: none;
+      --paragraph_color8: #fff6f6;
 
       --body_background_color: #f7f7f7;
       --container_color: #ffffff;
@@ -127,6 +129,16 @@
       background-color:var(--paragraph_bg7);
       color: var(--paragraph_color7);
     }
+
+    .lilbox[data-version="v8"] {
+      background-color:var(--paragraph_bg8);
+      color: var(--paragraph_color8);
+      font-variant: small-caps;
+      font-weight: bold;
+      font-size: 18px;
+      box-shadow: none;
+    }
+
     .ghost {
       box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px, rgba(0, 0, 0, 0.23) 0px 6px 6px;
     }
@@ -159,6 +171,9 @@
         </div>
         <div class="lilbox" data-type="box" data-version="v7" data-text="Lily">
           <p class="lilbox-text" data-type="box-content" contenteditable="false">Lily</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v8" data-text="Title">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Title</p>
         </div>
       </div>
   
@@ -233,6 +248,11 @@
         "type": "box",
         "version": "v7",
         "text": "Lily"
+      },
+      {
+        "type": "box",
+        "version": "v8",
+        "text": "Title"
       }
     ],
     "content": [
