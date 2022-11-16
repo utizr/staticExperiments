@@ -45,19 +45,27 @@
       --paragraph_color6: #373802;
       --paragraph_bg7: #ff6363;
       --paragraph_color7: #fff6f6;
+
       --body_background_color: #f7f7f7;
-      --container-color: #ffffff;
+      --container_color: #ffffff;
+      --body_background_color_dark: #5e5e5e;
+      --container_color_dark: #6a6a6a;
+      --section_title_color: #e5e2e2;
     }
     body {
-      background-color: var(--body_background_color);
+      background-color: var(--body_background_color_dark);
       padding: 30px;
+    }
+
+    h3 {
+      color: var(--section_title_color);
     }
     .lilbox-container {
       margin: 0px 6px;
       padding: 6px 6px;
       box-shadow: rgba(0, 0, 0, 0.02) 0px 1px 3px 0px, rgba(27, 31, 35, 0.15) 0px 0px 0px 1px;
       min-height: 75px;
-      background-color: var(--container-color);
+      background-color: var(--container_color_dark);
     }
     #paragraph-template-container {
       padding-bottom: 30px;
@@ -394,6 +402,7 @@
     for (const box of boxTexts) {
       box.addEventListener('click', textClick);
       box.addEventListener('blur', textBlur);
+      box.addEventListener('paste', textPaste);
     }
   }
   function setupDragAndDrop() {
@@ -451,6 +460,13 @@
     selection = window.getSelection();//get the selection object (allows you to change selection)
     selection.removeAllRanges();//remove any selections already made
     selection.addRange(range);//make the range you have just created the visible selection
+  }
+
+  function textPaste(e) {
+    e.preventDefault()
+    var text = e.clipboardData.getData('text/plain')
+    console.log("text",text)
+    document.execCommand('insertText', false, text)
   }
   function textBlur(e) {
     const box = e.target.parentElement;
