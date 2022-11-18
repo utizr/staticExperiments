@@ -12,6 +12,7 @@
 
     <link rel="stylesheet" href="./css/pure-min.css">
     <link rel="stylesheet" href="./css/grids-responsive-min.css" />
+    <link rel="stylesheet" href="./css/icons/style.css" />
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
     <script src="./js/sortable.js"></script>
@@ -56,6 +57,8 @@
     }
     body {
       background-color: var(--body_background_color_dark);
+    }
+    #page {
       padding: 30px;
     }
 
@@ -77,11 +80,6 @@
       width: 86px;
     }
 
-    #button-reset {
-      position: absolute;
-      top: 0;
-      right:0;
-    }
     .lilbox {
       border-radius: 6px;
       margin: 12px;
@@ -142,12 +140,42 @@
     .ghost {
       box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px, rgba(0, 0, 0, 0.23) 0px 6px 6px;
     }
+
+    #main-menu.pure-menu .symbol {
+      font-size: 1.7em;
+    }
+
+    .pure-menu .symbol {
+      text-transform: none;
+    }
+
+    .pure-menu-link {
+      background: none;
+      border: none;
+      color: white;
+    }
+    .pure-menu-link:hover {
+      background: white;
+      color: black;
+    }
+    .pure-menu-link:focus {
+      background: none;
+    }
   
   </style>
 
   <body>
+    
 
-    <button id="button-reset" class="button-small pure-button">Reset</button>
+    <div id="main-menu" class="pure-menu pure-menu-horizontal">
+      <a class="pure-menu-heading pure-menu-link"><div class="lsf symbol">menu</div></a>
+      <ul class="pure-menu-list menu-list">
+          <li class="pure-menu-item">
+              <a href="#" id="button-reset" class="pure-menu-link"><div class="lsf symbol">refresh</div></a>
+          </li>
+      </ul>
+    </div>
+
     <div id="page">
 
       <div id="paragraph-template-container">
@@ -179,19 +207,19 @@
   
       <div data-type="box-container" class="pure-g">
         <div data-type="box-section" data-title="ACT 1" class="pure-u-1 pure-u-lg-1-3">
-          <h3>ACT 1</h3>
+          <h3 class="box-section-title">ACT 1</h3>
           <div id="sort-test" class="lilbox-container">
             <!-- boxes come here  -->
           </div>
         </div>
         <div data-type="box-section" data-title="ACT 2" class="pure-u-1 pure-u-lg-1-3">
-          <h3>ACT 2</h3>
+          <h3 class="box-section-title">ACT 2</h3>
           <div class="lilbox-container">
             <!-- boxes come here  -->
           </div>
         </div>
         <div data-type="box-section" data-title="ACT 3" class="pure-u-1 pure-u-lg-1-3">
-          <h3>ACT 3</h3>
+          <h3 class="box-section-title">ACT 3</h3>
           <div class="lilbox-container">
             <!-- boxes come here  -->
           </div>
@@ -330,7 +358,7 @@
 
     const sectionTop = `
       <div data-type="box-section" data-title="${title}" class="pure-u-1 ${breakIntoTwoColumns} pure-u-${sectionSize}-1-${sectionFactor}">
-        <h3>${title}</h3>
+        <h3 class="box-section-title">${title}</h3>
         <div class="lilbox-container">
           <!-- boxes come here  -->
     `
@@ -409,20 +437,27 @@
     templateContainer = document.getElementById('paragraph-template-container');
     boxContainer = document.querySelector('[data-type="box-container"]');
     setupBoxes();
+    setupSections();
     setupDragAndDrop();
   }
 
   function setupBoxes() {
-    const boxes = document.getElementsByClassName('lilbox');
-    for (const box of boxes) {
-      box.addEventListener('input', updateValue);
-    }
     const boxTexts = document.getElementsByClassName('lilbox-text');
 
     for (const box of boxTexts) {
-      box.addEventListener('click', textClick);
-      box.addEventListener('blur', textBlur);
+      box.addEventListener('click', boxClick);
+      box.addEventListener('blur', boxBlur);
       box.addEventListener('paste', textPaste);
+    }
+  }
+
+  function setupSections() {
+    const sectionTexts = document.getElementsByClassName('box-section-title');
+
+    for (const sectionText of sectionTexts) {
+      sectionText.addEventListener('click', sectionClick);
+      sectionText.addEventListener('blur', sectionBlur);
+      sectionText.addEventListener('paste', textPaste);
     }
   }
   function setupDragAndDrop() {
@@ -440,8 +475,9 @@
       delayOnTouchOnly: true, // only delay if user is using touch
       // Element dragging ended
       onEnd: function (/**Event*/evt) {
-        setupBoxes()
-        saveState()
+        setupBoxes();
+        setupSections();
+        saveState();
       },
     });
 
@@ -455,16 +491,33 @@
         delay: 70, // time in milliseconds to define when the sorting should start
         delayOnTouchOnly: true, // only delay if user is using touch
         onEnd: function (/**Event*/evt) {
-          setupBoxes()
-          saveState()
+          setupBoxes();
+          setupSections();
+          saveState();
         },
       });
     }
   }
 
-  // handlers
-  function updateValue(e) {
-    // console.log(e.target.innerHTML);
+  function boxClick(e) {
+    textClick(e);
+  }
+
+  function boxBlur(e) {
+    textBlur(e);
+    const box = e.target.parentElement;
+    box.dataset.text = e.target.innerHTML;
+    saveState();
+  }
+
+  function sectionClick(e) {
+    textClick(e);
+  }
+  function sectionBlur(e) {
+    textBlur(e);
+    const section = e.target.parentElement;
+    section.dataset.title = e.target.innerHTML;
+    saveState();
   }
 
   function textClick(e) {
@@ -485,32 +538,37 @@
   function textPaste(e) {
     e.preventDefault()
     var text = e.clipboardData.getData('text/plain')
-    console.log("text",text)
     document.execCommand('insertText', false, text)
   }
   function textBlur(e) {
     const box = e.target.parentElement;
     if(e.target.innerHTML.trim() == '') {
       box.remove();
-      saveState();
       return
     }
     e.target.contentEditable = "false";
-    box.dataset.text = e.target.innerHTML;
+  }
+
+  function resetState(e) {
+    e.preventDefault();
+    loadState(pageDataTemplate);
     saveState();
   }
 
-  function resetState() {
-    loadState(pageDataTemplate)
-    saveState();
+  function resetFocus(e) {
+    e.preventDefault();
+    e.target.blur();
   }
   
   // INI:
   setupBoxes()
+  setupSections()
   setupDragAndDrop()
 
   loadState()
   buttonReset.addEventListener('click', resetState);
+  buttonReset.addEventListener('mousedown', resetFocus);
+  
 
   </script>
   </body>
