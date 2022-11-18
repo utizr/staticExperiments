@@ -1,0 +1,88 @@
+acts:
+  - title: ACT I
+    blocks:
+      - title: Block 1
+        description: This block will introduce the protagonist and their ordinary world (Setup)
+        chapters:
+          - title: 1 – Introduction
+            description: introduce the main character(s) and their normal world (setup)
+          - title: 2 – Inciting Incidenten
+            description: something happens to disrupt the status quo (conflict)
+          - title: 3 – Immediate Reaction
+            description: main character(s) react to the inciting incident (resolution)
+      - title: Block 2
+        description: In this block, a problem disrupts the protagonist's normal life (Conflict)
+        chapters:
+          - title: 4 – Reaction
+            description: The main character(s) plan what they should do (setup)
+          - title: 5 – Action
+            description: Something prevents the character(s) from implementing their plan (conflict)
+          - title: 6 – Consequence
+            description: The result of the character(s) plan being hindered(resolution)
+      - title: Block 3
+        description: This block focuses on how the protagonist's life has changed (Resolution)
+        chapters:
+          - title: 7 – Pressure
+            description: Something happens to add pressure to the situation (setup)
+          - title: 8 – Pinch
+            description: The antagonistic forces of the story become better known (conflict)
+          - title: 9 – Push
+            description: The character(s) move into a new world/are now changed forever (resolution)
+  - title: ACT II
+    blocks:
+      - title: Block 4
+        description: In this block the protagonist explores their new world (Setup)
+        chapters:
+          - title: 10 – New World
+            description: The character(s) explore new world/new way of seeing the world (setup)
+          - title: 11 – Fun and Games
+            description: The character(s) develop through bonding, having fun and learning about themselves and their environment (event/conflict)
+          - title: 12 – Old World Contrast
+            description: Show how the new world is so different from what the character(s) knew before (resolution)
+      - title: Block 5
+        description: In this block the protagonist discovers the crisis of the new world (Conflict)
+        chapters:
+          - title: 13 – Build Up
+            description: Secrets are revealed (setup)
+          - title: 14 – Midpoint
+            description: Something makes everything change… again (conflict)
+          - title: 15 – Reversal
+            description: Something that has appeared to be one thing, turns out to be something else, e.g. good guy is really a bad guy (resolution)
+      - title: Block 6
+        description: Here the protagonists dedicate themselves to finding a solution (resolution)
+        chapters:
+          - title: 16 – Reaction
+            description: The character(s) react to the reversal (setup)
+          - title: 17 – Action
+            description: Action is taken against the events in the reversal (conflict)
+          - title: 18 – Dedication
+            description: The character(s) regroup. They gather supplies they need, learn skills they need to learn (resolution)
+  - title: ACT III
+    blocks:
+      - title: Block 7
+        description: Here the protagonist faces defeat and victory seems impossible (Setup)
+        chapters:
+          - title: 19 – Trials
+            description: The Character(s) know what they must do now, what they must overcome (setup)
+          - title: 20 – Pinch
+            description: Somebody or something gets in the way of the character(s) doing what they need to do (event/conflict)
+          - title: 21 – Darkest Moment
+            description: All seems lost (resolution)
+      - title: Block 8
+        description: Here the protagonist must find power and take action (Conflict)
+        chapters:
+          - title: 22 – Power Within
+            description: The character(s) rally and refuse to give up (setup)
+          - title: 23 – Action
+            description: The antagonistic forces rear their ugly head again and must be thwarted (conflict)
+          - title: 24 – Converge
+            description: The character(s) gather themselves for a sort of last supper (resolution)
+      - title: Block 9
+        description: Here the protagonist fights, wins and resolves the quest (Resolution)
+        chapters:
+          - title: 25 – Battle
+            description: The time has come for the final battle (can be literal or figurative) (setup)
+          - title: 26 – Climax
+            description: The battle is either lost or won (depending on the type of story you're telling) (conflict)
+          - title: 27 – Resolution
+            description: The aftermath of the battle, the character(s) have grown into different people from those at the beginning of the story (resolution)
