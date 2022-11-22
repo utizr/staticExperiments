@@ -59,7 +59,7 @@ h3 {
 }
 #paragraph-template-container .lilbox {
   display: inline-block;
-  width: 86px;
+  min-width: 86px;
 }
 
 .lilbox {

@@ -109,7 +109,55 @@
   const itemContextMenu = document.getElementById('item-context-menu');
 
   const buttonReset = document.getElementById("button-reset");
+  const buttonBack = document.getElementById("item-button-back");
+  const buttonDelete = document.getElementById("item-button-delete");
+  const buttonCopy = document.getElementById("item-button-copy");
 
+
+
+  let itemBeingEdited = null;
+  let menuClick = false;
+
+  function menuIn(e) {
+    console.log("mouseDown")
+    menuClick = true;
+  }
+  function menuOut(e) {
+    if(!menuClick) {
+      return
+    }
+    console.log("mouseUp",e.target.id || e.target)
+    menuClick = false;
+    hideIconContextMenu()
+    // TODO this does not work for some reason.
+    // loadState()
+  }
+
+  function copyHandler(e) {
+    copyedElement = itemBeingEdited.cloneNode(true)
+    itemBeingEdited.parentNode.insertBefore(copyedElement, itemBeingEdited.nextSibling);
+    saveState()
+    loadState()
+  }
+
+
+  function deleteHandler(e) {
+    itemBeingEdited.remove()
+    saveState()
+    loadState()
+  }
+
+  buttonDelete.addEventListener('click', deleteHandler);
+  buttonDelete.addEventListener('mousedown', menuIn);
+  buttonDelete.addEventListener('mouseup', menuOut);
+  buttonDelete.addEventListener('blur', menuOut);
+
+  buttonCopy.addEventListener('click', copyHandler);
+  buttonCopy.addEventListener('mousedown', menuIn);
+  buttonCopy.addEventListener('mouseup', menuOut);
+  buttonCopy.addEventListener('blur', menuOut);
+
+  
 
   let pageDataTemplate = {
     "templates": [
@@ -203,7 +251,6 @@
   }
 
   function templateBox(text, version) {
-    console.log("loading Text",text)
     return `
     <div class="lilbox" data-type="box" data-version="${version}" data-text="${encodeHTMLEntities(text)}">
       <p class="lilbox-text" data-type="box-content" contenteditable="false">${decodeURI(text)}</p>
@@ -275,7 +322,7 @@
     }
     pageData = result
     localStorage.setItem("pageData", JSON.stringify(pageData))
-    console.log("state saved")
+    console.log("State saved")
   }
 
   function loadState(state) {
@@ -310,6 +357,7 @@
     setupBoxes();
     setupSections();
     setupDragAndDrop();
+    console.log("State loaded")
   }
 
   function setupBoxes() {
@@ -331,6 +379,7 @@
       sectionText.addEventListener('paste', textPaste);
     }
   }
+
   function setupDragAndDrop() {
   
     Sortable.create(templateContainer, {
@@ -398,6 +447,7 @@
     if(elem.contentEditable == "true") {
       return;
     }
+    itemBeingEdited = e.target.parentElement;
     elem.contentEditable = "true";
     elem.focus();
     const range = document.createRange();//Create a range (a range is a like the selection but invisible)
@@ -423,8 +473,14 @@
     document.execCommand('insertHTML', false, encodeHTMLEntities(text))
   }
 
-  function textBlur(e) {
+  function hideIconContextMenu() {
     itemContextMenu.style.display = 'none';
+  }
+  function textBlur(e) {
+    if (menuClick) {
+      return false;
+    }
+    hideIconContextMenu()
     const box = e.target.parentElement;
     if(e.target.innerHTML.trim() == '') {
       box.remove();
