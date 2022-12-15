@@ -1,0 +1,34 @@
+html {
+    font-size: 16px;
+}
+body {
+    padding: 2rem;
+}
+#results, #riddle {
+    max-width: 34rem;
+    padding: 2rem 0rem;
+    position:relative;
+}
+.icon-wrapper {
+    display: inline-block;
+    width: 3.4rem;
+    height: 3.4rem;
+    padding: 0.7rem;
+}
+
+#riddle {
+    margin-top: 1rem;
+    min-height: 4.9rem;
+    padding: 0em;
+    border: 1px dashed #666;
+}
+
+.icon {
+    font-size: 2.7rem;
+    display: inline-block;
+    padding: 0;
+    padding-top: 0.2rem;
+    width: 3.4rem;
+    height: 3.2rem;
+    text-align: center;
+}

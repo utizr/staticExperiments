@@ -1,0 +1,159 @@
+{
+    "templates": [
+        {
+            "type": "box",
+            "version": "v1",
+            "text": "Gusztáv"
+        },
+        {
+            "type": "box",
+            "version": "v2",
+            "text": "Marci"
+        },
+        {
+            "type": "box",
+            "version": "v3",
+            "text": "Julia"
+        },
+        {
+            "type": "box",
+            "version": "v4",
+            "text": "Albert"
+        },
+        {
+            "type": "box",
+            "version": "v5",
+            "text": "Hugo"
+        },
+        {
+            "type": "box",
+            "version": "v6",
+            "text": "Bob"
+        },
+        {
+            "type": "box",
+            "version": "v7",
+            "text": "Lily"
+        },
+        {
+            "type": "box",
+            "version": "v8",
+            "text": "Title"
+        },
+        {
+            "type": "box",
+            "version": "v9",
+            "text": "Note"
+        }
+    ],
+    "content": [
+        {
+            "type": "section",
+            "title": "ACT%201:%20The%20Setup",
+            "content": [
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Exposition"
+                },
+                {
+                    "type": "box",
+                    "version": "v5",
+                    "text": "Show%20the%20hero%20in%20his/her%20normal%20world,%20show%20the%20flaws%20and%20what%20he%20wants."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Inciting%20Incident"
+                },
+                {
+                    "type": "box",
+                    "version": "v5",
+                    "text": "The%20hero%20is%20presented%20with%20an%20adventure."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Plot%20point%20One"
+                },
+                {
+                    "type": "box",
+                    "version": "v7",
+                    "text": "The%20hero%20makes%20the%20choice%20to%20embrace%20the%20opportunity%20presented%20by%20the%20inciting%20incident.%20This%20throws%20the%20hero%20into%20a%20new%20world."
+                }
+            ]
+        },
+        {
+            "type": "section",
+            "title": "ACT%202:%20The%20Conflict",
+            "content": [
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Rising%20Action"
+                },
+                {
+                    "type": "box",
+                    "version": "v5",
+                    "text": "The%20hero%20gets%20to%20know%20the%20new%20word,%20makes%20allies%20and%20enemies,%20and%20face%20challenges.%20The%20hero%20is%20mostly%20responsive%20to%20the%20new%20things%20happening%20to%20him."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Midpoint"
+                },
+                {
+                    "type": "box",
+                    "version": "v1",
+                    "text": "Something%20big%20happens%20here,%20and%20mostly%20bad.%20It%20shows%20the%20hero%20a%20new%20grave%20danger."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Plot%20Point%20two"
+                },
+                {
+                    "type": "box",
+                    "version": "v7",
+                    "text": "This%20is%20the%20point%20where%20the%20hero%20is%20becoming%20active,%20and%20initiates%20things.%20He%20prepares%20to%20face%20the%20danger."
+                }
+            ]
+        },
+        {
+            "type": "section",
+            "title": "ACT%203:%20The%20Resolution",
+            "content": [
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Pre-Climax"
+                },
+                {
+                    "type": "box",
+                    "version": "v5",
+                    "text": "All%20is%20lost.%20The%20hero%20faces%20the%20challenge%20and%20his%20deepest%20fears%20and%20weaknesses,%20but%20appears%20to%20loose,%20this%20is%20the%20darkest%20moment."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Climax"
+                },
+                {
+                    "type": "box",
+                    "version": "v1",
+                    "text": "The&nbsp;hero%20rises%20from%20the%20ashes%20and%20prevails."
+                },
+                {
+                    "type": "box",
+                    "version": "v8",
+                    "text": "Denouement"
+                },
+                {
+                    "type": "box",
+                    "version": "v7",
+                    "text": "The%20character%20arc%20is%20complete,%20promises%20are%20tied%20up.%20Shows%20how%20the%20hero%20has%20grown,%20and%20changed."
+                }
+            ]
+        }
+    ]
+}

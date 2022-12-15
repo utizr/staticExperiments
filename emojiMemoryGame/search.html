@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+
+  <!-- csss framework documentation -->
+  <!-- https://purecss.io/grids/ -->
+
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emojis</title>
+
+    <link rel="stylesheet" href="./css/pure-min.css">
+    <link rel="stylesheet" href="./css/page.css" />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
+    <script src="./js/emojis.js"></script>
+</head>
+
+
+  <body>
+
+    <div id="content">
+        <form id="search-form" class="pure-form">
+            <input id="search-input" type="text" placeholder="search.."/>
+            <input id="exclude-input" type="text" placeholder="exclude.."/>
+            <button class="pure-button" type="submit">Submit</button>
+        </form>
+        <a id="random-button" class="pure-button" href="#">Random</a>
+        <div id="results"></div>
+    </div>
+
+
+  <script>
+    const excludeIntput = document.getElementById("exclude-input")
+    const searchIntput = document.getElementById("search-input")
+    const resultContainer = document.getElementById("results")
+
+    function search(e) {
+        e.preventDefault()
+        const searchText = searchIntput.value
+        const excludeWords = excludeIntput.value.split(" ")
+        
+        const filteredEmojis = emojis.filter((emoji) => {
+            const isInSearch = emoji.tags.indexOf(searchText) !== -1
+            const excluded = !!excludeWords.find( (excludeWord) => {
+                return emoji.tags.indexOf(excludeWord) !== -1
+            })
+            return isInSearch && !excluded
+        })
+        const emojiHTML = filteredEmojis.reduce(function (result, emoji) {
+            return result + "<span class=\"icon\" title=\"" +emoji.group +"\n"+ emoji.subgroup +"\n"+ emoji.tags +"\">"  + emoji.code + "</span>";
+        }, "");
+        
+        resultContainer.innerHTML = emojiHTML
+    }
+
+    function random(e) {
+        e.preventDefault()
+        const resultEmojis = []
+        const excludeWords = "skin flags symbol".split(" ")
+        const filteredEmojis = emojis.filter((emoji) => {
+            const excluded = !!excludeWords.find( (excludeWord) => {
+                return emoji.tags.indexOf(excludeWord) !== -1
+            })
+            return !excluded
+        })
+
+        const randomIndexes = []
+        for (let i = 0; i < 35; i++) {
+            let randomIndex = null
+            do {
+                randomIndex = Math.floor(Math.random()*filteredEmojis.length)
+            } while (randomIndexes.includes(randomIndex)) ;
+            randomIndexes.push(randomIndex)
+            resultEmojis.push(filteredEmojis[randomIndex])
+        }
+
+        const emojiHTML = resultEmojis.reduce(function (result, emoji) {
+            return result + "<span class=\"icon\" title=\"" +emoji.group +"\n"+ emoji.subgroup +"\n"+ emoji.tags +"\">"  + emoji.code + "</span>";
+        }, "");
+        
+        resultContainer.innerHTML = emojiHTML
+    }
+
+    document.getElementById("search-form").onsubmit = search
+    document.getElementById("random-button").onclick = random
+  </script>
+  </body>
+
+</html>

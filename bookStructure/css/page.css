@@ -1,12 +1,3 @@
-
-/* :root {
---paragraph_bg1_gray: #282828;
---paragraph_color1_gray: #a3a3a3;
-
---paragraph_bg1: #99ad30;
---paragraph_color1: #000000;
---body_background_color: #4a4a4a;
-} */
 :root {
 --paragraph_bg1_gray: #282828;
 --paragraph_color1_gray: #a3a3a3;
@@ -27,6 +18,8 @@
 --paragraph_color7: #fff6f6;
 --paragraph_bg8: none;
 --paragraph_color8: #fff6f6;
+--paragraph_bg9: none;
+--paragraph_color9: #ece5e5;
 
 --body_background_color: #f7f7f7;
 --container_color: #ffffff;
@@ -46,6 +39,10 @@ body {
 
 h3 {
   color: var(--section_title_color);
+  font-size: 1.3em;
+  padding-left: 5px;
+  font-variant: small-caps;
+  font-family: Georgia;
 }
 .lilbox-container {
   border-radius: 3px;
@@ -65,16 +62,16 @@ h3 {
 
 .lilbox {
   border-radius: 6px;
-  margin: 12px;
+  margin: 8px;
   padding: 0 4px;
 
   font-family: Georgia;
-  font-size: 1.1em;
+  font-size: 1em;
   box-shadow: rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;
 }
 .lilbox p {
   margin:0;
-  padding: 12px 12px;
+  padding: 8px 8px;
 }
 .lilbox-container .lilbox {
   padding:0;
@@ -116,7 +113,19 @@ h3 {
   color: var(--paragraph_color8);
   font-variant: small-caps;
   font-weight: bold;
-  font-size: 18px;
+  font-size: 1.25em;
+  box-shadow: none;
+}
+
+.lilbox[data-version="v8"] p {
+  padding: 6px 2px;
+}
+
+.lilbox[data-version="v9"] {
+  background-color:var(--paragraph_bg9);
+  color: var(--paragraph_color9);
+  border: 1px solid #888;
+  font-size: 1em;
   box-shadow: none;
 }
 

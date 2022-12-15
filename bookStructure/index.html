@@ -101,6 +101,10 @@
 
   <script>
 
+  // variables
+  let pageData = null
+  let itemBeingEdited = null;
+  let menuClick = false;
 
   // getting base elements:
   const pageContainer = document.getElementById('page');
@@ -114,14 +118,11 @@
   const buttonCopy = document.getElementById("item-button-copy");
 
 
-
-  let itemBeingEdited = null;
-  let menuClick = false;
-
   function menuIn(e) {
     console.log("mouseDown")
     menuClick = true;
   }
+
   function menuOut(e) {
     if(!menuClick) {
       return
@@ -134,6 +135,7 @@
   }
 
   function copyHandler(e) {
+    e.preventDefault();
     copyedElement = itemBeingEdited.cloneNode(true)
     itemBeingEdited.parentNode.insertBefore(copyedElement, itemBeingEdited.nextSibling);
     saveState()
@@ -142,6 +144,7 @@
 
 
   function deleteHandler(e) {
+    e.preventDefault();
     itemBeingEdited.remove()
     saveState()
     loadState()
@@ -157,7 +160,20 @@
   buttonCopy.addEventListener('mouseup', menuOut);
   buttonCopy.addEventListener('blur', menuOut);
 
+  // MAIN MENU
+  function resetState(e) {
+    e.preventDefault();
+    loadState(pageDataTemplate);
+  }
+
+  function resetFocus(e) {
+    e.preventDefault();
+    e.target.blur();
+  }
   
+  buttonReset.addEventListener('click', resetState);
+  buttonReset.addEventListener('mousedown', resetFocus);
+
 
   let pageDataTemplate = {
     "templates": [
@@ -200,6 +216,11 @@
         "type": "box",
         "version": "v8",
         "text": "Title"
+      },
+      {
+        "type": "box",
+        "version": "v9",
+        "text": "Note"
       }
     ],
     "content": [
@@ -220,7 +241,7 @@
       }
     ]
   }
-  let pageData = null
+
 
   // templates
 
@@ -358,6 +379,9 @@
     setupSections();
     setupDragAndDrop();
     console.log("State loaded")
+    if(state) {
+      saveState()
+    }
   }
 
   function setupBoxes() {
@@ -489,16 +513,7 @@
     e.target.contentEditable = "false";
   }
 
-  function resetState(e) {
-    e.preventDefault();
-    loadState(pageDataTemplate);
-    saveState();
-  }
-
-  function resetFocus(e) {
-    e.preventDefault();
-    e.target.blur();
-  }
+ 
   
   // INI:
   setupBoxes()
@@ -506,8 +521,7 @@
   setupDragAndDrop()
 
   loadState()
-  buttonReset.addEventListener('click', resetState);
-  buttonReset.addEventListener('mousedown', resetFocus);
+
   
 
   </script>

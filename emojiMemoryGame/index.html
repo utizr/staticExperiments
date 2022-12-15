@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+
+  <!-- csss framework documentation -->
+  <!-- https://purecss.io/grids/ -->
+
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emojis</title>
+
+    <link rel="stylesheet" href="./css/pure-min.css">
+    <link rel="stylesheet" href="./css/page.css" />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
+    <script src="./js/emojis.js"></script>
+  </head>
+
+
+  <body>
+
+    <div id="content">
+        <div class="pure-menu pure-menu-horizontal">
+          <ul class="pure-menu-list">
+              <li class="pure-menu-item">
+                <a id="new-button" href="#" class="pure-menu-link">New</a>
+              </li>
+              <li class="pure-menu-item">
+                <a id="start-button" href="#" class="pure-menu-link">Start Game</a>
+              </li>
+              <li class="pure-menu-item">
+                  <a id="show-button" href="#" class="pure-menu-link">Show</a>
+              </li>
+              <li class="pure-menu-item pure-menu-has-children pure-menu-allow-hover">
+                <a href="#" id="level-button" class="pure-menu-link">Level (1)</a>
+                <ul class="pure-menu-children">
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setLevel(event, 1)" class="pure-menu-link">Level 1</a>
+                  </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setLevel(event, 2)" class="pure-menu-link">Level 2</a>
+                  </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setLevel(event, 3)" class="pure-menu-link">Level 3</a>
+                  </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setLevel(event, 4)" class="pure-menu-link">Level 4</a>
+                  </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setLevel(event, 5)" class="pure-menu-link">Level 5</a>
+                  </li>
+                </ul>
+            </li>
+          </ul>
+      </div>
+
+
+        <div id="riddle"></div>
+        <div id="results"></div>
+    </div>
+
+
+  <script>
+    const riddleContainer = document.getElementById("riddle")
+    const resultContainer = document.getElementById("results")
+    const newButton = document.getElementById("new-button")
+    const startButton = document.getElementById("start-button")
+    const showButton = document.getElementById("show-button")
+    const levelButton = document.getElementById("level-button")
+
+    let gameState = {
+      level: 1,
+      status: 'ini',
+      emojis: [],
+      riddleEmojis: [], // this contains the riddle 
+    }
+
+    function setLevel(e, level) {
+      e.preventDefault()
+      gameState.level = level
+      levelButton.innerHTML = `Level (${level})`
+      newGame()
+      setStage()
+    }
+    function handleButtonEventDefault(e) {
+      if (!e) {
+        return
+      }
+      e.preventDefault()
+      e.target.blur()
+    }
+    function setStage() {
+      // buttons
+      switch (gameState.status) {
+        case 'ini':
+          newButton.innerHTML = 'New'
+          startButton.style.display = 'none'
+          showButton.style.display = 'none'
+          break;
+        case 'playing':
+          newButton.innerHTML = 'New'
+          startButton.style.display = 'inline-block'
+          startButton.innerHTML = 'Reset Game'
+          showButton.style.display = 'inline-block'
+          break;
+        case 'showingRiddle':
+          newButton.innerHTML = 'New'
+          startButton.style.display = 'inline-block'
+          startButton.innerHTML = 'Start Game'
+          showButton.style.display = 'none'
+          break;
+        default:
+          break;
+      }
+
+      // riddle block
+      riddleContainer.style.minHeight = gameState.level * 5 + "rem"
+     
+    }
+    // notes:
+    // resultContainer.querySelectorAll('[data-id="128664"]')
+    function iconClickHandler(e, icon) {
+      if (icon.dataset.empty) {
+        return false
+      }
+      e.preventDefault()
+      const clone = icon.cloneNode(true)
+      riddleContainer.appendChild(clone)
+      icon.firstChild.style.visibility = 'hidden'
+      icon.dataset.empty = 'true'
+      validateResolution()
+    }
+
+    function addBehaviour() {
+      const icons = document.querySelectorAll('.icon-wrapper')
+
+      icons.forEach( (icon) => {
+        icon.onclick = function(e) {iconClickHandler(e, icon)}
+      })
+
+    }
+
+    function getRandomEmojis(count) {
+      const resultEmojis = []
+      const excludeWords = "skin flags symbol".split(" ")
+        const filteredEmojis = emojis.filter((emoji) => {
+            const excluded = !!excludeWords.find( (excludeWord) => {
+                return emoji.tags.indexOf(excludeWord) !== -1
+            })
+            return !excluded
+        })
+
+        const randomIndexes = []
+        for (let i = 0; i < count; i++) {
+            let randomIndex = null
+            do {
+                randomIndex = Math.floor(Math.random()*filteredEmojis.length)
+            } while (randomIndexes.includes(randomIndex)) ;
+            randomIndexes.push(randomIndex)
+            resultEmojis.push(filteredEmojis[randomIndex])
+        }
+        resultEmojis.forEach((emoji) => {emoji.id = createEmojiID(emoji.code)})
+        return resultEmojis
+    }
+
+    function createEmojiID(emojiCode) {
+      return emojiCode.replace(/^&#/, '').replace(';','').replace(/&#/g,'-')
+    }
+
+    function validateResolution() {
+      let status = 'playing'
+      const guessedIcons = riddleContainer.querySelectorAll('.icon-wrapper')
+      guessedIconIDs = []
+      for (let i = 0; i < guessedIcons.length; i++) {
+        const element = guessedIcons[i];
+        guessedIconIDs.push(element.dataset.id)
+      }
+
+      for (let i = 0; i < guessedIconIDs.length; i++) {
+        const guessedEmojiID = guessedIconIDs[i];
+        const resultEmojiID = gameState.resolution[i];
+        
+        if (guessedEmojiID != resultEmojiID) {
+          const badIcon = riddleContainer.querySelector(`[data-id="${guessedEmojiID}"]`)
+          badIcon.style.background = 'red'
+          status = 'lost'
+        }
+      }
+      if (status != 'lost' && guessedIconIDs.length == gameState.resolution.length) {
+        status = 'won'
+      }
+      gameState.status = status
+    }
+
+    function newGame(e) {
+      handleButtonEventDefault(e)
+      gameState.emojis = getRandomEmojis(35)
+      gameState.riddleEmojis = gameState.emojis.slice(0, 7 * gameState.level)
+      gameState.resolution = gameState.riddleEmojis.map( (emo) => emo.id)
+      gameState.emojis = gameState.emojis.sort(() => 0.3 - Math.random())
+      gameState.emojis = gameState.emojis.sort(() => 0.7 - Math.random())
+
+      const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
+          return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
+      }, "");
+      
+      resultContainer.innerHTML = ''
+      riddleContainer.innerHTML = riddleEmojiHTML
+
+      gameState.status = 'showingRiddle'
+      setStage()
+    }
+    function showRiddle(e) {
+      handleButtonEventDefault(e)
+      const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
+          return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
+      }, "");
+      
+      resultContainer.innerHTML = ''
+      riddleContainer.innerHTML = riddleEmojiHTML
+
+      gameState.status = 'showingRiddle'
+      setStage()
+    }
+
+    function startGame(e) {
+      handleButtonEventDefault(e)
+      const allEmojiHTML = gameState.emojis.reduce(function (result, emoji) {
+          return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
+      }, "");
+
+      resultContainer.innerHTML = allEmojiHTML
+      riddleContainer.innerHTML = ''
+      addBehaviour()
+      gameState.status = 'playing'
+      setStage()
+    }
+
+    newButton.onclick = newGame
+    startButton.onclick = startGame
+    showButton.onclick = showRiddle
+    setStage()
+  </script>
+  </body>
+
+</html>
