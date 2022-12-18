@@ -2,7 +2,7 @@ html {
     font-size: 16px;
 }
 body {
-    padding: 2rem;
+    padding: 1rem;
 }
 #results, #riddle {
     max-width: 34rem;
