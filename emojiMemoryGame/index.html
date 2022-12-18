@@ -69,10 +69,10 @@
     const menuContainer = document.getElementById("menu")
     const riddleContainer = document.getElementById("riddle")
     const resultContainer = document.getElementById("results")
-    const newButton = document.getElementById("new-button")
-    const startButton = document.getElementById("start-button")
-    const showButton = document.getElementById("show-button")
-    const levelButton = document.getElementById("level-button")
+    let newButton = document.getElementById("new-button")
+    let startButton = document.getElementById("start-button")
+    let showButton = document.getElementById("show-button")
+    let levelButton = document.getElementById("level-button")
 
     let gameState = {
       level: 1,
@@ -89,9 +89,6 @@
       // levelButton.innerHTML = `Level (${level})`
       newGame()
       // hack to remove hover effect on phones
-      const menuHTMLContent = menuContainer.innerHTML
-      menuContainer.innerHTML = ''
-      menuContainer.innerHTML = menuHTMLContent
       setStage()
     }
 
@@ -111,6 +108,13 @@
       e.target.blur()
     }
     function setStage() {
+      const menuHTMLContent = menuContainer.innerHTML
+      menuContainer.innerHTML = ''
+      menuContainer.innerHTML = menuHTMLContent
+      newButton = document.getElementById("new-button")
+      startButton = document.getElementById("start-button")
+      showButton = document.getElementById("show-button")
+      levelButton = document.getElementById("level-button")
       // buttons
       switch (gameState.status) {
         case 'ini':
