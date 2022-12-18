@@ -27,7 +27,7 @@
                 <a id="new-button" href="#" class="pure-menu-link">New</a>
               </li>
               <li class="pure-menu-item">
-                <a id="start-button" href="#" class="pure-menu-link">Start Game</a>
+                <a id="start-button" href="#" class="pure-menu-link">Start</a>
               </li>
               <li class="pure-menu-item">
                   <a id="show-button" href="#" class="pure-menu-link">Show</a>
@@ -117,13 +117,13 @@
         case 'playing':
           newButton.innerHTML = 'New'
           startButton.style.display = 'inline-block'
-          startButton.innerHTML = 'Reset Game'
+          startButton.innerHTML = 'Reset'
           showButton.style.display = 'inline-block'
           break;
         case 'showingRiddle':
           newButton.innerHTML = 'New'
           startButton.style.display = 'inline-block'
-          startButton.innerHTML = 'Start Game'
+          startButton.innerHTML = 'Start'
           showButton.style.display = 'none'
           riddleContainer.style.background = 'none'
           break;
@@ -144,6 +144,8 @@
       // riddle block
       riddleContainer.style.minHeight = gameState.level * 5 + "rem"
       riddleContainer.style.width = gameState.rowLength * 5 + "rem"
+      resultContainer.style.width = gameState.rowLength * 5 + "rem"
+      
      
     }
     // notes:

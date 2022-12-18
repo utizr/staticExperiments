@@ -2,12 +2,21 @@ html {
     font-size: 16px;
 }
 body {
-    padding: 1rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+}
+#content {
+    display: inline-block;
+    text-align: initial;
+}
+
+#content .pure-menu-link {
+    padding: 0.5em 0.7em;
 }
 #results, #riddle {
     max-width: 34rem;
     padding: 2rem 0rem;
-    position:relative;
+    position: relative;
 }
 .icon-wrapper {
     display: inline-block;
