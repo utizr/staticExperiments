@@ -17,20 +17,19 @@
     <script src="./js/emojis.js"></script>
   </head>
 
-
   <body>
 
     <div id="content">
-        <div class="pure-menu pure-menu-horizontal">
+        <div id="menu" class="pure-menu pure-menu-horizontal">
           <ul class="pure-menu-list">
               <li class="pure-menu-item">
-                <a id="new-button" href="#" class="pure-menu-link">New</a>
+                <a id="new-button" onclick="newGame(event)" href="#" class="pure-menu-link">New</a>
               </li>
               <li class="pure-menu-item">
-                <a id="start-button" href="#" class="pure-menu-link">Start</a>
+                <a id="start-button" onclick="startGame(event)" href="#" class="pure-menu-link">Start</a>
               </li>
               <li class="pure-menu-item">
-                  <a id="show-button" href="#" class="pure-menu-link">Show</a>
+                  <a id="show-button" onclick="showRiddle(event)" href="#" class="pure-menu-link">Show</a>
               </li>
               <li class="pure-menu-item pure-menu-has-children pure-menu-allow-hover">
                 <a href="#" id="level-button" class="pure-menu-link">Level (1)</a>
@@ -67,6 +66,7 @@
 
 
   <script>
+    const menuContainer = document.getElementById("menu")
     const riddleContainer = document.getElementById("riddle")
     const resultContainer = document.getElementById("results")
     const newButton = document.getElementById("new-button")
@@ -88,6 +88,10 @@
       gameState.level = level
       // levelButton.innerHTML = `Level (${level})`
       newGame()
+      // hack to remove hover effect on phones
+      const menuHTMLContent = menuContainer.innerHTML
+      menuContainer.innerHTML = ''
+      menuContainer.innerHTML = menuHTMLContent
       setStage()
     }
 
@@ -268,9 +272,6 @@
       setStage()
     }
 
-    newButton.onclick = newGame
-    startButton.onclick = startGame
-    showButton.onclick = showRiddle
     setStage()
   </script>
   </body>
