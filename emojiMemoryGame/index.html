@@ -181,7 +181,7 @@
 
     function getRandomEmojis(count) {
       const resultEmojis = []
-      const excludeWords = "skin flags symbol o’clock".split(" ")
+      const excludeWords = "skin flags symbol o’clock thirty".split(" ")
         const filteredEmojis = emojis.filter((emoji) => {
             const excluded = !!excludeWords.find( (excludeWord) => {
                 return emoji.tags.indexOf(excludeWord) !== -1
