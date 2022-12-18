@@ -50,11 +50,16 @@
                   <li class="pure-menu-item">
                     <a href="#" onclick="setLevel(event, 5)" class="pure-menu-link">Level 5</a>
                   </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setDifficulty(event, 1)" class="pure-menu-link">Beginner</a>
+                  </li>
+                  <li class="pure-menu-item">
+                    <a href="#" onclick="setDifficulty(event, 2)" class="pure-menu-link">Advanced</a>
+                  </li>
                 </ul>
             </li>
           </ul>
       </div>
-
 
         <div id="riddle"></div>
         <div id="results"></div>
@@ -71,6 +76,8 @@
 
     let gameState = {
       level: 1,
+      rowLength: 4,
+      difficulty: 'Beginner',
       status: 'ini',
       emojis: [],
       riddleEmojis: [], // this contains the riddle 
@@ -79,10 +86,19 @@
     function setLevel(e, level) {
       e.preventDefault()
       gameState.level = level
-      levelButton.innerHTML = `Level (${level})`
+      // levelButton.innerHTML = `Level (${level})`
       newGame()
       setStage()
     }
+
+    function setDifficulty(e, diffictulty) {
+      e.preventDefault()
+      gameState.rowLength = diffictulty == 1 ? 4 : 7
+      gameState.difficulty = diffictulty == 1 ? 'Beginner' : 'Advanced'
+      newGame()
+      setStage()
+    }
+    
     function handleButtonEventDefault(e) {
       if (!e) {
         return
@@ -109,13 +125,25 @@
           startButton.style.display = 'inline-block'
           startButton.innerHTML = 'Start Game'
           showButton.style.display = 'none'
+          riddleContainer.style.background = 'none'
+          break;
+        case 'won':
+          newButton.innerHTML = 'New'
+          startButton.style.display = 'none'
+          showButton.style.display = 'none'
+          riddleContainer.style.background = '#66e466'
           break;
         default:
           break;
       }
 
+      // difficulty level:
+
+      levelButton.innerHTML = `${gameState.difficulty} (${gameState.level})`
+
       // riddle block
       riddleContainer.style.minHeight = gameState.level * 5 + "rem"
+      riddleContainer.style.width = gameState.rowLength * 5 + "rem"
      
     }
     // notes:
@@ -143,7 +171,7 @@
 
     function getRandomEmojis(count) {
       const resultEmojis = []
-      const excludeWords = "skin flags symbol".split(" ")
+      const excludeWords = "skin flags symbol o’clock".split(" ")
         const filteredEmojis = emojis.filter((emoji) => {
             const excluded = !!excludeWords.find( (excludeWord) => {
                 return emoji.tags.indexOf(excludeWord) !== -1
@@ -191,12 +219,13 @@
         status = 'won'
       }
       gameState.status = status
+      setStage()
     }
 
     function newGame(e) {
       handleButtonEventDefault(e)
-      gameState.emojis = getRandomEmojis(35)
-      gameState.riddleEmojis = gameState.emojis.slice(0, 7 * gameState.level)
+      gameState.emojis = getRandomEmojis(gameState.rowLength * 5)
+      gameState.riddleEmojis = gameState.emojis.slice(0, gameState.rowLength * gameState.level)
       gameState.resolution = gameState.riddleEmojis.map( (emo) => emo.id)
       gameState.emojis = gameState.emojis.sort(() => 0.3 - Math.random())
       gameState.emojis = gameState.emojis.sort(() => 0.7 - Math.random())
