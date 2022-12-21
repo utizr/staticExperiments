@@ -192,8 +192,13 @@
             randomIndexes.push(randomIndex)
             resultEmojis.push(filteredEmojis[randomIndex])
         }
-        resultEmojis.forEach((emoji) => {emoji.id = createEmojiID(emoji.code)})
-        return resultEmojis
+        return resultEmojis.map((emoji) => {return {
+          id: createEmojiID(emoji.code),
+          name: emoji.name,
+          code: emoji.code,
+          show: true,
+          valid: true,
+        }})
     }
 
     function createEmojiID(emojiCode) {
@@ -227,8 +232,12 @@
     }
 
     function createNewGameState() {
+      // get a bunch of random emojis
       gameState.allEmojis = getRandomEmojis(gameState.rowLength * 5)
+      // take the first x of the random emojis to be the riddle
+      // that the user has to remember
       gameState.riddleEmojis = gameState.allEmojis.slice(0, gameState.rowLength * gameState.level)
+      // shuffle the emojis
       gameState.allEmojis = gameState.allEmojis.sort(() => 0.3 - Math.random())
       gameState.allEmojis = gameState.allEmojis.sort(() => 0.7 - Math.random())
     }
