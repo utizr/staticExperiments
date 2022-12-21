@@ -61,32 +61,27 @@
       </div>
 
         <div id="riddle"></div>
-        <div id="results"></div>
+        <div id="all-emojis"></div>
     </div>
 
 
   <script>
     const menuContainer = document.getElementById("menu")
     const riddleContainer = document.getElementById("riddle")
-    const resultContainer = document.getElementById("results")
-    let newButton = document.getElementById("new-button")
-    let startButton = document.getElementById("start-button")
-    let showButton = document.getElementById("show-button")
-    let levelButton = document.getElementById("level-button")
+    const allEmojisContainer = document.getElementById("all-emojis")
 
     let gameState = {
       level: 1,
       rowLength: 4,
       difficulty: 'Beginner',
       status: 'ini',
-      emojis: [],
+      allEmojis: [],
       riddleEmojis: [], // this contains the riddle 
     }
 
     function setLevel(e, level) {
       e.preventDefault()
       gameState.level = level
-      // levelButton.innerHTML = `Level (${level})`
       newGame()
       setStage()
     }
@@ -106,15 +101,16 @@
       e.preventDefault()
       e.target.blur()
     }
+
     function setStage() {
       // hack to remove hover effect on phones
       const menuHTMLContent = menuContainer.innerHTML
       menuContainer.innerHTML = ''
       menuContainer.innerHTML = menuHTMLContent
-      newButton = document.getElementById("new-button")
-      startButton = document.getElementById("start-button")
-      showButton = document.getElementById("show-button")
-      levelButton = document.getElementById("level-button")
+      let newButton = document.getElementById("new-button")
+      let startButton = document.getElementById("start-button")
+      let showButton = document.getElementById("show-button")
+      let levelButton = document.getElementById("level-button")
       // buttons
       switch (gameState.status) {
         case 'ini':
@@ -152,9 +148,8 @@
       // riddle block
       riddleContainer.style.minHeight = gameState.level * 5 + "rem"
       riddleContainer.style.width = gameState.rowLength * 5 + "rem"
-      resultContainer.style.width = gameState.rowLength * 5 + "rem"
+      allEmojisContainer.style.width = gameState.rowLength * 5 + "rem"
       
-     
     }
     // notes:
     // resultContainer.querySelectorAll('[data-id="128664"]')
@@ -176,7 +171,6 @@
       icons.forEach( (icon) => {
         icon.onclick = function(e) {iconClickHandler(e, icon)}
       })
-
     }
 
     function getRandomEmojis(count) {
@@ -217,7 +211,7 @@
 
       for (let i = 0; i < guessedIconIDs.length; i++) {
         const guessedEmojiID = guessedIconIDs[i];
-        const resultEmojiID = gameState.resolution[i];
+        const resultEmojiID = gameState.riddleEmojis[i].id;
         
         if (guessedEmojiID != resultEmojiID) {
           const badIcon = riddleContainer.querySelector(`[data-id="${guessedEmojiID}"]`)
@@ -225,38 +219,42 @@
           status = 'lost'
         }
       }
-      if (status != 'lost' && guessedIconIDs.length == gameState.resolution.length) {
+      if (status != 'lost' && guessedIconIDs.length == gameState.riddleEmojis.length) {
         status = 'won'
       }
       gameState.status = status
       setStage()
     }
 
+    function createNewGameState() {
+      gameState.allEmojis = getRandomEmojis(gameState.rowLength * 5)
+      gameState.riddleEmojis = gameState.allEmojis.slice(0, gameState.rowLength * gameState.level)
+      gameState.allEmojis = gameState.allEmojis.sort(() => 0.3 - Math.random())
+      gameState.allEmojis = gameState.allEmojis.sort(() => 0.7 - Math.random())
+    }
+    
     function newGame(e) {
       handleButtonEventDefault(e)
-      gameState.emojis = getRandomEmojis(gameState.rowLength * 5)
-      gameState.riddleEmojis = gameState.emojis.slice(0, gameState.rowLength * gameState.level)
-      gameState.resolution = gameState.riddleEmojis.map( (emo) => emo.id)
-      gameState.emojis = gameState.emojis.sort(() => 0.3 - Math.random())
-      gameState.emojis = gameState.emojis.sort(() => 0.7 - Math.random())
+      createNewGameState()
 
       const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
           return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
       }, "");
       
-      resultContainer.innerHTML = ''
+      allEmojisContainer.innerHTML = ''
       riddleContainer.innerHTML = riddleEmojiHTML
 
       gameState.status = 'showingRiddle'
       setStage()
     }
+
     function showRiddle(e) {
       handleButtonEventDefault(e)
       const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
           return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
       }, "");
       
-      resultContainer.innerHTML = ''
+      allEmojisContainer.innerHTML = ''
       riddleContainer.innerHTML = riddleEmojiHTML
 
       gameState.status = 'showingRiddle'
@@ -265,11 +263,11 @@
 
     function startGame(e) {
       handleButtonEventDefault(e)
-      const allEmojiHTML = gameState.emojis.reduce(function (result, emoji) {
+      const allEmojiHTML = gameState.allEmojis.reduce(function (result, emoji) {
           return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
       }, "");
 
-      resultContainer.innerHTML = allEmojiHTML
+      allEmojisContainer.innerHTML = allEmojiHTML
       riddleContainer.innerHTML = ''
       addBehaviour()
       gameState.status = 'playing'
