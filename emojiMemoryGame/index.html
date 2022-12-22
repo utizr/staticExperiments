@@ -125,6 +125,8 @@
           showButton.style.display = 'inline-block'
           break;
         case 'showingRiddle':
+          drawRiddle()
+          clearAllEmojis()
           newButton.innerHTML = 'New'
           startButton.style.display = 'inline-block'
           startButton.innerHTML = 'Start'
@@ -231,6 +233,18 @@
       setStage()
     }
 
+    function drawRiddle() {
+      const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
+          return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
+      }, "");
+      
+      riddleContainer.innerHTML = riddleEmojiHTML
+    }
+
+    function clearAllEmojis() {
+      allEmojisContainer.innerHTML = ''
+    }
+
     function createNewGameState() {
       // get a bunch of random emojis
       gameState.allEmojis = getRandomEmojis(gameState.rowLength * 5)
@@ -245,14 +259,6 @@
     function newGame(e) {
       handleButtonEventDefault(e)
       createNewGameState()
-
-      const riddleEmojiHTML = gameState.riddleEmojis.reduce(function (result, emoji) {
-          return result + `<span class="icon-wrapper" data-id="${emoji.id}"><span class="icon" title="${emoji.name}">${emoji.code}</span></span>`
-      }, "");
-      
-      allEmojisContainer.innerHTML = ''
-      riddleContainer.innerHTML = riddleEmojiHTML
-
       gameState.status = 'showingRiddle'
       setStage()
     }
