@@ -12,9 +12,11 @@
 
     <link rel="stylesheet" href="./css/pure-min.css">
     <link rel="stylesheet" href="./css/page.css" />
+    <link rel="stylesheet" href="./css/animations.css" />
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦉</text></svg>">
     <script src="./js/emojis.js"></script>
+    <script src="./js/animate.js"></script>
   </head>
 
   <body>
@@ -138,6 +140,7 @@
           startButton.style.display = 'none'
           showButton.style.display = 'none'
           riddleContainer.style.background = '#66e466'
+          animate(riddleContainer, 'jello-vertical')
           break;
         default:
           break;
@@ -156,15 +159,25 @@
     // notes:
     // resultContainer.querySelectorAll('[data-id="128664"]')
     function iconClickHandler(e, icon) {
+      if (gameState.status == 'lost' || gameState.status == 'won') {
+        return
+      }
       if (icon.dataset.empty) {
         return false
       }
       e.preventDefault()
       const clone = icon.cloneNode(true)
       riddleContainer.appendChild(clone)
-      icon.firstChild.style.visibility = 'hidden'
-      icon.dataset.empty = 'true'
-      validateResolution()
+      animate(clone, 'scale-in-center', function (ico, animation) {
+        setTimeout(() => {
+          validateResolution()
+        }, 10);
+      });
+      animate(icon.firstChild, 'scale-out-center', function (ico, animation) {
+        ico.style.visibility = 'hidden'
+        icon.dataset.empty = 'true'
+      });
+      // validateResolution()
     }
 
     function addBehaviour() {
@@ -179,20 +192,20 @@
       const resultEmojis = []
       const excludeWords = "skin flags symbol o’clock thirty".split(" ")
         const filteredEmojis = emojis.filter((emoji) => {
-            const excluded = !!excludeWords.find( (excludeWord) => {
-                return emoji.tags.indexOf(excludeWord) !== -1
-            })
-            return !excluded
+          const excluded = !!excludeWords.find( (excludeWord) => {
+            return emoji.tags.indexOf(excludeWord) !== -1
+          })
+          return !excluded
         })
 
         const randomIndexes = []
         for (let i = 0; i < count; i++) {
-            let randomIndex = null
-            do {
-                randomIndex = Math.floor(Math.random()*filteredEmojis.length)
-            } while (randomIndexes.includes(randomIndex)) ;
-            randomIndexes.push(randomIndex)
-            resultEmojis.push(filteredEmojis[randomIndex])
+          let randomIndex = null
+          do {
+            randomIndex = Math.floor(Math.random()*filteredEmojis.length)
+          } while (randomIndexes.includes(randomIndex)) ;
+          randomIndexes.push(randomIndex)
+          resultEmojis.push(filteredEmojis[randomIndex])
         }
         return resultEmojis.map((emoji) => {return {
           id: createEmojiID(emoji.code),
@@ -223,6 +236,10 @@
         if (guessedEmojiID != resultEmojiID) {
           const badIcon = riddleContainer.querySelector(`[data-id="${guessedEmojiID}"]`)
           badIcon.style.background = 'red'
+          setTimeout(() => {
+            animate(badIcon, 'wobble-hor-bottom')
+          }, 20);
+          
           status = 'lost'
         }
       }
