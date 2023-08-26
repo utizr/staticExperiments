@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html>
+
+  <!-- csss framework documentation -->
+  <!-- https://purecss.io/grids/ -->
+
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanban</title>
+
+    <link rel="stylesheet" href="./css/pure-min.css">
+    <link rel="stylesheet" href="./css/grids-responsive-min.css" />
+    <link rel="stylesheet" href="./css/icons/style.css" />
+    <link rel="stylesheet" href="./css/page.css" />
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>">
+    <script src="./js/sortable.js"></script>
+</head>
+
+
+  <body>
+    
+
+    <div id="main-menu" class="pure-menu pure-menu-horizontal">
+      <a class="pure-menu-heading pure-menu-link"><div class="lsf symbol">menu</div></a>
+      <ul class="pure-menu-list menu-list">
+          <li class="pure-menu-item">
+              <a href="#" id="button-reset" class="pure-menu-link"><div class="lsf symbol">refresh</div></a>
+          </li>
+      </ul>
+    </div>
+
+    <div id="item-context-menu" class="pure-menu pure-menu-horizontal">
+      <ul class="pure-menu-list menu-list">
+          <li class="pure-menu-item">
+            <a href="#" id="item-button-back" class="pure-menu-link"><div class="lsf symbol">back</div></a>
+          </li>
+          <li class="pure-menu-item">
+              <a href="#" id="item-button-copy" class="pure-menu-link"><div class="lsf symbol">copy</div></a>
+          </li>
+          <li class="pure-menu-item">
+            <a href="#" id="item-button-delete" class="pure-menu-link"><div class="lsf symbol">delete</div></a>
+          </li>
+      </ul>
+    </div>
+
+    <div id="page">
+
+      <div id="paragraph-template-container">
+        <div class="lilbox" data-type="box" data-version="v1" data-text="Todo">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Todo</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v2" data-text="Simple">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Simple</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v3" data-text="Fun">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Fun</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v4" data-text="Idea">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Idea</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v5" data-text="Standard">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Standard</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v6" data-text="Experiment">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Experiment</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v7" data-text="Important">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Important</p>
+        </div>
+        <div class="lilbox" data-type="box" data-version="v8" data-text="Title">
+          <p class="lilbox-text" data-type="box-content" contenteditable="false">Title</p>
+        </div>
+      </div>
+  
+      <div data-type="box-container" class="pure-g">
+        <div data-type="box-section" data-title="ACT 1" class="pure-u-1 pure-u-lg-1-3">
+          <h3 class="box-section-title">Todo</h3>
+          <div id="sort-test" class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
+        <div data-type="box-section" data-title="ACT 2" class="pure-u-1 pure-u-lg-1-3">
+          <h3 class="box-section-title">Doing</h3>
+          <div class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
+        <div data-type="box-section" data-title="ACT 3" class="pure-u-1 pure-u-lg-1-3">
+          <h3 class="box-section-title">Done</h3>
+          <div class="lilbox-container">
+            <!-- boxes come here  -->
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+
+  <script>
+
+  // variables
+  let pageData = null
+  let itemBeingEdited = null;
+  let menuClick = false;
+
+  // getting base elements:
+  const pageContainer = document.getElementById('page');
+  let templateContainer = document.getElementById('paragraph-template-container');
+  let boxContainer = document.querySelector('[data-type="box-container"]');
+  const itemContextMenu = document.getElementById('item-context-menu');
+
+  const buttonReset = document.getElementById("button-reset");
+  const buttonBack = document.getElementById("item-button-back");
+  const buttonDelete = document.getElementById("item-button-delete");
+  const buttonCopy = document.getElementById("item-button-copy");
+
+
+  function menuIn(e) {
+    console.log("mouseDown")
+    menuClick = true;
+  }
+
+  function menuOut(e) {
+    if(!menuClick) {
+      return
+    }
+    console.log("mouseUp",e.target.id || e.target)
+    menuClick = false;
+    hideIconContextMenu()
+    // TODO this does not work for some reason.
+    // loadState()
+  }
+
+  function copyHandler(e) {
+    e.preventDefault();
+    copyedElement = itemBeingEdited.cloneNode(true)
+    itemBeingEdited.parentNode.insertBefore(copyedElement, itemBeingEdited.nextSibling);
+    saveState()
+    loadState()
+  }
+
+
+  function deleteHandler(e) {
+    e.preventDefault();
+    itemBeingEdited.remove()
+    saveState()
+    loadState()
+  }
+
+  buttonDelete.addEventListener('click', deleteHandler);
+  buttonDelete.addEventListener('mousedown', menuIn);
+  buttonDelete.addEventListener('mouseup', menuOut);
+  buttonDelete.addEventListener('blur', menuOut);
+
+  buttonCopy.addEventListener('click', copyHandler);
+  buttonCopy.addEventListener('mousedown', menuIn);
+  buttonCopy.addEventListener('mouseup', menuOut);
+  buttonCopy.addEventListener('blur', menuOut);
+
+  // MAIN MENU
+  function resetState(e) {
+    e.preventDefault();
+    loadState(pageDataTemplate);
+  }
+
+  function resetFocus(e) {
+    e.preventDefault();
+    e.target.blur();
+  }
+  
+  buttonReset.addEventListener('click', resetState);
+  buttonReset.addEventListener('mousedown', resetFocus);
+
+
+  let pageDataTemplate = {
+    "templates": [
+      {
+        "type": "box",
+        "version": "v1",
+        "text": "Todo"
+      },
+      {
+        "type": "box",
+        "version": "v2",
+        "text": "Simple"
+      },
+      {
+        "type": "box",
+        "version": "v3",
+        "text": "Fun"
+      },
+      {
+        "type": "box",
+        "version": "v4",
+        "text": "Idea"
+      },
+      {
+        "type": "box",
+        "version": "v5",
+        "text": "Standard"
+      },
+      {
+        "type": "box",
+        "version": "v6",
+        "text": "Experiment"
+      },
+      {
+        "type": "box",
+        "version": "v7",
+        "text": "Important"
+      },
+      {
+        "type": "box",
+        "version": "v8",
+        "text": "Title"
+      },
+      {
+        "type": "box",
+        "version": "v9",
+        "text": "Note"
+      }
+    ],
+    "content": [
+      {
+        "type": "section",
+        "title": "Todo",
+        "content": []
+      },
+      {
+        "type": "section",
+        "title": "Doing",
+        "content": []
+      },
+      {
+        "type": "section",
+        "title": "Done",
+        "content": []
+      }
+    ]
+  }
+
+
+  // templates
+
+  function htmlToElements(html) {
+    var template = document.createElement('template');
+    template.innerHTML = html;
+    return template.content.childNodes;
+  }
+
+  function templateContent(content) {
+    let result = ''
+    let length = content.length
+    
+    
+    content.forEach(item  => {
+      switch (item.type) {
+        case 'box':
+          result += templateBox(item.text, item.version)
+          break;
+        case 'section':
+          result += templateSection(item.title, item.content, length)
+          break;
+        default:
+          break;
+      }
+    });
+    return result
+  }
+
+  function templateBox(text, version) {
+    return `
+    <div class="lilbox" data-type="box" data-version="${version}" data-text="${encodeHTMLEntities(text)}">
+      <p class="lilbox-text" data-type="box-content" contenteditable="false">${decodeURI(text)}</p>
+    </div>\n
+    `
+  }
+
+  function templateSection(title, content, length) {
+
+    let result = '';
+    let sectionSize = 'lg';
+    if(length < 4) {
+      sectionSize = 'md'
+    }
+    if(length > 4) {
+      sectionSize = 'xl'
+    }
+
+    // const sectionContainerSize = length;
+    const sectionFactor = length
+
+    const breakIntoTwoColumns = length < 4 ? '' : 'pure-u-md-1-2'
+
+    const sectionTop = `
+      <div data-type="box-section" data-title="${title}" class="pure-u-1 ${breakIntoTwoColumns} pure-u-${sectionSize}-1-${sectionFactor}">
+        <h3 class="box-section-title">${decodeURI(title)}</h3>
+        <div class="lilbox-container">
+          <!-- boxes come here  -->
+    `
+    const sectionBottom = `
+        </div>
+      </div>
+    `
+    result += sectionTop;
+    result += templateContent(content);
+    result += sectionBottom;
+  
+    return result
+  }
+
+  // box functions
+  function getBoxVersion(className) {
+    const regex = /v(\d+)/;
+    const result = className.match(regex); // ["are", index: 3, input: "We are what we believe we are.", groups: undefined]
+    return result[0]
+  }
+
+  function saveState() {
+    const result = {templates:[], content: []}
+    let boxes = templateContainer.querySelectorAll('[data-type="box"]');
+    for (const box of boxes) {
+      const text = box.dataset.text;
+      const version = box.dataset.version;
+      result.templates.push({type: 'box', version, text})
+    }
+    const sections = boxContainer.querySelectorAll('[data-type="box-section"]');
+    for (const section of sections) {
+      const sectionData = {type: 'section', title: '', content: []}
+      sectionData.title = section.dataset.title;
+
+      let boxes = section.querySelectorAll('[data-type="box"]');
+      for (const box of boxes) {
+        const text = box.dataset.text;
+        const version = box.dataset.version;
+        sectionData.content.push({type: 'box', version, text})
+      }
+
+      result.content.push(sectionData)
+    }
+    pageData = result
+    localStorage.setItem("pageData", JSON.stringify(pageData))
+    console.log("State saved")
+  }
+
+  function loadState(state) {
+    
+    if(state) {
+      pageData = state;
+    } else {
+      const savedPageData = localStorage.getItem("pageData");
+      pageData = savedPageData ? JSON.parse(savedPageData) : pageData;
+    }
+
+    const templateTop = `
+      <div id="paragraph-template-container">
+          <!-- boxes come here  -->
+    `
+    const templateBottom = `
+      </div>
+    `
+
+    const boxContainerTop = `
+      <div data-type="box-container" class="pure-g">
+        <!-- sections come here  -->
+    `
+    const boxContainerBottom = `
+      </div>
+    `
+    const pageContent =  templateTop + templateContent(pageData.templates) + templateBottom + boxContainerTop + templateContent(pageData.content) + boxContainerBottom;
+
+    pageContainer.innerHTML = pageContent;
+    templateContainer = document.getElementById('paragraph-template-container');
+    boxContainer = document.querySelector('[data-type="box-container"]');
+    setupBoxes();
+    setupSections();
+    setupDragAndDrop();
+    console.log("State loaded")
+    if(state) {
+      saveState()
+    }
+  }
+
+  function setupBoxes() {
+    const boxTexts = document.getElementsByClassName('lilbox-text');
+
+    for (const box of boxTexts) {
+      box.addEventListener('click', boxClick);
+      box.addEventListener('blur', boxBlur);
+      box.addEventListener('paste', textPaste);
+    }
+  }
+
+  function setupSections() {
+    const sectionTexts = document.getElementsByClassName('box-section-title');
+
+    for (const sectionText of sectionTexts) {
+      sectionText.addEventListener('click', sectionClick);
+      sectionText.addEventListener('blur', sectionBlur);
+      sectionText.addEventListener('paste', textPaste);
+    }
+  }
+
+  function setupDragAndDrop() {
+  
+    Sortable.create(templateContainer, {
+      name: 'template',
+      group: {
+          name: 'shared',
+          pull: 'clone',
+          put: false
+      },
+      animation: 300,
+      ghostClass: 'ghost',
+      delay: 70, // time in milliseconds to define when the sorting should start
+      delayOnTouchOnly: true, // only delay if user is using touch
+      // Element dragging ended
+      onEnd: function (/**Event*/evt) {
+        setupBoxes();
+        setupSections();
+        saveState();
+      },
+    });
+
+    const els = document.getElementsByClassName('lilbox-container');
+    for (const el of els) {
+      Sortable.create(el, {
+        name: 'bar',
+        group: 'shared',
+        animation: 300,
+        ghostClass: 'ghost',
+        delay: 70, // time in milliseconds to define when the sorting should start
+        delayOnTouchOnly: true, // only delay if user is using touch
+        onEnd: function (/**Event*/evt) {
+          setupBoxes();
+          setupSections();
+          saveState();
+        },
+      });
+    }
+  }
+
+  function boxClick(e) {
+    textClick(e);
+  }
+
+  function boxBlur(e) {
+    textBlur(e);
+    const box = e.target.parentElement;
+    console.log(`boxBlur e.target.innerHTML = "${e.target.innerHTML}" enc = "${encodeURI(e.target.innerHTML)}"`)
+    box.dataset.text = encodeURI(e.target.innerHTML);
+    saveState();
+  }
+
+  function sectionClick(e) {
+    textClick(e);
+  }
+  function sectionBlur(e) {
+    textBlur(e);
+    const section = e.target.parentElement;
+    section.dataset.title = encodeURI(e.target.innerHTML);
+    saveState();
+  }
+
+  function textClick(e) {
+    itemContextMenu.style.display = 'block';
+    const elem = e.target; 
+    if(elem.contentEditable == "true") {
+      return;
+    }
+    itemBeingEdited = e.target.parentElement;
+    elem.contentEditable = "true";
+    elem.focus();
+    const range = document.createRange();//Create a range (a range is a like the selection but invisible)
+    range.selectNodeContents(elem);//Select the entire contents of the element with the range
+    range.collapse(false);//collapse the range to the end point. false means collapse to end rather than the start
+    selection = window.getSelection();//get the selection object (allows you to change selection)
+    selection.removeAllRanges();//remove any selections already made
+    selection.addRange(range);//make the range you have just created the visible selection
+  }
+
+  function decodeHTMLEntities(html) {
+    const txt = document.createElement('textarea');
+    txt.innerHTML = html;
+    return txt.value;
+  }
+  
+  function encodeHTMLEntities(rawStr) {
+    return rawStr.replace(/[\u00A0-\u9999<>\&]/g, ((i) => `&#${i.charCodeAt(0)};`));
+  }
+  function textPaste(e) {
+    e.preventDefault()
+    var text = e.clipboardData.getData('text/plain').trim()
+    document.execCommand('insertHTML', false, encodeHTMLEntities(text))
+  }
+
+  function hideIconContextMenu() {
+    itemContextMenu.style.display = 'none';
+  }
+  function textBlur(e) {
+    if (menuClick) {
+      return false;
+    }
+    hideIconContextMenu()
+    const box = e.target.parentElement;
+    if(e.target.innerHTML.trim() == '') {
+      box.remove();
+      return
+    }
+    e.target.contentEditable = "false";
+  }
+
+ 
+  
+  // INI:
+  setupBoxes()
+  setupSections()
+  setupDragAndDrop()
+
+  loadState()
+
+  
+
+  </script>
+  </body>
+
+</html>
