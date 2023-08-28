@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Editor</title>
+  <script src="https://unpkg.com/boxicons@latest/dist/boxicons.js"></script>
+</head>
+<body>
+  <div class="container">
+  </div>
+
+
+  <script>
+    /*
+      Helper Functions
+    */
+    function debounce(fn, delay = 250) {
+      let timer;
+      return function(...args) {
+        if (timer) {
+          clearTimeout(timer);
+        }
+        timer = setTimeout(() => {
+          fn(...args);
+          timer = null;
+        }, delay);
+      };
+    }
+
+    function $(selector, context = document) {
+      return context.querySelector(selector);
+    }
+
+    function $all(selector, context = document) {
+      return context.querySelectorAll(selector);
+    }
+
+    const createElement = (tagName, attributes = {}, ...children) => {
+      const node = document.createElement(tagName);
+
+      if (attributes) {
+        Object.keys(attributes).forEach(key => {
+          if (key === "className") {
+            const classes = attributes[key].split(" ");
+            classes.forEach(x => node.classList.add(x));
+          } else if (/^data-/.test(key)) {
+            const dataProp = key
+              .slice(5) // removes `data-`
+              .split("-")
+              .map(
+                (str, i) =>
+                  i === 0
+                    ? str
+                    : str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+              )
+              .join("");
+            node.dataset[dataProp] = attributes[key];
+          } else {
+            node.setAttribute(key, attributes[key]);
+          }
+        });
+      }
+
+      children.forEach(child => {
+        if (typeof child === "undefined" || child === null) {
+          return;
+        }
+        if (typeof child === "string") {
+          node.appendChild(document.createTextNode(child));
+        } else {
+          node.appendChild(child);
+        }
+      });
+
+      return node;
+    };
+
+    const editor_plugin = (function() {
+      const def = {
+        id: "",
+        defParagraphSeparator: "p",
+        parentSelector: "body",
+        actions: {
+          bold: {
+            type: "strong",
+            icon: "bold",
+            format: "inline",
+            command: "bold"
+          },
+          italic: {
+            type: "em",
+            icon: "italic",
+            format: "inline",
+            command: "italic"
+          },
+          underline: {
+            type: "u",
+            icon: "underline",
+            format: "inline",
+            command: "underline"
+          },
+          highlight: {
+            type: "mark",
+            icon: "highlight",
+            format: "inline",
+            command: "hiliteColor",
+            value: "#ffe066"
+          },
+          olist: {
+            type: "ol",
+            icon: "list-ol",
+            format: "block",
+            command: "insertOrderedList"
+          },
+          ulist: {
+            type: "ul",
+            icon: "list-ul",
+            format: "block",
+            command: "insertUnorderedList"
+          },
+          link: {
+            type: "a",
+            icon: "link",
+            format: "inline",
+            command: "createLink"
+          }         
+        },
+        inlineActionKeys: ["bold", "italic", "underline", "link"],
+        blockActionKeys: ["olist", "ulist"]
+      };
+
+      class RichEditor {
+        constructor(settings) {
+          this.settings = {
+            ...def,
+            ...settings
+          };
+          this.state = {
+            currentSelection: null,
+            currentBlock: {
+              index: 0,
+              type: settings.defParagraphSeparator || def.defParagraphSeparator,
+              text: ""
+            },
+            selectedBlockType: settings.defParagraphSeparator || "p"
+          };
+          this.keyCodes = {
+            BACKSPACE: 8,
+            DELETE: 46,
+            TAB: 9,
+            ENTER: 13
+          };
+          this.el = {
+            parent: $(settings.parentSelector) || document.body,
+            toolbar: $(`${settings.id}__toolbar`) || this.renderToolbar(),
+            iframe: $(`#${settings.id}`) || this.renderEditor(),
+            HTMLOutput: $(`${settings.id}__html-output`) || this.renderHTMLOutput()
+          };
+          this.showSelectedBlockType = this.showSelectedBlockType.bind(this);
+          this.showSelectedInlineStyles = this.showSelectedInlineStyles.bind(this);
+          this.init();
+        }
+
+        init() {
+          this.el = {
+            ...this.el,
+            doc: $(`#${this.settings.id}`).contentWindow.document
+          };
+          const defParaSeparator = this.settings.defParagraphSeparator;
+          this.el.doc.head.appendChild(createElement('style', {
+            type: 'text/css'
+          }, `body{ font-family:arial; font-size:14px;}a{cursor: pointer}`));
+          this.el.doc.body.setAttribute('contenteditable', "true");
+          this.el.doc.execCommand(
+            "defaultParagraphSeparator",
+            false,
+            this.settings.defParagraphSeparator
+          );
+          this.el.doc.addEventListener("keyup", () => this.displayHTML(), false);
+
+          this.el.doc.body.addEventListener("input", () => {
+            const firstChild = this.el.doc.body.firstChild;
+            if (!firstChild || firstChild.nodeType !== 3) return;
+            const range = document.createRange();
+            range.selectNodeContents(firstChild);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.editText(
+              "formatBlock",
+              `<${this.settings.defParagraphSeparator}>`
+            );
+          });
+
+          this.el.doc.body.addEventListener("keyup", this.showSelectedBlockType);
+          this.el.doc.body.addEventListener("mouseup", this.showSelectedBlockType);
+          this.el.doc.body.addEventListener(
+            "mouseup",
+            this.showSelectedInlineStyles
+          );
+          this.el.doc.body.addEventListener("keyup", this.showSelectedInlineStyles);
+        }
+
+        showSelectedBlockType(e) {
+          const key = e.key || e.keyCode;
+          if (
+            e.type === "mouseup" ||
+            (key === "Enter" ||
+              key === this.keyCodes.ENTER ||
+              key === "Backspace" ||
+              key === this.keyCodes.BACKSPACE)
+          ) {
+            const selection = this.el.doc.getSelection().anchorNode.parentNode;
+            const parentType = selection.parentNode.nodeName.toLowerCase();
+            const type = selection.nodeName.toLowerCase();
+            $all('.toolbar__btn[data-format="block"]', this.el.toolbar).forEach(
+              btn => {
+                if (btn.dataset.type === type || btn.dataset.type === parentType) {
+                  btn.classList.add("is-selected");
+                } else {
+                  btn.classList.remove("is-selected");
+                }
+              }
+            );
+          }
+        }
+
+        showSelectedInlineStyles(e) {
+          const selection = this.el.doc.getSelection();
+          const type = selection.anchorNode.parentNode.tagName.toLowerCase();
+          if (type === "body") return;
+          this.settings.inlineActionKeys.forEach(key => {
+            const command = this.settings.actions[key].command;
+            const btn = $(`.toolbar__btn[data-command="${command}"]`);
+            if (this.el.doc.queryCommandState(command)) {
+              btn.classList.add("is-selected");
+            } else {
+              btn.classList.remove("is-selected");
+            }
+          });
+        }
+
+        getCurrentBlock() {
+          const selection = this.el.doc.getSelection().anchorNode.parentNode;
+          const type = selection.nodeName.toLowerCase();
+          if (type === "body" || type === "html") return;
+          const children = this.el.doc.body.childNodes;
+          let index = 0;
+          for (let i = 0; i < children.length; i++) {
+            if (children[i] == selection) {
+              index = i;
+              break;
+            }
+          }
+          const currentBlock = {
+            index,
+            type,
+            text: selection.textContent
+          };
+          console.log(currentBlock);
+          return currentBlock;
+        }
+
+        setState(newState) {
+          this.state = {
+            ...this.state,
+            ...newState
+          };
+        }
+
+        selectTool(e) {
+          const target = e.target;
+          if (!target.matches(".toolbar__btn")) return;
+          const command = target.dataset.command;
+          const format = target.dataset.format;
+          const type = target.dataset.type;
+          const value = target.value;
+          const removeFormat = this.el.doc.queryCommandState(command);
+          target.classList.toggle("is-selected");
+
+          switch (format) {
+            case "inline":
+              if (command === "createLink") {
+                // TODO: check if string is URL. If it is, transform it into link. If not, mount link form
+                this.mountFormInsertLink();
+              } else {
+                this.editText(command, value);
+              }
+              break;
+            case "block":
+              if (removeFormat) {
+                const selection = this.el.doc.getSelection();
+                if (selection && selection.rangeCount) {
+                  const container = selection.getRangeAt(0).commonAncestorContainer;
+                  this.unwrap(container, this.settings.defParagraphSeparator);
+                }
+              } else {
+                $all('.toolbar__btn[data-format="block"]', this.el.toolbar).forEach(
+                  btn => {
+                    if (btn.dataset.type === type) {
+                      btn.classList.add("is-selected");
+                    } else {
+                      btn.classList.remove("is-selected");
+                    }
+                  }
+                );
+                this.editText(command, value);
+                this.setState({ selectedBlockType: type });
+                const selection = this.el.doc.getSelection();
+                if (selection && selection.rangeCount) {
+                  const ancestor = selection.getRangeAt(0).commonAncestorContainer;
+                  const block =
+                    ancestor.nodeType !== 3
+                      ? ancestor.closest(`${type}`)
+                      : ancestor.parentNode.closest(`${type}`);
+                  if (block.parentNode !== this.el.doc.body) {
+                    this.unwrap(block.parentNode);
+                  }
+                }
+              }
+              break;
+          }
+        }
+
+        mountFormInsertLink() {
+          const form = this.el.formInsertLink || this.renderFormInsertLink();
+          const selection = this.el.doc.getSelection();
+          if (selection && selection.rangeCount) {
+            console.log(selection);
+            const span = document.createElement("span");
+            const range = selection.getRangeAt(0);
+            range.surroundContents(span);
+            form.style.top = span.offsetTop + this.el.iframe.offsetTop - 56 + "px";
+            form.style.left = span.offsetLeft + 16 + "px";
+            form.classList.remove("is-hidden");
+            this.el.doc.body.focus();
+          }
+        }
+
+        unwrap(container, newChildType = null) {
+          const parent = container.parentNode;
+
+          while (container.firstChild) {
+            if (newChildType) {
+              container.replaceChild(
+                createElement(newChildType, null, container.firstChild.textContent),
+                container.firstChild
+              );
+            }
+            parent.insertBefore(container.firstChild, container);
+          }
+          parent.removeChild(container);
+          this.displayHTML();
+        }
+
+        // TODO: add url form
+        editText(command, val = "") {
+          const isChanged = this.el.doc.execCommand(command, false, val);
+          if (isChanged) {
+            this.displayHTML();
+          }
+          this.el.doc.body.focus();
+        }
+
+        displayHTML() {
+          this.el.HTMLOutput.value = this.el.doc.body.innerHTML;
+          console.log(this.el.HTMLOutput.value);
+        }
+
+        renderEditor() {
+          const editor = createElement("iframe", {
+            id: this.settings.id,
+            name: this.settings.id,
+            className: "rich-editor",
+            src: "about:blank",
+            target: "_parent",
+            title: "rich-text-editor"
+          });
+          $(this.settings.parentSelector).appendChild(editor);
+          return editor;
+        }
+
+        renderHTMLOutput() {
+          const output = createElement("textarea", {
+            id: `${this.settings.id}__html-output`,
+            className: "html-output"
+          });
+          $(this.settings.parentSelector).appendChild(output);
+          return output;
+        }
+
+        renderToolbar() {
+          const toolbar = createElement("div", {
+            id: `${this.settings.id}__toolbar`,
+            className: "toolbar"
+          });
+          const actionKeys = [
+            ...this.settings.inlineActionKeys,
+            ...this.settings.blockActionKeys
+          ];
+          actionKeys.forEach(key => {
+            toolbar.appendChild(
+              createElement(
+                "button",
+                {
+                  className: "toolbar__btn",
+                  type: "button",
+                  "data-command": this.settings.actions[key].command,
+                  "data-type": this.settings.actions[key].type,
+                  "data-format": this.settings.actions[key].format,
+                  value: this.settings.actions[key].value || ""
+                },
+                createElement("box-icon", {
+                  className: "toolbar__icon",
+                  name: this.settings.actions[key].icon
+                })
+              )
+            );
+          });
+          toolbar.addEventListener("click", e => {
+            e.preventDefault();
+            this.selectTool(e);
+          });
+          $(this.settings.parentSelector).appendChild(toolbar);
+          return toolbar;
+        }
+
+        renderFormInsertLink() {
+          const btnClose = createElement(
+            "button",
+            {
+              className: "toolbar__form-btn",
+              type: "button"
+            },
+            createElement("box-icon", {
+              className: "box-icon",
+              name: "x"
+            })
+          );
+          const input = createElement("input", {
+            className: "toolbar__submit",
+            type: "submit",
+            name: "url",
+            value: "Insert Link"
+          });
+          const form = createElement(
+            "form",
+            {
+              className: "toolbar__form--inline toolbar__form--link is-hidden",
+              name: "insertLink"
+            },
+            createElement("input", {
+              className: "toolbar__input toolbar__input--link",
+              type: "text",
+              name: "url",
+              id: "url",
+              placeholder: "Enter URL..."
+            }),
+            input,
+            btnClose
+          );
+          btnClose.addEventListener("click", e => {
+            form.classList.add("is-hidden");
+            if (input.value !== "") {
+            }
+          });
+          input.addEventListener("blur", e => {
+            let url = e.currentTarget.value;
+            if (!/^http:\/\//.test(url)) {
+              url = "http://" + url;
+            }
+            e.currentTarget.value = url;
+          });
+
+          form.addEventListener("submit", e => {
+            e.preventDefault();
+            console.log("submit");
+            const input = $(".toolbar__input--link", e.currentTarget);
+            let url = input.value;
+            if (!/^http:\/\//.test(url)) {
+              url = "http://" + url;
+            }
+            console.log(url);
+            e.currentTarget.classList.add("is-hidden");
+            e.currentTarget.reset();
+            this.editText("createLink", url);
+            const selection = this.el.doc.getSelection();
+            console.log(selection.anchorNode.parentNode);
+            this.unwrap(selection.anchorNode.parentNode.closest("span"));
+          });
+          this.el = {
+            ...this.el,
+            formInsertLink: form
+          };
+          this.el.parent.appendChild(form);
+          return form;
+        }
+      }
+
+      return RichEditor;
+    })();
+
+    const editor = new editor_plugin({
+      id: "richEditor",
+      parentSelector: ".container"
+    });
+
+
+  </script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+    }
+    .container {
+      width: 100%;
+      position: absolute;
+      transform: translate(-50%, -50%);
+      left: 50%;
+      top: 50%;
+      max-width: 400px;
+      max-height: 300px;
+      height: 100%;
+    }
+    .rich-editor {
+      width: 100%;
+      height: 100%;
+      border: 1px solid #000;
+      position: relative;
+      padding: 16px;
+    }
+    .html-output {
+      display: block;
+      width: 100%;
+      height: 40px;
+    }
+    .toolbar {
+      width: 100%;
+      display: flex;
+    }
+    .toolbar__btn {
+      width: 42px;
+      height: 42px;
+      background-color: transparent;
+      cursor: pointer;
+    }
+    .toolbar__btn box-icon {
+      pointer-events: none;
+      vertical-align: middle;
+      fill: #adb5bd;
+    }
+    .toolbar__btn.is-selected box-icon {
+      fill: #212529;
+    }
+    .toolbar__form--inline {
+      position: absolute;
+      background-color: #343a40;
+      color: #fff;
+      padding: 8px;
+      width: 300px;
+      border-radius: 8px;
+    }
+    .toolbar__form--inline.is-hidden {
+      display: none;
+    }
+    .toolbar__form--inline input {
+      border: 1px solid transparent;
+      border-bottom: 2px solid transparent;
+      background-color: transparent;
+      font-size: 16px;
+      color: #fff;
+      padding: 8px 8px 4px 8px;
+      margin-bottom: 3px;
+      vertical-align: middle;
+      width: calc(100% - 28px);
+      font-weight: 300;
+    }
+    .toolbar__form--inline input:placeholder {
+      color: rgba(248, 249, 250, 0.6);
+    }
+    .toolbar__form--inline input:focus {
+      outline: none;
+      border-bottom-color: #b197fc;
+    }
+    .toolbar__form--inline button {
+      line-height: 0;
+      vertical-align: middle;
+      padding: 4px;
+      border: none;
+      cursor: pointer;
+      background-color: transparent;
+    }
+    .toolbar__form--inline button:focus {
+      outline: none;
+    }
+    .toolbar__form--inline button .box-icon {
+      width: 20px;
+      height: 20px;
+      vertical-align: middle;
+      fill: #f8f9fa;
+    }
+    .toolbar__form--inline input[type="submit"] {
+      visibility: hidden;
+      position: absolute;
+      opacity: 0;
+    }
+    .toolbar__form--inline::after {
+      content: '';
+      position: absolute;
+      border-width: 12px;
+      border-style: solid;
+      border-color: #343a40 transparent transparent transparent;
+      top: 100%;
+      left: 0;
+    }
+    
+  </style>
+</body>
+</html>
