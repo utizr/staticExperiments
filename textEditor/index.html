@@ -179,6 +179,17 @@
           );
           this.el.doc.addEventListener("keyup", () => this.displayHTML(), false);
 
+          function encodeHTMLEntities(rawStr) {
+            return rawStr.replace(/[\u00A0-\u9999<>\&]/g, ((i) => `&#${i.charCodeAt(0)};`));
+          }
+
+          this.el.doc.addEventListener('paste', (e) => {
+              e.preventDefault()
+              var text = e.clipboardData.getData('text/plain').trim()
+              this.el.doc.execCommand('insertHTML', false, encodeHTMLEntities(text))
+            }
+          );
+
           this.el.doc.body.addEventListener("input", () => {
             const firstChild = this.el.doc.body.firstChild;
             if (!firstChild || firstChild.nodeType !== 3) return;
