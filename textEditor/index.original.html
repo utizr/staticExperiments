@@ -162,9 +162,6 @@
           this.init();
         }
 
-        getSelection() {
-          return this.el.doc.getSelection() || this.el.iframe.contentWindow.getSelection();
-        }
         init() {
           this.el = {
             ...this.el,
@@ -174,8 +171,7 @@
           this.el.doc.head.appendChild(createElement('style', {
             type: 'text/css'
           }, `body{ font-family:arial; font-size:14px;}a{cursor: pointer}`));
-          // this.el.doc.body.setAttribute('contenteditable', "true");
-          // this.el.doc.body.contentEditable = true;
+          this.el.doc.body.setAttribute('contenteditable', "true");
           this.el.doc.execCommand(
             "defaultParagraphSeparator",
             false,
@@ -187,21 +183,26 @@
             return rawStr.replace(/[\u00A0-\u9999<>\&]/g, ((i) => `&#${i.charCodeAt(0)};`));
           }
 
+          this.el.doc.addEventListener('paste', (e) => {
+              e.preventDefault()
+              var text = e.clipboardData.getData('text/plain').trim()
+              this.el.doc.execCommand('insertHTML', false, encodeHTMLEntities(text))
+            }
+          );
 
-          // this.el.doc.body.addEventListener("input", () => {
-          //   const firstChild = this.el.doc.body.firstChild;
-          //   console.log("firstChild.nodeType !== 3>>",firstChild.nodeType)
-          //   if (!firstChild || firstChild.nodeType !== 3) return;
-          //   const range = document.createRange();
-          //   range.selectNodeContents(firstChild);
-          //   const selection = this.getSelection();
-          //   selection.removeAllRanges();
-          //   selection.addRange(range);
-          //   this.editText(
-          //     "formatBlock",
-          //     `<${this.settings.defParagraphSeparator}>`
-          //   );
-          // });
+          this.el.doc.body.addEventListener("input", () => {
+            const firstChild = this.el.doc.body.firstChild;
+            if (!firstChild || firstChild.nodeType !== 3) return;
+            const range = document.createRange();
+            range.selectNodeContents(firstChild);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            this.editText(
+              "formatBlock",
+              `<${this.settings.defParagraphSeparator}>`
+            );
+          });
 
           this.el.doc.body.addEventListener("keyup", this.showSelectedBlockType);
           this.el.doc.body.addEventListener("mouseup", this.showSelectedBlockType);
@@ -210,38 +211,6 @@
             this.showSelectedInlineStyles
           );
           this.el.doc.body.addEventListener("keyup", this.showSelectedInlineStyles);
-
-          // HACK for firefox
-          setTimeout(() => {
-            var iframe = document.getElementById("richEditor");
-            var body = iframe.contentWindow.document.body;
-            this.el.doc = iframe.contentWindow.document;
-            this.el.doc.body.setAttribute('contenteditable', "true");
-            this.el.doc.body.addEventListener("input", () => {
-              const firstChild = this.el.doc.body.firstChild;
-              if (!firstChild || firstChild.nodeType !== 3) return;
-              console.log("firstChild.nodeType !== 3>>",firstChild.nodeType,firstChild)
-              const range = document.createRange();
-              range.selectNodeContents(firstChild);
-              const selection = this.getSelection();
-              selection.removeAllRanges();
-              selection.addRange(range);
-              console.log("CREATINGFIRST BLOCK")
-              this.editText(
-                "formatBlock",
-                `<${this.settings.defParagraphSeparator}>`
-              );
-            });
-
-            this.el.doc.addEventListener('paste', (e) => {
-              e.preventDefault()
-              var text = e.clipboardData.getData('text/plain').trim()
-              this.el.doc.execCommand('insertHTML', false, encodeHTMLEntities(text))
-            });
-
-
-
-          }, 2);
         }
 
         showSelectedBlockType(e) {
@@ -398,48 +367,8 @@
 
         // TODO: add url form
         editText(command, val = "") {
-          console.log("command",command, val);
-          // const selection = this.el.doc.getSelection();
-          let selection = this.el.doc.getSelection() || this.el.iframe.contentWindow.getSelection();
-          console.log("this.el",this.el)
-
-          console.log(" Selection.rangeCount", selection.rangeCount)
-          console.log("command<",command)
-
-          if (command == 'formatBlock') {
-
-            let range = document.createRange();//Create a range (a range is a like the selection but invisible)
-            range.selectNodeContents(this.el.doc.body);//Select the entire contents of the element with the range
-
-            const content = range.extractContents();
-            const newNode = this.el.doc.createElement( "p" );
-            newNode.appendChild(content)
-            range.deleteContents();
-            range.insertNode( newNode );
-
-            // reset carret to the end
-            range = document.createRange();//Create a range (a range is a like the selection but invisible)
-            range.selectNodeContents(newNode);//Select the entire contents of the element with the range
-            range.collapse(false);//collapse the range to the end point. false means collapse to end rather than the start
-            selection = this.el.doc.getSelection() || this.el.iframe.contentWindow.getSelection();//get the selection object (allows you to change selection)
-            selection.removeAllRanges();//remove any selections already made
-            selection.addRange(range);//make the range you have just created the visible selection
-          }
-
-          if (command == 'bold') {
-
-            const range = selection.getRangeAt( 0 );
-
-            const content = range.extractContents();
-            const newNode = this.el.doc.createElement( "b" );
-            newNode.appendChild(content)
-            range.insertNode( newNode );
-          }
-
-
-          // const isChanged = this.el.doc.execCommand(command, false, val);
-
-          if (true) {
+          const isChanged = this.el.doc.execCommand(command, false, val);
+          if (isChanged) {
             this.displayHTML();
           }
           this.el.doc.body.focus();
@@ -612,10 +541,6 @@
       border: 1px solid #000;
       position: relative;
       padding: 16px;
-    }
-
-    p {
-      color:brown;
     }
     .html-output {
       display: block;

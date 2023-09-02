@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <title>iframe test</title>
+</head>
+<body>
+  <iframe id="atto_pastespecial_iframe" frameborder="0" style="border: 1px solid gray">
+    #document
+      <html>
+        <head></head>
+        <body contenteditable="true"><p>test</p></body>
+      </html>
+  </iframe>
+
+  <div id="outside">outside test</div>
+
+  <script>
+    var iframe = document.getElementById("atto_pastespecial_iframe");
+    var body = iframe.contentWindow.document.body;
+    body.setAttribute('contenteditable', "true");
+    document.getElementById('outside').setAttribute('contenteditable', "true");
+  </script>
+  <style>
+
+  body {
+    margin: 50px;
+  }
+  </style>
+</body>
+</html>
