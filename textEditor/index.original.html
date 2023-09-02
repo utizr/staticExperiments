@@ -126,7 +126,7 @@
             command: "createLink"
           }         
         },
-        inlineActionKeys: ["bold", "italic", "underline", "link"],
+        inlineActionKeys: ["bold", "italic", "underline", "highlight", "link"],
         blockActionKeys: ["olist", "ulist"]
       };
 
@@ -239,12 +239,13 @@
 
         showSelectedInlineStyles(e) {
           const selection = this.el.doc.getSelection();
-          const type = selection.anchorNode.parentNode.tagName.toLowerCase();
-          if (type === "body") return;
+          const selectedElement = selection.anchorNode.parentNode.tagName.toLowerCase();
+          if (selectedElement === "body") return;
           this.settings.inlineActionKeys.forEach(key => {
             const command = this.settings.actions[key].command;
+            const actionElement = this.settings.actions[key].element;
             const btn = $(`.toolbar__btn[data-command="${command}"]`);
-            if (this.el.doc.queryCommandState(command)) {
+            if (actionElement === selectedElement) {
               btn.classList.add("is-selected");
             } else {
               btn.classList.remove("is-selected");

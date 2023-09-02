@@ -84,18 +84,21 @@
         actions: {
           bold: {
             type: "strong",
+            element: "b",
             icon: "bold",
             format: "inline",
             command: "bold"
           },
           italic: {
             type: "em",
+            element: "i",
             icon: "italic",
             format: "inline",
             command: "italic"
           },
           underline: {
             type: "u",
+            element: "u",
             icon: "underline",
             format: "inline",
             command: "underline"
@@ -103,6 +106,13 @@
           highlight: {
             type: "mark",
             icon: "highlight",
+            format: "inline",
+            command: "hiliteColor",
+            value: "#ffe066"
+          },
+          remove: {
+            type: "remove",
+            icon: "x",
             format: "inline",
             command: "hiliteColor",
             value: "#ffe066"
@@ -126,7 +136,7 @@
             command: "createLink"
           }         
         },
-        inlineActionKeys: ["bold", "italic", "underline", "link"],
+        inlineActionKeys: ["bold", "italic", "underline", "remove", "link"],
         blockActionKeys: ["olist", "ulist"]
       };
 

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <title>remove bold test</title>
+</head>
+<body>
+
+  <p>This is a text that contains some <b>super bold</b> text. and even more of <b>super bold</b> this is coming here.</p>
+  <p>This is some more text below</p>
+
+  <button id="remove-bold">Remove Bold</button>
+  <button id="bold">Bold</button>
+
+  <script>
+    // document.addEventListener("pointerup", highlightSelection);
+
+    document.getElementById("remove-bold").addEventListener("click", removeBold);
+    document.getElementById("bold").addEventListener("click", makeBold);
+
+    function removeBold() {
+      const selection = window.getSelection();
+
+      if (selection.type === "Range") {
+        for (let i = 0; i < selection.rangeCount; i++) {
+          const range = selection.getRangeAt(i);
+          const selectionContainer = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
+          range.selectNode;
+          console.log("selectionContainer",selectionContainer);
+          console.log("selectionContainer.nodeType",selectionContainer.nodeType);
+          
+          const bolds = selectionContainer.querySelectorAll('b');
+
+          bolds.forEach( (element) => {
+            if (range.intersectsNode(element)) {
+              replaceBold(element);
+            }
+
+          })
+        }
+      }
+    }
+
+
+    function replaceBold(element) {
+      const newNode = document.createTextNode(element.textContent);
+      const parentNode = element.parentNode; 
+      parentNode.replaceChild(newNode, element);
+      parentNode.normalize();
+    }
+    
+    function makeBold() {
+      const selection = window.getSelection();
+      const range = selection.getRangeAt( 0 );
+      const content = range.extractContents();
+      const newNode = document.createElement( "b" );
+      newNode.appendChild(content)
+      range.insertNode( newNode );
+      newNode.parentNode.normalize();
+    }
+
+    function highlightSelection(e) {
+      const selection = window.getSelection();
+
+      if (selection.type === "Range") {
+        for (let i = 0; i < selection.rangeCount; i++) {
+          const range = selection.getRangeAt(i);
+          console.log("ca",range.commonAncestorContainer.tagName);
+          console.log("s",range.startContainer.parentNode.tagName);
+          playAnimation(range.startContainer);
+        }
+      }
+    }
+
+    function playAnimation(el) {
+      if (el.nodeType === Node.TEXT_NODE) {
+        el = el.parentNode;
+      }
+
+      el.classList.remove("highlight");
+      setTimeout(() => {
+        el.classList.add("highlight");
+      }, 0);
+    }
+  </script>
+  <style>
+    .highlight {
+      animation: highlight linear 1s;
+    }
+
+    @keyframes highlight {
+      from {
+        outline: 1px solid #f00f;
+      }
+      to {
+        outline: 1px solid #f000;
+      }
+    }
+
+    body {
+      padding: 1px;
+    }
+  </style>
+</body>
+</html>
