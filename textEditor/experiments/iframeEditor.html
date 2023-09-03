@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <title>iframe test</title>
+</head>
+<body>
+
+  <div id="container"></div>
+
+  <button id="remove-bold">Remove Bold</button>
+  <button id="bold">Bold</button>
+  <button id="info">Info</button>
+
+  <script>
+
+    document.body.onload = function () {
+        createIframe("container");
+        document.getElementById("remove-bold").addEventListener("click", removeBold);
+        document.getElementById("bold").addEventListener("click", makeBold);
+        document.getElementById("info").addEventListener("click", selectionInfo);
+    }
+   
+    function selectionInfo() {
+      const selection = getSelection();
+      const range = selection.getRangeAt(0);
+
+      const selectionContainer = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
+
+      // console.log("text nodes:", getAllTextNodesInSelection(selectionContainer, range, []))
+      // console.log("startContainer",range.startContainer)
+
+      const textNodes = getAllTextNodesInSelection(selectionContainer, range, []);
+      makeTextNodesBold(textNodes, range)
+    }
+
+    function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
+      selectionContainer.childNodes.forEach( (node) => {
+        if (node.nodeType === 3 && range.intersectsNode(node)) {
+          collectedTextNodes.push(node);
+        } else {
+          const newNodes = getAllTextNodesInSelection(node, range, collectedTextNodes)
+        }
+      })
+      return collectedTextNodes
+    }
+
+    function getSelection() {
+      const container = document.getElementById("container")
+      const iframe = container.querySelector("iframe");
+
+      return iframe.contentWindow.document.getSelection() || iframe.contentWindow.getSelection()
+    }
+
+    function createIframe(containerID) {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('frameborder', 0);
+      iframe.id = "myiframe";
+      const container = document.getElementById(containerID)
+      container.appendChild(iframe);
+
+      setTimeout(() => {
+        const iframe = container.querySelector("iframe");
+        const body = iframe.contentWindow.document.body;
+        body.innerHTML = "<p>First paragraph which is awesome.</p><p>Second paragraph, that is even more awesome.</p>"
+        body.setAttribute('contenteditable', "true");
+        iframe.contentWindow.document.body.addEventListener("input", () => {
+          console.log("INput")
+          resizeIframe(iframe)
+        });
+      }, 2);
+
+    }
+
+    function resizeIframe(iframe)  {
+      iframe.style.minHeight = "auto";
+      iframe.style.minHeight = iframe.contentWindow.document.body.scrollHeight + "px";
+    }
+
+    function removeBold() {
+      const selection = getSelection();
+
+      if (selection.type === "Range") {
+        for (let i = 0; i < selection.rangeCount; i++) {
+          const range = selection.getRangeAt(i);
+          const selectionContainer = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
+          range.selectNode;
+          console.log("selectionContainer",selectionContainer);
+          console.log("selectionContainer.nodeType",selectionContainer.nodeType);
+
+          if (selectionContainer.tagName == 'B') {
+            replaceBold(selectionContainer);
+            return
+          }
+          
+          const bolds = selectionContainer.querySelectorAll('b');
+
+          bolds.forEach( (element) => {
+            if (range.intersectsNode(element)) {
+              replaceBold(element);
+            }
+          })
+        }
+      }
+    }
+
+    function flattenInlineElements(container) {
+      let inlineElements = container.querySelectorAll('b');
+      inlineElements.forEach( (elem) => {
+        if (elem.parentNode.tagName == 'B') {
+          replaceBold(elem);
+        }
+      });
+    }
+
+    function dedupeAdjacentInlineElements(container) {
+      console.log("Deduping")
+      inlineElements = container.querySelectorAll('b');
+
+      for (let i = 1; i < inlineElements.length; i++) {
+        const e1 = inlineElements[i-1];
+        const e2 = inlineElements[i];
+        if (e1.nextSibling === e2) {
+          e1.appendChild(e2.childNodes[0]);
+          e2.remove();
+          container.normalize();
+          return dedupeAdjacentInlineElements(container)
+        }
+      }
+    }
+
+
+    // replaces bold with simple textNode
+    function replaceBold(element) {
+      const newNode = document.createTextNode(element.textContent);
+      const parentNode = element.parentNode; 
+      parentNode.replaceChild(newNode, element);
+      parentNode.normalize();
+    }
+    
+
+    function makeTextNodesBold(textNodes, fullRange) {
+      textNodes.forEach( (textNode) => {
+        const range = fullRange.cloneRange()
+        if (range.startContainer != textNode) {
+          range.setStartBefore(textNode)
+        }
+        if (range.endContainer != textNode) {
+          range.setEndAfter(textNode)
+        }
+        const content = range.extractContents();
+        const newNode = document.createElement( "b" );
+        newNode.appendChild(content)
+        range.insertNode( newNode );
+        flattenInlineElements(newNode.parentNode);
+        dedupeAdjacentInlineElements(newNode.parentNode);
+      })
+    }
+
+    function makeBold() {
+      const selection = getSelection();
+      const range = selection.getRangeAt(0);
+      const selectionContainer = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode : range.commonAncestorContainer;
+      const textNodes = getAllTextNodesInSelection(selectionContainer, range, []);
+      makeTextNodesBold(textNodes, range)
+    }
+    
+    function makeBoldForInlineElement() {
+      const selection = getSelection();
+      const range = selection.getRangeAt( 0 );
+      const content = range.extractContents();
+      const newNode = document.createElement( "b" );
+      newNode.appendChild(content)
+      range.insertNode( newNode );
+      flattenInlineElements(newNode.parentNode);
+      dedupeAdjacentInlineElements(newNode.parentNode);
+    }
+
+  </script>
+  <style>
+
+  body {
+    margin: 50px;
+  }
+  iframe {
+    border: 1px solid gray;
+    width: 800px;
+  }
+  </style>
+</body>
+</html>
