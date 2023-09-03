@@ -35,10 +35,23 @@
             if (range.intersectsNode(element)) {
               replaceBold(element);
             }
-
           })
         }
       }
+    }
+
+    function flattenBold(container) {
+      const bolds = container.querySelectorAll('b');
+      bolds.forEach( (bold) => {
+        console.log("bold.parentNode.tagName>",bold.parentNode.tagName)
+        if (bold.parentNode.tagName == 'B') {
+          replaceBold(bold);
+        }
+      });
+
+      // b[0].appendChild(b[1].childNodes[0])
+      // while querySelectorAll('b').length > 1
+      // do merge the two together and remove the second one.
     }
 
 
@@ -56,7 +69,7 @@
       const newNode = document.createElement( "b" );
       newNode.appendChild(content)
       range.insertNode( newNode );
-      newNode.parentNode.normalize();
+      flattenBold(newNode.parentNode);
     }
 
     function highlightSelection(e) {
