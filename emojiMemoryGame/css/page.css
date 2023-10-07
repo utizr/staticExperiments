@@ -26,6 +26,7 @@ body {
 }
 
 #riddle {
+    border-radius: 18px;
     margin-top: 1rem;
     min-height: 4.9rem;
     padding: 0em;
