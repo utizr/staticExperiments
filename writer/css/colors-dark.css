@@ -1,0 +1,37 @@
+:root {
+  --body_background_color: #585858;
+
+  --menu_background_color: #4e4e4e;
+  --menu_background_color-hover: #ffffff;
+  --menu_border_color: #373737;
+  --menu_text_color: #ffffff;
+  --menu_text_color-hover: black;
+  --page_text_color: #c5c5c5;
+}
+
+body {
+  background-color: var(--body_background_color);
+}
+
+#item-context-menu {
+  background: var(--menu_background_color);
+  border-bottom: 1px solid var(--menu_border_color);
+}
+
+#main-menu {
+  background: var(--menu_background_color);
+  border-color: var(--menu_border_color);
+}
+
+.pure-menu-link {
+  color: var(--menu_text_color);
+}
+
+.pure-menu-link:hover {
+  background: var(--menu_background_color-hover);
+  color: var(--menu_text_color-hover);
+}
+
+#page {
+    color: var(--page_text_color);
+}
