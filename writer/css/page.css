@@ -13,6 +13,10 @@
   font-style: italic;
 }
 
+body {
+  padding: 0;
+  margin: 0;
+}
 #item-context-menu {
   position: fixed;
   left: 0px;
@@ -25,6 +29,21 @@
   left: 0px;
   top: 0px;
   border-bottom: 1px solid;
+  width: 100%;
+}
+
+.menu-button {
+  display: inline-block;
+  padding: 5px 12px;
+}
+
+.menu-button.active {
+  color: #00a4c1;
+}
+.menu-button:hover {
+  color: white;
+  background: black;
+  cursor: pointer;
 }
 
 #main-menu.pure-menu .symbol,
@@ -51,7 +70,7 @@
 }
 
 #container {
-  padding: 58px 12px 120px 12px;
+  padding: 60px 5px 120px 10px;
   margin-left: auto;
   margin-right: auto;
   max-width: 50em;

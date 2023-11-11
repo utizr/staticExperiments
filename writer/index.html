@@ -9,8 +9,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Writer</title>
 
-    <link rel="stylesheet" href="./css/pure-min.css" />
-    <link rel="stylesheet" href="./css/grids-responsive-min.css" />
     <link rel="stylesheet" href="./css/icons/style.css" />
     <link rel="stylesheet" href="./css/page.css" />
     <link rel="stylesheet" href="./css/colors-light.css" />
@@ -21,12 +19,9 @@
   <style></style>
   <body>
     <div id="main-menu" class="pure-menu pure-menu-horizontal">
-      <a class="pure-menu-heading pure-menu-link"><div class="lsf symbol">menu</div></a>
-      <ul class="pure-menu-list menu-list">
-        <li class="pure-menu-item">
-          <a href="#" id="button-reset" class="pure-menu-link"><div class="lsf symbol">bold</div></a>
-        </li>
-      </ul>
+      <a class="menu-button"><div class="lsf symbol">menu</div></a>
+      <a id="book-button" class="menu-button"><div class="lsf symbol">book</div></a>
+      <a id="convert-button" class="menu-button"><div class="lsf symbol">file</div></a>
     </div>
 
     <div id="item-context-menu" class="pure-menu pure-menu-horizontal">
@@ -55,9 +50,35 @@
       const textNodeType = 3;
       const documentFragmentType = 11;
 
-      const editor = document.getElementById("container");
+      function $(selector, element = document) {
+        return element.querySelector(selector);
+      }
 
+      function $$(selector, element = document) {
+        return Array.from(element.querySelectorAll(selector));
+      }
+
+      const editor = $("#container");
+      const page = $("#page");
       editor.addEventListener("paste", textPaste);
+
+      const bookButton = $("#book-button");
+      bookButton.addEventListener("click", function () {
+        page.classList.toggle("book");
+        bookButton.classList.toggle("active");
+      });
+
+      const convertToText = $("#convert-button");
+      convertToText.addEventListener("click", function () {
+        const inlineElements = Array.from(editor.children);
+        console.log(
+          inlineElements
+            .map((ie) => {
+              return ie.textContent;
+            })
+            .join("\n"),
+        );
+      });
 
       const observer = new MutationObserver((mutationList) =>
         mutationList
@@ -81,8 +102,7 @@
         // console.log("ctrlKey", event.ctrlKey);
         // console.log("key", event.key);
         if (event.key === "Backspace") {
-          const empty = isEmpty(editor);
-          if (empty) {
+          if (isEmpty(editor)) {
             clearContainer(container);
           }
         }
@@ -105,12 +125,12 @@
         container.innerHTML = `<p><br/></p>`;
 
         const sel = document.getSelection() || window.getSelection();
-        const rangeOnLastElement = new Range();
-        rangeOnLastElement.selectNode(container.children[0].children[0]);
-        rangeOnLastElement.collapse(false);
+        const rangeOnBr = new Range();
+        rangeOnBr.selectNode(container.children[0].children[0]);
+        rangeOnBr.collapse(false);
         sel.removeAllRanges();
-        sel.addRange(rangeOnLastElement);
-        return rangeOnLastElement;
+        sel.addRange(rangeOnBr);
+        return rangeOnBr;
       }
 
       function replaceSelectedText(replacementText) {
@@ -197,6 +217,30 @@
             rangeOnLastElement.collapse(false);
             sel.removeAllRanges();
             sel.addRange(rangeOnLastElement);
+          } else if (elements.length > 1 && lines.length === 1) {
+            // multiple lines and multiple inline elements selected
+            // here we are attaching the first line to the first inline elemen
+            // paste the middle ones right after
+            // and attach the last line to the begining of the last inline element
+
+            const firstTextNode = document.createTextNode(lines[0]);
+
+            const firstInline = elements[0];
+            const lastInline = elements[elements.length - 1];
+
+            firstInline.append(firstTextNode);
+            firstInline.append(lastInline.innerHTML);
+
+            range.collapse(false);
+
+            lastInline.remove();
+            let rangeOnLastElement = new Range();
+            rangeOnLastElement.setStart(firstTextNode, 0);
+            rangeOnLastElement.setEnd(firstTextNode, lines[0].length);
+            rangeOnLastElement.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(rangeOnLastElement);
+            firstInline.normalize();
           } else if (elements.length > 1) {
             // multiple lines and multiple inline elements selected
             // here we are attaching the first line to the first inline elemen
@@ -238,7 +282,6 @@
       }
 
       function textPaste(e) {
-        console.log("event:paste");
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
