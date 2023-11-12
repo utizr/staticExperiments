@@ -84,6 +84,9 @@ body {
   #page {
     font-size: 1.2rem;
   }
+  #page p {
+    line-height: 1.6rem;
+  }
 }
 
 #dialog {
@@ -123,7 +126,7 @@ body {
 #page p {
   margin: 0;
   padding: 0;
-  line-height: 1.4rem;
+  line-height: 1.9rem;
   margin-bottom: 0.4rem;
 }
 
