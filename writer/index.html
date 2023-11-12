@@ -51,8 +51,7 @@
       const debug = $("#debug");
 
       debug.innerHTML = `body: ${document.defaultView.getComputedStyle(document.body, null).getPropertyValue("font-size")}`;
-      debug.innerHTML += ` menu: ${document.defaultView.getComputedStyle($("#main-menu"), null).getPropertyValue("font-size")}`;
-      debug.innerHTML += ` page: ${document.defaultView.getComputedStyle($("#page"), null).getPropertyValue("font-size")}`;
+      debug.innerHTML += ` platform: ${navigator.platform}`;
 
       function $$(selector, element = document) {
         return Array.from(element.querySelectorAll(selector));

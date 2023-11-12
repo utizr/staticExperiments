@@ -60,6 +60,14 @@ body {
   }
 }
 
+@media (hover: none) {
+  .menu-button:active {
+    color: black;
+    background: transparent;
+    cursor: pointer;
+  }
+}
+
 #main-menu .symbol {
   text-transform: none;
 }
