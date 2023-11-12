@@ -37,6 +37,8 @@
       </div>
     </div>
 
+    <div id="debug">font-size</div>
+
     <script>
       const inlineContainers = ["p"];
       const textNodeType = 3;
@@ -45,6 +47,12 @@
       function $(selector, element = document) {
         return element.querySelector(selector);
       }
+
+      const debug = $("#debug");
+
+      debug.innerHTML = `body: ${document.defaultView.getComputedStyle(document.body, null).getPropertyValue("font-size")}`;
+      debug.innerHTML += ` menu: ${document.defaultView.getComputedStyle($("#main-menu"), null).getPropertyValue("font-size")}`;
+      debug.innerHTML += ` page: ${document.defaultView.getComputedStyle($("#page"), null).getPropertyValue("font-size")}`;
 
       function $$(selector, element = document) {
         return Array.from(element.querySelectorAll(selector));
