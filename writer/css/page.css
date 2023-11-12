@@ -13,6 +13,10 @@
   font-style: italic;
 }
 
+#mobile {
+  display: none;
+}
+
 body {
   padding: 0;
   margin: 0;
@@ -40,60 +44,93 @@ body {
 .menu-button.active {
   color: #00a4c1;
 }
-.menu-button:hover {
-  color: white;
-  background: black;
-  cursor: pointer;
+
+@media (hover: hover) {
+  .menu-button:hover {
+    color: white;
+    background: black;
+    cursor: pointer;
+  }
+  #dialog-close-button:hover {
+    color: #00a4c1;
+  }
 }
 
-#main-menu.pure-menu .symbol,
-#item-context-menu.pure-menu .symbol {
-  font-size: 1.7em;
+#main-menu .symbol,
+#item-context-menu .symbol {
+  font-size: 1.7rem;
 }
 
-.pure-menu .symbol {
+#main-menu .symbol {
   text-transform: none;
 }
 
-.pure-menu-link {
-  background: none;
-  border: none;
-}
-
-.pure-menu-link:focus {
-  background: none;
-}
-
 #page {
-  font-size: 1.3em;
+  font-size: 1.3rem;
   font-family: RedHatDisplay;
+}
+
+@media only screen and (max-width: 600px) {
+  #mobile {
+    display: inline-block;
+  }
+  #page {
+    font-size: 1.2rem;
+  }
+}
+
+#dialog {
+  position: fixed;
+  display: none;
+  left: 0px;
+  top: 0px;
+  width: 100%;
+  height: 100%;
+  background: white;
+}
+
+#dialog.active {
+  display: block;
+}
+
+#dialog-close-button {
+  position: fixed;
+  left: 0px;
+  top: 0px;
+  padding: 8px;
+}
+
+#dialog-close-button .symbol {
+  padding: 0px;
+  font-size: 45px;
+  line-height: 36px;
 }
 
 #container {
   padding: 60px 5px 120px 10px;
   margin-left: auto;
   margin-right: auto;
-  max-width: 50em;
+  max-width: 50rem;
 }
 
 #page p {
   margin: 0;
   padding: 0;
-  line-height: 1.4em;
-  margin-bottom: 0.4em;
+  line-height: 1.4rem;
+  margin-bottom: 0.4rem;
 }
 
 #page p:first-of-type {
-  text-indent: 0em;
+  text-indent: 0rem;
 }
 
 #page.book p {
-  text-indent: 1em;
-  margin-bottom: 0em;
+  text-indent: 1rem;
+  margin-bottom: 0rem;
 }
 
 #page.book p:first-of-type {
-  text-indent: 0em;
+  text-indent: 0rem;
 }
 
 /* to remove content editable border at activation */

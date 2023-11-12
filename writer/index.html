@@ -18,24 +18,15 @@
 
   <style></style>
   <body>
-    <div id="main-menu" class="pure-menu pure-menu-horizontal">
+    <div id="main-menu">
       <a class="menu-button"><div class="lsf symbol">menu</div></a>
       <a id="book-button" class="menu-button"><div class="lsf symbol">book</div></a>
       <a id="convert-button" class="menu-button"><div class="lsf symbol">file</div></a>
+      <a id="mobile" class="menu-button"><div class="lsf symbol">mobile</div></a>
     </div>
 
-    <div id="item-context-menu" class="pure-menu pure-menu-horizontal">
-      <ul class="pure-menu-list menu-list">
-        <li class="pure-menu-item">
-          <a href="#" id="item-button-back" class="pure-menu-link"><div class="lsf symbol">back</div></a>
-        </li>
-        <li class="pure-menu-item">
-          <a href="#" id="item-button-copy" class="pure-menu-link"><div class="lsf symbol">copy</div></a>
-        </li>
-        <li class="pure-menu-item">
-          <a href="#" id="item-button-delete" class="pure-menu-link"><div class="lsf symbol">delete</div></a>
-        </li>
-      </ul>
+    <div id="dialog" class="">
+      <a id="dialog-close-button"><div class="lsf symbol">close</div></a>
     </div>
 
     <div id="page">
@@ -45,6 +36,7 @@
         <p>Third paragraph, that is even more awesome.</p>
       </div>
     </div>
+
     <script>
       const inlineContainers = ["p"];
       const textNodeType = 3;
@@ -58,9 +50,24 @@
         return Array.from(element.querySelectorAll(selector));
       }
 
+      const dialog = $("#dialog");
+      const dialogCloseButton = $("#dialog-close-button");
+
+      function toggleDialog() {
+        dialog.classList.toggle("active");
+      }
+
       const editor = $("#container");
       const page = $("#page");
       editor.addEventListener("paste", textPaste);
+
+      const convertButton = $("#convert-button");
+      convertButton.addEventListener("click", function () {
+        toggleDialog();
+      });
+      dialogCloseButton.addEventListener("click", function () {
+        toggleDialog();
+      });
 
       const bookButton = $("#book-button");
       bookButton.addEventListener("click", function () {
