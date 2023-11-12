@@ -45,6 +45,10 @@ body {
   color: #00a4c1;
 }
 
+#main-menu .menu-button {
+  font-size: 1.7rem;
+}
+
 @media (hover: hover) {
   .menu-button:hover {
     color: white;
@@ -54,11 +58,6 @@ body {
   #dialog-close-button:hover {
     color: #00a4c1;
   }
-}
-
-#main-menu .symbol,
-#item-context-menu .symbol {
-  font-size: 1.7em;
 }
 
 #main-menu .symbol {
