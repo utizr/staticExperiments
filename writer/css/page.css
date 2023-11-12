@@ -49,25 +49,6 @@ body {
   font-size: 1.7rem;
 }
 
-@media (hover: hover) {
-  .menu-button:hover {
-    color: white;
-    background: black;
-    cursor: pointer;
-  }
-  #dialog-close-button:hover {
-    color: #00a4c1;
-  }
-}
-
-@media (hover: none) {
-  .menu-button:active {
-    color: black;
-    background: transparent;
-    cursor: pointer;
-  }
-}
-
 #main-menu .symbol {
   text-transform: none;
 }
@@ -75,18 +56,6 @@ body {
 #page {
   font-size: 1.38rem;
   font-family: RedHatDisplay;
-}
-
-@media only screen and (max-width: 600px) {
-  #mobile {
-    display: inline-block;
-  }
-  #page {
-    font-size: 1.2rem;
-  }
-  #page p {
-    line-height: 1.6rem;
-  }
 }
 
 #dialog {
@@ -132,7 +101,7 @@ body {
 #page p {
   margin: 0;
   padding: 0;
-  line-height: 2.2rem;
+  line-height: 2.02rem;
   margin-bottom: 0.4rem;
 }
 
@@ -152,4 +121,35 @@ body {
 /* to remove content editable border at activation */
 [contenteditable] {
   outline: 0px solid transparent;
+}
+
+@media only screen and (max-width: 600px) {
+  #mobile {
+    display: inline-block;
+  }
+  #page {
+    font-size: 1.2rem;
+  }
+  #page p {
+    line-height: 1.4rem;
+  }
+}
+
+@media (hover: hover) {
+  .menu-button:hover {
+    color: white;
+    background: black;
+    cursor: pointer;
+  }
+  #dialog-close-button:hover {
+    color: #00a4c1;
+  }
+}
+
+@media (hover: none) {
+  .menu-button:active {
+    color: black;
+    background: transparent;
+    cursor: pointer;
+  }
 }
