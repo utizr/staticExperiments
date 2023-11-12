@@ -27,6 +27,7 @@
 
     <div id="dialog" class="">
       <a id="dialog-close-button"><div class="lsf symbol">close</div></a>
+      <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
     </div>
 
     <div id="page">
@@ -61,9 +62,19 @@
       const page = $("#page");
       editor.addEventListener("paste", textPaste);
 
+      function convertTextAndDisplay() {
+        const inlineElements = Array.from(editor.children);
+        const text = inlineElements
+          .map((ie) => {
+            return ie.textContent;
+          })
+          .join("\n");
+        $("#content-text").textContent = text;
+      }
       const convertButton = $("#convert-button");
       convertButton.addEventListener("click", function () {
         toggleDialog();
+        convertTextAndDisplay();
       });
       dialogCloseButton.addEventListener("click", function () {
         toggleDialog();
@@ -73,18 +84,6 @@
       bookButton.addEventListener("click", function () {
         page.classList.toggle("book");
         bookButton.classList.toggle("active");
-      });
-
-      const convertToText = $("#convert-button");
-      convertToText.addEventListener("click", function () {
-        const inlineElements = Array.from(editor.children);
-        console.log(
-          inlineElements
-            .map((ie) => {
-              return ie.textContent;
-            })
-            .join("\n"),
-        );
       });
 
       const observer = new MutationObserver((mutationList) =>

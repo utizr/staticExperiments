@@ -103,6 +103,12 @@ body {
   display: block;
 }
 
+#content-text {
+  margin-top: 3.5rem;
+  width: 97%;
+  height: 90%;
+}
+
 #dialog-close-button {
   position: fixed;
   left: 0px;
