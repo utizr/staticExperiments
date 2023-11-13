@@ -135,7 +135,7 @@ body {
   }
 }
 
-@media (hover: hover) {
+@media (pointer: fine) {
   .menu-button:hover {
     color: white;
     background: black;
@@ -146,7 +146,7 @@ body {
   }
 }
 
-@media (hover: none) {
+@media (pointer: coarse) {
   .menu-button:active {
     color: black;
     background: transparent;
