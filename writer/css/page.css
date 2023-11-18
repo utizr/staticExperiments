@@ -73,19 +73,16 @@ body {
 }
 
 #content-text {
-  margin-top: 3.5rem;
   width: 97%;
   height: 90%;
 }
 
-#dialog-close-button {
-  position: fixed;
-  left: 0px;
-  top: 0px;
+.dialog-button {
+  display: inline-block;
   padding: 8px;
 }
 
-#dialog-close-button .symbol {
+.dialog-button .symbol {
   padding: 0px;
   font-size: 45px;
   line-height: 36px;
@@ -141,7 +138,7 @@ body {
     background: black;
     cursor: pointer;
   }
-  #dialog-close-button:hover {
+  .dialog-button:hover {
     color: #00a4c1;
   }
 }

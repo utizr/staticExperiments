@@ -26,7 +26,10 @@
     </div>
 
     <div id="dialog" class="">
-      <a id="dialog-close-button"><div class="lsf symbol">close</div></a>
+      <div id="dialog-button-container">
+        <a id="dialog-close-button" class="dialog-button"><div class="lsf symbol">close</div></a>
+        <a id="dialog-save-button" class="dialog-button"><div class="lsf symbol">check</div></a>
+      </div>
       <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
     </div>
 
@@ -53,24 +56,81 @@
 
       const dialog = $("#dialog");
       const dialogCloseButton = $("#dialog-close-button");
+      const dialogSaveButton = $("#dialog-save-button");
+      const editor = $("#container");
+      const page = $("#page");
+
+      // HELPERS >>>>>>>>>>>>>>>>>>
+
+      function debounce(fn, delay) {
+        var timer = null;
+        return function () {
+          var context = this,
+            args = arguments;
+          clearTimeout(timer);
+          timer = setTimeout(function () {
+            fn.apply(context, args);
+          }, delay);
+        };
+      }
+
+      const saveDebounce = debounce(() => {
+        localStorage.setItem("book", convertToText());
+      }, 3000);
+
+      // there is probably no need for a decoder, since a.textContent will get
+      // the decoded data out.
+      function encodeHTMLEntities(rawStr) {
+        return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
+      }
+
+      function loadFromText(text, container) {
+        const lines = text.split("\n");
+        const htmlData = lines
+          .map((line) => {
+            let text = encodeHTMLEntities(line);
+            if (text === "") {
+              text = "<br/>";
+            }
+            return `<p>${text}</p>`;
+          })
+          .join("\n");
+        container.innerHTML = htmlData;
+      }
+
+      function loadDataOnPageLoad() {
+        const book = localStorage.getItem("book");
+        loadFromText(book, editor);
+      }
+      loadDataOnPageLoad();
+
+      // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
+
+      dialogSaveButton.addEventListener("click", function () {
+        loadFromText($("#content-text").value, editor);
+        toggleDialog();
+      });
 
       function toggleDialog() {
         dialog.classList.toggle("active");
       }
 
-      const editor = $("#container");
-      const page = $("#page");
       editor.addEventListener("paste", textPaste);
 
-      function convertTextAndDisplay() {
+      function convertToText() {
         const inlineElements = Array.from(editor.children);
         const text = inlineElements
           .map((ie) => {
             return ie.textContent;
           })
           .join("\n");
-        $("#content-text").textContent = text;
+        return text;
       }
+
+      function convertTextAndDisplay() {
+        $("#content-text").textContent = convertToText();
+      }
+
       const convertButton = $("#convert-button");
       convertButton.addEventListener("click", function () {
         toggleDialog();
@@ -112,6 +172,8 @@
             clearContainer(container);
           }
         }
+
+        saveDebounce();
       });
 
       function isEmpty(editor) {
