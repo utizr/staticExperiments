@@ -23,7 +23,7 @@
       <a id="book-button" class="menu-button"><div class="lsf symbol">book</div></a>
       <a id="convert-button" class="menu-button"><div class="lsf symbol">file</div></a>
       <a id="clear-button" class="menu-button"><div class="lsf symbol">delete</div></a>
-      <a id="mobile" class="menu-button"><div class="lsf symbol">mobile</div></a>
+      <a id="unsaved-button" class="menu-button"><div class="lsf symbol">etc</div></a>
     </div>
 
     <div id="dialog" class="">
@@ -60,6 +60,7 @@
       const dialogSaveButton = $("#dialog-save-button");
       const editor = $("#container");
       const page = $("#page");
+      const unsaved = $("#unsaved-button");
 
       // HELPERS >>>>>>>>>>>>>>>>>>
 
@@ -77,6 +78,7 @@
 
       const saveDebounce = debounce(() => {
         localStorage.setItem("book", convertToText());
+        unsaved.style.display = "none";
       }, 1000);
 
       // there is probably no need for a decoder, since a.textContent will get
@@ -181,6 +183,7 @@
           }
         }
 
+        unsaved.style.display = "inline-block";
         saveDebounce();
       });
 
@@ -361,6 +364,8 @@
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
+        unsaved.style.display = "inline-block";
+        saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {

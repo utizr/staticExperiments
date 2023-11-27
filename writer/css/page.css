@@ -13,7 +13,7 @@
   font-style: italic;
 }
 
-#mobile {
+#unsaved-button {
   display: none;
 }
 
@@ -121,9 +121,6 @@ body {
 }
 
 @media only screen and (max-width: 600px) {
-  #mobile {
-    display: inline-block;
-  }
   #page {
     font-size: 1.2rem;
   }
