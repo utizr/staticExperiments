@@ -177,11 +177,12 @@
         // // console.log("altKey", event.altKey);
         // // console.log("ctrlKey", event.ctrlKey);
         // // console.log("key", event.key);
-        // if (event.key === "Backspace") {
-        //   if (isEmpty(editor)) {
-        //     clearContainer(editor);
-        //   }
-        // }
+        if (event.inputType === "deleteContentBackward") {
+          console.log("Backspace");
+          if (isEmpty(editor)) {
+            clearContainer(editor);
+          }
+        }
 
         unsaved.style.display = "inline-block";
         saveDebounce();
