@@ -156,7 +156,7 @@
         clearContainer(editor);
       });
 
-      const observer = new MutationObserver((mutationList) =>
+      const observer = new MutationObserver((mutationList) => {
         mutationList
           .filter((m) => m.type === "childList")
           .forEach((m) => {
@@ -166,22 +166,22 @@
                 insertedElement.replaceWith(text);
               }
             });
-          }),
-      );
+          });
+      });
       observer.observe(editor, { childList: true, subtree: true });
 
-      editor.addEventListener("keyup", (event) => {
-        if (event.isComposing || event.keyCode === 229) {
-          return;
-        }
-        // console.log("altKey", event.altKey);
-        // console.log("ctrlKey", event.ctrlKey);
-        // console.log("key", event.key);
-        if (event.key === "Backspace") {
-          if (isEmpty(editor)) {
-            clearContainer(editor);
-          }
-        }
+      editor.addEventListener("input", (event) => {
+        // if (event.isComposing || event.keyCode === 229) {
+        //   return;
+        // }
+        // // console.log("altKey", event.altKey);
+        // // console.log("ctrlKey", event.ctrlKey);
+        // // console.log("key", event.key);
+        // if (event.key === "Backspace") {
+        //   if (isEmpty(editor)) {
+        //     clearContainer(editor);
+        //   }
+        // }
 
         unsaved.style.display = "inline-block";
         saveDebounce();
@@ -364,8 +364,6 @@
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
-        unsaved.style.display = "inline-block";
-        saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {
