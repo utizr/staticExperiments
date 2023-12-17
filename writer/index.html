@@ -213,6 +213,15 @@
         return rangeOnBr;
       }
 
+      function carretToTextNodeEnd(sel, textNode) {
+        let rangeOnLastElement = new Range();
+        rangeOnLastElement.setStart(textNode, 0);
+        rangeOnLastElement.setEnd(textNode, textNode.textContent.length);
+        rangeOnLastElement.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(rangeOnLastElement);
+      }
+
       function replaceSelectedText(replacementText) {
         const lines = replacementText.split("\n").filter((line) => {
           return line.length;
@@ -246,14 +255,7 @@
             rangeOnLastElement.collapse(false);
             sel.removeAllRanges();
             sel.addRange(rangeOnLastElement);
-          } else if (elements.length == 1 && lines.length == 1) {
-            // if we are inserting to the middle of the paragraph
-            // and we are inserting a simple 1 line text
-            const text = document.createTextNode(lines[0]);
-            range.insertNode(text);
-            elements[0].normalize();
-            range.collapse(false);
-          } else if (elements.length == 1 && lines.length > 1) {
+          } else if (elements.length == 1 && lines.length > 0) {
             // if we are inserting to the middle of a paragraph
             // and we are inserting more lines.
             // In this case we are creating a new paragraph from the extracted first part
@@ -264,39 +266,38 @@
             const startRange = range.cloneRange();
             const endRange = range.cloneRange();
             const firstTextNode = document.createTextNode(lines.shift());
-            const lastText = lines.pop();
-            const lastTextNode = document.createTextNode(lastText);
             startRange.setStartBefore(inlineNode.firstChild);
             endRange.setEndAfter(inlineNode.firstChild);
 
             const startContent = startRange.extractContents();
             const firstNode = document.createElement("p");
-            firstNode.append(startContent);
+            if (!!startContent.textContent) {
+              firstNode.append(startContent);
+            }
             firstNode.append(firstTextNode);
             inlineNode.before(firstNode);
 
-            let insertAfterThis = firstNode;
+            let endNode = firstNode;
+            let endTextNode = firstTextNode;
             for (const line of lines) {
               const p = document.createElement("p");
               const text = document.createTextNode(line);
+              endTextNode = text;
               p.appendChild(text);
-              insertAfterThis.after(p);
-              insertAfterThis = p;
+              endNode.after(p);
+              endNode = p;
             }
-
             const endContent = endRange.extractContents();
-            const endNode = document.createElement("p");
-            endNode.append(lastTextNode);
-            endNode.append(endContent);
-            inlineNode.after(endNode);
+            if (!!endContent.textContent) {
+              endNode.append(endContent);
+            }
             range.collapse(false);
 
-            let rangeOnLastElement = new Range();
-            rangeOnLastElement.setStart(lastTextNode, 0);
-            rangeOnLastElement.setEnd(lastTextNode, lastText.length);
-            rangeOnLastElement.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(rangeOnLastElement);
+            carretToTextNodeEnd(sel, endTextNode);
+            if (!inlineNode.innerHTML) {
+              inlineNode.remove();
+            }
+            endNode.normalize();
           } else if (elements.length > 1 && lines.length === 1) {
             // multiple lines and multiple inline elements selected
             // here we are attaching the first line to the first inline elemen
@@ -365,6 +366,8 @@
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
+        unsaved.style.display = "inline-block";
+        saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {
