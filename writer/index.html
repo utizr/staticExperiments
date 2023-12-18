@@ -312,8 +312,8 @@
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
-        // unsaved.style.display = "inline-block";
-        // saveDebounce();
+        unsaved.style.display = "inline-block";
+        saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {
