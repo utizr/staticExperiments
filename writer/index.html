@@ -255,27 +255,29 @@
             rangeOnLastElement.collapse(false);
             sel.removeAllRanges();
             sel.addRange(rangeOnLastElement);
-          } else if (elements.length == 1 && lines.length > 0) {
+          } else if (elements.length > 0 && lines.length > 0) {
             // if we are inserting to the middle of a paragraph
             // and we are inserting more lines.
             // In this case we are creating a new paragraph from the extracted first part
             // of the paragraph, and attach the first line; we then insert the middle lines
             // as new paragraphs. Then at the end we create a new paragraph from the extracted
             // last part of the paragraph, and attach the last line to it.
-            const inlineNode = elements[0];
+            const firstInlineNode = elements.shift();
+            const lastInlineNode = elements.pop() || firstInlineNode;
             const startRange = range.cloneRange();
             const endRange = range.cloneRange();
             const firstTextNode = document.createTextNode(lines.shift());
-            startRange.setStartBefore(inlineNode.firstChild);
-            endRange.setEndAfter(inlineNode.firstChild);
+            startRange.setStartBefore(firstInlineNode.firstChild);
+            endRange.setEndAfter(lastInlineNode.firstChild);
 
             const startContent = startRange.extractContents();
             const firstNode = document.createElement("p");
             if (!!startContent.textContent) {
-              firstNode.append(startContent);
+              firstNode.append(startContent.textContent);
             }
             firstNode.append(firstTextNode);
-            inlineNode.before(firstNode);
+
+            firstInlineNode.before(firstNode);
 
             let endNode = firstNode;
             let endTextNode = firstTextNode;
@@ -289,75 +291,19 @@
             }
             const endContent = endRange.extractContents();
             if (!!endContent.textContent) {
-              endNode.append(endContent);
+              endNode.append(endContent.textContent);
             }
             range.collapse(false);
 
             carretToTextNodeEnd(sel, endTextNode);
-            if (!inlineNode.innerHTML) {
-              inlineNode.remove();
+            if (!firstInlineNode.innerHTML) {
+              firstInlineNode.remove();
             }
+            if (firstInlineNode != lastInlineNode && !lastInlineNode.innerHTML) {
+              lastInlineNode.remove();
+            }
+            firstNode.normalize();
             endNode.normalize();
-          } else if (elements.length > 1 && lines.length === 1) {
-            // multiple lines and multiple inline elements selected
-            // here we are attaching the first line to the first inline elemen
-            // paste the middle ones right after
-            // and attach the last line to the begining of the last inline element
-
-            const firstTextNode = document.createTextNode(lines[0]);
-
-            const firstInline = elements[0];
-            const lastInline = elements[elements.length - 1];
-
-            firstInline.append(firstTextNode);
-            firstInline.append(lastInline.innerHTML);
-
-            range.collapse(false);
-
-            lastInline.remove();
-            let rangeOnLastElement = new Range();
-            rangeOnLastElement.setStart(firstTextNode, 0);
-            rangeOnLastElement.setEnd(firstTextNode, lines[0].length);
-            rangeOnLastElement.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(rangeOnLastElement);
-            firstInline.normalize();
-          } else if (elements.length > 1) {
-            // multiple lines and multiple inline elements selected
-            // here we are attaching the first line to the first inline elemen
-            // paste the middle ones right after
-            // and attach the last line to the begining of the last inline element
-
-            const firstTextNode = document.createTextNode(lines.shift());
-            const lastText = lines.pop();
-            const lastTextNode = document.createTextNode(lastText);
-
-            const firstInline = elements[0];
-            const lastInline = elements[elements.length - 1];
-
-            firstInline.append(firstTextNode);
-            firstInline.normalize();
-
-            let insertAfterThis = firstInline;
-            for (const line of lines) {
-              const p = document.createElement("p");
-              const text = document.createTextNode(line);
-              p.appendChild(text);
-              insertAfterThis.after(p);
-              insertAfterThis = p;
-            }
-            range.collapse(false);
-
-            if (lastText) {
-              lastInline.prepend(lastTextNode);
-              lastInline.normalize();
-              let rangeOnLastElement = new Range();
-              rangeOnLastElement.setStart(lastTextNode, 0);
-              rangeOnLastElement.setEnd(lastTextNode, lastText.length);
-              rangeOnLastElement.collapse(false);
-              sel.removeAllRanges();
-              sel.addRange(rangeOnLastElement);
-            }
           }
         }
       }
@@ -366,8 +312,8 @@
         e.preventDefault();
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
-        unsaved.style.display = "inline-block";
-        saveDebounce();
+        // unsaved.style.display = "inline-block";
+        // saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {
