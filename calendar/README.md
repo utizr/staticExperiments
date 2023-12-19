@@ -1,0 +1,1 @@
+This is an approximately 10 year old code that generates a calendar in js.
