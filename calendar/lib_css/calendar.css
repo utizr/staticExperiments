@@ -13,6 +13,7 @@ body {
   border: 0px;
   text-decoration: none;
   outline: 0px;
+  background: #413f3f;
 }
 /* 
 a:focus{
@@ -127,6 +128,7 @@ a:focus{
 .c_week .c_dayToday {
   display: block;
   color: #fff;
-  background: red;
+  background: #cd0e0e;
   text-decoration: none;
+  border-radius: 16px;
 }
