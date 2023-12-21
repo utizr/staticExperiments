@@ -17,12 +17,18 @@ body {
 
 body {
   background: #413f3f;
+  text-align: center;
+  padding-top: 20px;
 }
 /* 
 a:focus{
     outline:0px;
 } */
 
+#calendar-container {
+  display: inline-block;
+  text-align: left;
+}
 .calendarContainer {
   width: 224px;
   margin: 10px;
