@@ -66,6 +66,22 @@ a:focus{
   outline: 0;
   padding: 0;
   margin: 0;
+  border-spacing: 0;
+}
+
+.c_first_week .c_sunday {
+  border-top-right-radius: 10px;
+}
+
+.c_last_week .c_sunday {
+  border-bottom-right-radius: 10px;
+}
+.c_first_week .c_saturday {
+  border-top-left-radius: 10px;
+}
+
+.c_last_week .c_saturday {
+  border-bottom-left-radius: 10px;
 }
 
 .c_columnHeading td a {
@@ -131,7 +147,7 @@ a:focus{
 .c_week .c_dayToday {
   display: block;
   color: #fff;
-  background: #cd0e0e;
+  background: #27ac0c;
   text-decoration: none;
   border-radius: 16px;
 }
