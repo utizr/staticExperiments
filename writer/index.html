@@ -43,9 +43,8 @@
     </div>
 
     <script>
-      const inlineContainers = ["p"];
-      const textNodeType = 3;
-      const documentFragmentType = 11;
+
+
 
       function $(selector, element = document) {
         return element.querySelector(selector);
@@ -54,6 +53,12 @@
       function $$(selector, element = document) {
         return Array.from(element.querySelectorAll(selector));
       }
+
+
+      const inlineContainers = ["p"];
+      const textNodeType = 3;
+      const documentFragmentType = 11;
+
 
       const dialog = $("#dialog");
       const dialogCloseButton = $("#dialog-close-button");
@@ -80,6 +85,9 @@
         localStorage.setItem("book", convertToText());
         unsaved.style.display = "none";
       }, 1000);
+
+
+      // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
       // there is probably no need for a decoder, since a.textContent will get
       // the decoded data out.
@@ -110,7 +118,6 @@
       }
       loadDataOnPageLoad();
 
-      // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
       dialogSaveButton.addEventListener("click", function () {
         loadFromText($("#content-text").value, editor);
@@ -120,6 +127,8 @@
       function toggleDialog() {
         dialog.classList.toggle("active");
       }
+
+      // PASTE handler
 
       editor.addEventListener("paste", textPaste);
 
