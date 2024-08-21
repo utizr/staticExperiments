@@ -69,37 +69,41 @@
 
       // HELPERS >>>>>>>>>>>>>>>>>>
 
-      function debounce(fn, delay) {
-        var timer = null;
-        return function () {
-          var context = this,
-            args = arguments;
-          clearTimeout(timer);
-          timer = setTimeout(function () {
-            fn.apply(context, args);
-          }, delay);
-        };
+      const helper =  {
+        ini() {
+          this.saveDebounce = this.saveDebounce();
+        },
+        debounce: function(fn, delay) {
+          var timer = null;
+          return function () {
+            var context = this,
+              args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+              fn.apply(context, args);
+            }, delay);
+          };
+        },
+        saveDebounce: function() {
+          return this.debounce(() => {
+            localStorage.setItem("book", convertToText());
+            unsaved.style.display = "none";
+          }, 1000)
+        },
+        encodeHTMLEntities(rawStr) {
+          return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
+        },
       }
 
-      const saveDebounce = debounce(() => {
-        localStorage.setItem("book", convertToText());
-        unsaved.style.display = "none";
-      }, 1000);
-
+      helper.ini();
 
       // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
-
-      // there is probably no need for a decoder, since a.textContent will get
-      // the decoded data out.
-      function encodeHTMLEntities(rawStr) {
-        return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
-      }
 
       function loadFromText(text, container) {
         const lines = text.split("\n");
         const htmlData = lines
           .map((line) => {
-            let text = encodeHTMLEntities(line);
+            let text = helper.encodeHTMLEntities(line);
             if (text === "") {
               text = "<br/>";
             }
@@ -143,7 +147,7 @@
       }
 
       function convertTextAndDisplay() {
-        $("#content-text").textContent = convertToText();
+        $("#content-text").value = convertToText();
       }
 
       const convertButton = $("#convert-button");
@@ -194,7 +198,7 @@
         }
 
         unsaved.style.display = "inline-block";
-        saveDebounce();
+        helper.saveDebounce();
       });
 
       function isEmpty(editor) {
@@ -322,7 +326,7 @@
         var text = e.clipboardData.getData("text/plain").trim();
         replaceSelectedText(text);
         unsaved.style.display = "inline-block";
-        saveDebounce();
+        helper.saveDebounce();
       }
 
       function hasAnySelectedTextNodes(container, range) {
