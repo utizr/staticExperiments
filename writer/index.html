@@ -97,6 +97,24 @@
 
       helper.ini();
 
+
+      // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
+
+      function toggleDialog() {
+        dialog.classList.toggle("active");
+      }
+
+      // STORAGE METHODS <<<<<<<<<<<<<<<<<<<<<
+      function loadDataOnPageLoad() {
+        const book = localStorage.getItem("book");
+        if (!book) {
+          return;
+        }
+        loadFromText(book, editor);
+      }
+      loadDataOnPageLoad();
+
+
       // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
       function loadFromText(text, container) {
@@ -113,28 +131,8 @@
         container.innerHTML = htmlData;
       }
 
-      function loadDataOnPageLoad() {
-        const book = localStorage.getItem("book");
-        if (!book) {
-          return;
-        }
-        loadFromText(book, editor);
-      }
-      loadDataOnPageLoad();
-
-
-      dialogSaveButton.addEventListener("click", function () {
-        loadFromText($("#content-text").value, editor);
-        toggleDialog();
-      });
-
-      function toggleDialog() {
-        dialog.classList.toggle("active");
-      }
 
       // PASTE handler
-
-      editor.addEventListener("paste", textPaste);
 
       function convertToText() {
         const inlineElements = Array.from(editor.children);
@@ -149,57 +147,6 @@
       function convertTextAndDisplay() {
         $("#content-text").value = convertToText();
       }
-
-      const convertButton = $("#convert-button");
-      convertButton.addEventListener("click", function () {
-        toggleDialog();
-        convertTextAndDisplay();
-      });
-      dialogCloseButton.addEventListener("click", function () {
-        toggleDialog();
-      });
-
-      const bookButton = $("#book-button");
-      bookButton.addEventListener("click", function () {
-        page.classList.toggle("book");
-        bookButton.classList.toggle("active");
-      });
-      const clearButton = $("#clear-button");
-      clearButton.addEventListener("click", function () {
-        clearContainer(editor);
-      });
-
-      const observer = new MutationObserver((mutationList) => {
-        mutationList
-          .filter((m) => m.type === "childList")
-          .forEach((m) => {
-            m.addedNodes.forEach((insertedElement) => {
-              if (insertedElement.tagName === "SPAN") {
-                const text = document.createTextNode(insertedElement.textContent);
-                insertedElement.replaceWith(text);
-              }
-            });
-          });
-      });
-      observer.observe(editor, { childList: true, subtree: true });
-
-      editor.addEventListener("input", (event) => {
-        // if (event.isComposing || event.keyCode === 229) {
-        //   return;
-        // }
-        // // console.log("altKey", event.altKey);
-        // // console.log("ctrlKey", event.ctrlKey);
-        // // console.log("key", event.key);
-        if (event.inputType === "deleteContentBackward") {
-          console.log("Backspace");
-          if (isEmpty(editor)) {
-            clearContainer(editor);
-          }
-        }
-
-        unsaved.style.display = "inline-block";
-        helper.saveDebounce();
-      });
 
       function isEmpty(editor) {
         if (editor.children.length === 1) {
@@ -391,6 +338,69 @@
         parentNode.replaceChild(newNode, element);
         parentNode.normalize();
       }
+
+
+      // BEHAVIOURS >>>>>>>>>>>>>>>>>>
+
+
+      dialogSaveButton.addEventListener("click", function () {
+        loadFromText($("#content-text").value, editor);
+        toggleDialog();
+      });
+
+      const convertButton = $("#convert-button");
+      convertButton.addEventListener("click", function () {
+        toggleDialog();
+        convertTextAndDisplay();
+      });
+      dialogCloseButton.addEventListener("click", function () {
+        toggleDialog();
+      });
+
+      const bookButton = $("#book-button");
+      bookButton.addEventListener("click", function () {
+        page.classList.toggle("book");
+        bookButton.classList.toggle("active");
+      });
+      const clearButton = $("#clear-button");
+      clearButton.addEventListener("click", function () {
+        clearContainer(editor);
+      });
+
+      const observer = new MutationObserver((mutationList) => {
+        mutationList
+          .filter((m) => m.type === "childList")
+          .forEach((m) => {
+            m.addedNodes.forEach((insertedElement) => {
+              if (insertedElement.tagName === "SPAN") {
+                const text = document.createTextNode(insertedElement.textContent);
+                insertedElement.replaceWith(text);
+              }
+            });
+          });
+      });
+      observer.observe(editor, { childList: true, subtree: true });
+
+      editor.addEventListener("paste", textPaste);
+
+      editor.addEventListener("input", (event) => {
+        // if (event.isComposing || event.keyCode === 229) {
+        //   return;
+        // }
+        // // console.log("altKey", event.altKey);
+        // // console.log("ctrlKey", event.ctrlKey);
+        // // console.log("key", event.key);
+        if (event.inputType === "deleteContentBackward") {
+          console.log("Backspace");
+          if (isEmpty(editor)) {
+            clearContainer(editor);
+          }
+        }
+
+        unsaved.style.display = "inline-block";
+        helper.saveDebounce();
+      });
+
     </script>
   </body>
 </html>
