@@ -44,8 +44,6 @@
 
     <script>
 
-
-
       function $(selector, element = document) {
         return element.querySelector(selector);
       }
@@ -54,11 +52,9 @@
         return Array.from(element.querySelectorAll(selector));
       }
 
-
       const inlineContainers = ["p"];
       const textNodeType = 3;
       const documentFragmentType = 11;
-
 
       const dialog = $("#dialog");
       const dialogCloseButton = $("#dialog-close-button");
@@ -97,7 +93,6 @@
 
       helper.ini();
 
-
       // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
 
       function toggleDialog() {
@@ -114,7 +109,6 @@
       }
       loadDataOnPageLoad();
 
-
       // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
       function loadFromText(text, container) {
@@ -130,7 +124,6 @@
           .join("\n");
         container.innerHTML = htmlData;
       }
-
 
       // PASTE handler
 
@@ -339,9 +332,7 @@
         parentNode.normalize();
       }
 
-
       // BEHAVIOURS >>>>>>>>>>>>>>>>>>
-
 
       dialogSaveButton.addEventListener("click", function () {
         loadFromText($("#content-text").value, editor);
