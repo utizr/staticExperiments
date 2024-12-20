@@ -1,397 +1,431 @@
 <!DOCTYPE html>
 <html>
-  <!-- csss framework documentation -->
-  <!-- https://purecss.io/grids/ -->
+<!-- csss framework documentation -->
+<!-- https://purecss.io/grids/ -->
 
-  <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Writer</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writer</title>
 
-    <link rel="stylesheet" href="./css/icons/style.css" />
-    <link rel="stylesheet" href="./css/page.css" />
-    <link rel="stylesheet" href="./css/colors-light.css" />
+  <link rel="stylesheet" href="./css/icons/style.css" />
+  <link rel="stylesheet" href="./css/page.css" />
+  <link rel="stylesheet" href="./css/colors-light.css" />
 
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>" />
-  </head>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>" />
+</head>
 
-  <style></style>
-  <body>
-    <div id="main-menu">
-      <a class="menu-button"><div class="lsf symbol">menu</div></a>
-      <a id="book-button" class="menu-button"><div class="lsf symbol">book</div></a>
-      <a id="convert-button" class="menu-button"><div class="lsf symbol">file</div></a>
-      <a id="clear-button" class="menu-button"><div class="lsf symbol">delete</div></a>
-      <a id="unsaved-button" class="menu-button"><div class="lsf symbol">etc</div></a>
+<style></style>
+
+<body>
+  <div id="main-menu">
+    <a class="menu-button">
+      <div class="lsf symbol">menu</div>
+    </a>
+    <a id="book-button" class="menu-button">
+      <div class="lsf symbol">book</div>
+    </a>
+    <a id="convert-button" class="menu-button">
+      <div class="lsf symbol">file</div>
+    </a>
+    <a id="clear-button" class="menu-button">
+      <div class="lsf symbol">delete</div>
+    </a>
+    <a id="unsaved-button" class="menu-button">
+      <div class="lsf symbol">etc</div>
+    </a>
+  </div>
+
+  <div id="dialog" class="">
+    <div id="dialog-button-container">
+      <a id="dialog-close-button" class="dialog-button">
+        <div class="lsf symbol">close</div>
+      </a>
+      <a id="dialog-save-button" class="dialog-button">
+        <div class="lsf symbol">check</div>
+      </a>
     </div>
+    <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
+  </div>
 
-    <div id="dialog" class="">
-      <div id="dialog-button-container">
-        <a id="dialog-close-button" class="dialog-button"><div class="lsf symbol">close</div></a>
-        <a id="dialog-save-button" class="dialog-button"><div class="lsf symbol">check</div></a>
-      </div>
-      <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
+  <div id="page">
+    <div id="container" contenteditable="true">
+      <p>First paragraph which is awesome.</p>
+      <p>Second paragraph, <b>italic</b> and is even more awesome.</p>
+      <p>Third paragraph, <i>bold</i> that is even more awesome.</p>
     </div>
+  </div>
 
-    <div id="page">
-      <div id="container" contenteditable="true">
-        <p>First paragraph which is awesome.</p>
-        <p>Second paragraph, and is even more awesome.</p>
-        <p>Third paragraph, that is even more awesome.</p>
-      </div>
-    </div>
+  <script>
 
-    <script>
+    function $(selector, element = document) {
+      return element.querySelector(selector);
+    }
 
-      function $(selector, element = document) {
-        return element.querySelector(selector);
+    function $$(selector, element = document) {
+      return Array.from(element.querySelectorAll(selector));
+    }
+
+    const inlineContainers = ["p"];
+    const textNodeType = 3;
+    const documentFragmentType = 11;
+
+    const dialog = $("#dialog");
+    const dialogCloseButton = $("#dialog-close-button");
+    const dialogSaveButton = $("#dialog-save-button");
+    const editor = $("#container");
+    const page = $("#page");
+    const unsaved = $("#unsaved-button");
+
+    // HELPERS >>>>>>>>>>>>>>>>>>
+
+    const helper = {
+      ini() {
+        this.saveDebounce = this.saveDebounce();
+      },
+      debounce: function (fn, delay) {
+        var timer = null;
+        return function () {
+          var context = this,
+            args = arguments;
+          clearTimeout(timer);
+          timer = setTimeout(function () {
+            fn.apply(context, args);
+          }, delay);
+        };
+      },
+      saveDebounce: function () {
+        return this.debounce(() => {
+          localStorage.setItem("book", convertToText());
+          unsaved.style.display = "none";
+        }, 1000)
+      },
+      encodeHTMLEntities(rawStr) {
+        return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
+      },
+    }
+
+    helper.ini();
+
+    // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
+
+    function toggleDialog() {
+      dialog.classList.toggle("active");
+    }
+
+    // STORAGE METHODS <<<<<<<<<<<<<<<<<<<<<
+    function loadDataOnPageLoad() {
+      const book = localStorage.getItem("book");
+      if (!book) {
+        return;
       }
+      loadFromText(book, editor);
+    }
+    // loadDataOnPageLoad();
 
-      function $$(selector, element = document) {
-        return Array.from(element.querySelectorAll(selector));
-      }
+    // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
-      const inlineContainers = ["p"];
-      const textNodeType = 3;
-      const documentFragmentType = 11;
-
-      const dialog = $("#dialog");
-      const dialogCloseButton = $("#dialog-close-button");
-      const dialogSaveButton = $("#dialog-save-button");
-      const editor = $("#container");
-      const page = $("#page");
-      const unsaved = $("#unsaved-button");
-
-      // HELPERS >>>>>>>>>>>>>>>>>>
-
-      const helper =  {
-        ini() {
-          this.saveDebounce = this.saveDebounce();
-        },
-        debounce: function(fn, delay) {
-          var timer = null;
-          return function () {
-            var context = this,
-              args = arguments;
-            clearTimeout(timer);
-            timer = setTimeout(function () {
-              fn.apply(context, args);
-            }, delay);
-          };
-        },
-        saveDebounce: function() {
-          return this.debounce(() => {
-            localStorage.setItem("book", convertToText());
-            unsaved.style.display = "none";
-          }, 1000)
-        },
-        encodeHTMLEntities(rawStr) {
-          return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
-        },
-      }
-
-      helper.ini();
-
-      // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
-
-      function toggleDialog() {
-        dialog.classList.toggle("active");
-      }
-
-      // STORAGE METHODS <<<<<<<<<<<<<<<<<<<<<
-      function loadDataOnPageLoad() {
-        const book = localStorage.getItem("book");
-        if (!book) {
-          return;
-        }
-        loadFromText(book, editor);
-      }
-      loadDataOnPageLoad();
-
-      // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
-
-      function loadFromText(text, container) {
-        const lines = text.split("\n");
-        const htmlData = lines
-          .map((line) => {
-            let text = helper.encodeHTMLEntities(line);
-            if (text === "") {
-              text = "<br/>";
-            }
-            return `<p>${text}</p>`;
-          })
-          .join("\n");
-        container.innerHTML = htmlData;
-      }
-
-      // PASTE handler
-
-      function convertToText() {
-        const inlineElements = Array.from(editor.children);
-        const text = inlineElements
-          .map((ie) => {
-            return ie.textContent;
-          })
-          .join("\n");
-        return text;
-      }
-
-      function convertTextAndDisplay() {
-        $("#content-text").value = convertToText();
-      }
-
-      function isEmpty(editor) {
-        if (editor.children.length === 1) {
-          const p = editor.children[0];
-          if (editor.children[0].tagName !== "P") {
-            return true;
+    function loadFromText(text, container) {
+      const lines = text.split("\n");
+      const htmlData = lines
+        .map((line) => {
+          let text = helper.encodeHTMLEntities(line);
+          if (text === "") {
+            text = "<br/>";
           }
-        }
-        if (!editor.children.length) {
+          return `<p>${text}</p>`;
+        })
+        .join("\n");
+      container.innerHTML = htmlData;
+    }
+
+    // PASTE handler
+
+    function convertToText() {
+      const inlineElements = Array.from(editor.children);
+      const text = inlineElements
+        .map((ie) => {
+          return ie.textContent;
+        })
+        .join("\n");
+      return text;
+    }
+
+    function convertTextAndDisplay() {
+      $("#content-text").value = convertToText();
+    }
+
+    function isEmpty(editor) {
+      if (editor.children.length === 1) {
+        const p = editor.children[0];
+        if (editor.children[0].tagName !== "P") {
           return true;
         }
-        return false;
       }
-
-      function clearContainer(container) {
-        container.innerHTML = `<p><br/></p>`;
-
-        const sel = document.getSelection() || window.getSelection();
-        const rangeOnBr = new Range();
-        rangeOnBr.selectNode(container.children[0].children[0]);
-        rangeOnBr.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(rangeOnBr);
-        return rangeOnBr;
+      if (!editor.children.length) {
+        return true;
       }
+      return false;
+    }
 
-      function carretToTextNodeEnd(sel, textNode) {
-        let rangeOnLastElement = new Range();
-        rangeOnLastElement.setStart(textNode, 0);
-        rangeOnLastElement.setEnd(textNode, textNode.textContent.length);
-        rangeOnLastElement.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(rangeOnLastElement);
-      }
+    function clearContainer(container) {
+      container.innerHTML = `<p><br/></p>`;
 
-      function replaceSelectedText(replacementText) {
-        const lines = replacementText.split("\n").filter((line) => {
-          return line.length;
-        });
+      const sel = document.getSelection() || window.getSelection();
+      const rangeOnBr = new Range();
+      rangeOnBr.selectNode(container.children[0].children[0]);
+      rangeOnBr.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(rangeOnBr);
+      return rangeOnBr;
+    }
 
-        let sel, range;
-        sel = document.getSelection() || window.getSelection();
-        if (sel.rangeCount) {
-          range = sel.getRangeAt(0);
+    function carretToTextNodeEnd(sel, textNode) {
+      let rangeOnLastElement = new Range();
+      rangeOnLastElement.setStart(textNode, 0);
+      rangeOnLastElement.setEnd(textNode, textNode.textContent.length);
+      rangeOnLastElement.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(rangeOnLastElement);
+    }
 
-          const elements = getAllInlineInSelection(container, range, []);
+    function replaceSelectedText(replacementText) {
+      const lines = replacementText.split("\n").filter((line) => {
+        return line.length;
+      });
 
-          range.deleteContents();
+      let sel, range;
+      sel = document.getSelection() || window.getSelection();
+      if (sel.rangeCount) {
+        range = sel.getRangeAt(0);
 
-          if (isEmpty(editor)) {
-            container.innerHTML = "";
+        const elements = getAllInlineInSelection(container, range, []);
 
-            let lastTextNode, lastText;
-            for (const line of lines) {
-              const p = document.createElement("p");
-              const text = document.createTextNode(line);
-              lastText = line;
-              lastTextNode = text;
-              p.appendChild(text);
-              container.append(p);
-            }
+        range.deleteContents();
 
-            let rangeOnLastElement = new Range();
-            rangeOnLastElement.setStart(lastTextNode, 0);
-            rangeOnLastElement.setEnd(lastTextNode, lastText.length);
-            rangeOnLastElement.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(rangeOnLastElement);
-          } else if (elements.length > 0 && lines.length > 0) {
-            // if we are inserting to the middle of a paragraph
-            // and we are inserting more lines.
-            // In this case we are creating a new paragraph from the extracted first part
-            // of the paragraph, and attach the first line; we then insert the middle lines
-            // as new paragraphs. Then at the end we create a new paragraph from the extracted
-            // last part of the paragraph, and attach the last line to it.
-            const firstInlineNode = elements.shift();
-            const lastInlineNode = elements.pop() || firstInlineNode;
-            const startRange = range.cloneRange();
-            const endRange = range.cloneRange();
-            const firstTextNode = document.createTextNode(lines.shift());
-            startRange.setStartBefore(firstInlineNode.firstChild);
-            endRange.setEndAfter(lastInlineNode.firstChild);
+        if (isEmpty(editor)) {
+          container.innerHTML = "";
 
-            const startContent = startRange.extractContents();
-            const firstNode = document.createElement("p");
-            if (!!startContent.textContent) {
-              firstNode.append(startContent.textContent);
-            }
-            firstNode.append(firstTextNode);
-
-            firstInlineNode.before(firstNode);
-
-            let endNode = firstNode;
-            let endTextNode = firstTextNode;
-            for (const line of lines) {
-              const p = document.createElement("p");
-              const text = document.createTextNode(line);
-              endTextNode = text;
-              p.appendChild(text);
-              endNode.after(p);
-              endNode = p;
-            }
-            const endContent = endRange.extractContents();
-            if (!!endContent.textContent) {
-              endNode.append(endContent.textContent);
-            }
-            range.collapse(false);
-
-            carretToTextNodeEnd(sel, endTextNode);
-            if (!firstInlineNode.innerHTML) {
-              firstInlineNode.remove();
-            }
-            if (firstInlineNode != lastInlineNode && !lastInlineNode.innerHTML) {
-              lastInlineNode.remove();
-            }
-            firstNode.normalize();
-            endNode.normalize();
+          let lastTextNode, lastText;
+          for (const line of lines) {
+            const p = document.createElement("p");
+            const text = document.createTextNode(line);
+            lastText = line;
+            lastTextNode = text;
+            p.appendChild(text);
+            container.append(p);
           }
+
+          let rangeOnLastElement = new Range();
+          rangeOnLastElement.setStart(lastTextNode, 0);
+          rangeOnLastElement.setEnd(lastTextNode, lastText.length);
+          rangeOnLastElement.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(rangeOnLastElement);
+        } else if (elements.length > 0 && lines.length > 0) {
+          // if we are inserting to the middle of a paragraph
+          // and we are inserting more lines.
+          // In this case we are creating a new paragraph from the extracted first part
+          // of the paragraph, and attach the first line; we then insert the middle lines
+          // as new paragraphs. Then at the end we create a new paragraph from the extracted
+          // last part of the paragraph, and attach the last line to it.
+          const firstInlineNode = elements.shift();
+          const lastInlineNode = elements.pop() || firstInlineNode;
+          const startRange = range.cloneRange();
+          const endRange = range.cloneRange();
+
+          const firstTextNode = document.createTextNode(lines.shift());
+          startRange.setStartBefore(firstInlineNode.firstChild);
+          endRange.setEndAfter(lastInlineNode.lastChild);
+          const endContent = endRange.extractContents();
+          const startContent = startRange.extractContents();
+
+          const firstNode = document.createElement("p");
+          // we check if there is any content before the selection
+          // if there is, we are adding them one by one to the new paragraph
+          // note that if we are appending a child from a htmlFragement (startContent)
+          // then it will be gone from the htmlFragement,
+          // so we keep using the firstChild until there is any left.
+          if (!!startContent.textContent) {
+            let node = startContent.firstChild;
+            while (node) {
+              firstNode.append(node);
+              node = startContent.firstChild;
+            }
+          }
+
+          firstNode.append(firstTextNode);
+
+          firstInlineNode.before(firstNode);
+
+          let endNode = firstNode;
+          let endTextNode = firstTextNode;
+          for (const line of lines) {
+            const p = document.createElement("p");
+            const text = document.createTextNode(line);
+            endTextNode = text;
+            p.appendChild(text);
+            endNode.after(p);
+            endNode = p;
+          }
+
+          if (!!endContent.textContent) {
+            let node = endContent.firstChild;
+            while (node) {
+              endNode.append(node);
+              node = endContent.firstChild;
+            }
+            // endNode.append(endContent.textContent);
+          }
+          range.collapse(false);
+
+          carretToTextNodeEnd(sel, endTextNode);
+          if (!firstInlineNode.innerHTML) {
+            firstInlineNode.remove();
+          }
+          if (firstInlineNode != lastInlineNode && !lastInlineNode.innerHTML) {
+            lastInlineNode.remove();
+          }
+          firstNode.normalize();
+          endNode.normalize();
+        }
+      }
+    }
+
+    function textPaste(e) {
+      e.preventDefault();
+      var text = e.clipboardData.getData("text/plain").trim();
+      replaceSelectedText(text);
+      unsaved.style.display = "inline-block";
+      helper.saveDebounce();
+    }
+
+    function hasAnySelectedTextNodes(container, range) {
+      return !!getAllTextNodesInSelection(container, range, []).length;
+    }
+
+    function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
+      selectionContainer.childNodes.forEach((node) => {
+        if (node.nodeType === textNodeType && range.intersectsNode(node)) {
+          collectedTextNodes.push(node);
+        } else {
+          const newNodes = getAllTextNodesInSelection(node, range, collectedTextNodes);
+        }
+      });
+      return collectedTextNodes;
+    }
+
+    function getAllInlineInSelection(selectionContainer, range, collectedInlineNodes) {
+      if (inlineContainers.includes(selectionContainer?.tagName.toLowerCase()) && hasAnySelectedTextNodes(selectionContainer, range)) {
+        collectedInlineNodes.push(selectionContainer);
+      }
+      selectionContainer.childNodes.forEach((node) => {
+        if (inlineContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range)) {
+          collectedInlineNodes.push(node);
+        } else if (node.nodeType != 3) {
+          const newNodes = getAllInlineInSelection(node, range, collectedInlineNodes);
+        }
+      });
+      // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
+      // so we are adding it manually if this is the commonAncestorContainer
+      if (!collectedInlineNodes.length && range.commonAncestorContainer.tagName === "P") {
+        collectedInlineNodes.push(range.commonAncestorContainer);
+      }
+      return collectedInlineNodes;
+    }
+
+    function flattenInlineElements(container, elementType) {
+      let inlineElements = container.querySelectorAll(elementType);
+      inlineElements.forEach((elem) => {
+        if (elem.parentNode.tagName.toLowerCase() == elementType) {
+          replaceInlineWithTextNode(elem);
+        }
+      });
+    }
+
+    // replaces bold with simple textNode
+    function replaceInlineWithTextNode(element, fullRange) {
+      if (fullRange) {
+        const range = fullRange.cloneRange();
+        if (range.startContainer.parentNode == element) {
+          console.log("Starter node");
+          // range.setStartBefore(inlineNode.firstChild)
+        }
+        if (range.endContainer.parentNode == element) {
+          console.log("Ender node");
+          // range.setEndAfter(inlineNode.lastChild)
         }
       }
 
-      function textPaste(e) {
-        e.preventDefault();
-        var text = e.clipboardData.getData("text/plain").trim();
-        replaceSelectedText(text);
-        unsaved.style.display = "inline-block";
-        helper.saveDebounce();
-      }
+      const newNode = document.createTextNode(element.textContent);
+      const parentNode = element.parentNode;
+      parentNode.replaceChild(newNode, element);
+      parentNode.normalize();
+    }
 
-      function hasAnySelectedTextNodes(container, range) {
-        return !!getAllTextNodesInSelection(container, range, []).length;
-      }
+    // BEHAVIOURS >>>>>>>>>>>>>>>>>>
 
-      function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
-        selectionContainer.childNodes.forEach((node) => {
-          if (node.nodeType === textNodeType && range.intersectsNode(node)) {
-            collectedTextNodes.push(node);
-          } else {
-            const newNodes = getAllTextNodesInSelection(node, range, collectedTextNodes);
-          }
-        });
-        return collectedTextNodes;
-      }
+    dialogSaveButton.addEventListener("click", function () {
+      loadFromText($("#content-text").value, editor);
+      toggleDialog();
+    });
 
-      function getAllInlineInSelection(selectionContainer, range, collectedInlineNodes) {
-        if (inlineContainers.includes(selectionContainer?.tagName.toLowerCase()) && hasAnySelectedTextNodes(selectionContainer, range)) {
-          collectedInlineNodes.push(selectionContainer);
-        }
-        selectionContainer.childNodes.forEach((node) => {
-          if (inlineContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range)) {
-            collectedInlineNodes.push(node);
-          } else if (node.nodeType != 3) {
-            const newNodes = getAllInlineInSelection(node, range, collectedInlineNodes);
-          }
-        });
-        // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
-        // so we are adding it manually if this is the commonAncestorContainer
-        if (!collectedInlineNodes.length && range.commonAncestorContainer.tagName === "P") {
-          collectedInlineNodes.push(range.commonAncestorContainer);
-        }
-        return collectedInlineNodes;
-      }
+    const convertButton = $("#convert-button");
+    convertButton.addEventListener("click", function () {
+      toggleDialog();
+      convertTextAndDisplay();
+    });
+    dialogCloseButton.addEventListener("click", function () {
+      toggleDialog();
+    });
 
-      function flattenInlineElements(container, elementType) {
-        let inlineElements = container.querySelectorAll(elementType);
-        inlineElements.forEach((elem) => {
-          if (elem.parentNode.tagName.toLowerCase() == elementType) {
-            replaceInlineWithTextNode(elem);
-          }
-        });
-      }
+    const bookButton = $("#book-button");
+    bookButton.addEventListener("click", function () {
+      page.classList.toggle("book");
+      bookButton.classList.toggle("active");
+    });
+    const clearButton = $("#clear-button");
+    clearButton.addEventListener("click", function () {
+      clearContainer(editor);
+    });
 
-      // replaces bold with simple textNode
-      function replaceInlineWithTextNode(element, fullRange) {
-        if (fullRange) {
-          const range = fullRange.cloneRange();
-          if (range.startContainer.parentNode == element) {
-            console.log("Starter node");
-            // range.setStartBefore(inlineNode.firstChild)
-          }
-          if (range.endContainer.parentNode == element) {
-            console.log("Ender node");
-            // range.setEndAfter(inlineNode.lastChild)
-          }
-        }
-
-        const newNode = document.createTextNode(element.textContent);
-        const parentNode = element.parentNode;
-        parentNode.replaceChild(newNode, element);
-        parentNode.normalize();
-      }
-
-      // BEHAVIOURS >>>>>>>>>>>>>>>>>>
-
-      dialogSaveButton.addEventListener("click", function () {
-        loadFromText($("#content-text").value, editor);
-        toggleDialog();
-      });
-
-      const convertButton = $("#convert-button");
-      convertButton.addEventListener("click", function () {
-        toggleDialog();
-        convertTextAndDisplay();
-      });
-      dialogCloseButton.addEventListener("click", function () {
-        toggleDialog();
-      });
-
-      const bookButton = $("#book-button");
-      bookButton.addEventListener("click", function () {
-        page.classList.toggle("book");
-        bookButton.classList.toggle("active");
-      });
-      const clearButton = $("#clear-button");
-      clearButton.addEventListener("click", function () {
-        clearContainer(editor);
-      });
-
-      const observer = new MutationObserver((mutationList) => {
-        mutationList
-          .filter((m) => m.type === "childList")
-          .forEach((m) => {
-            m.addedNodes.forEach((insertedElement) => {
-              if (insertedElement.tagName === "SPAN") {
-                const text = document.createTextNode(insertedElement.textContent);
-                insertedElement.replaceWith(text);
-              }
-            });
+    const observer = new MutationObserver((mutationList) => {
+      mutationList
+        .filter((m) => m.type === "childList")
+        .forEach((m) => {
+          m.addedNodes.forEach((insertedElement) => {
+            if (insertedElement.tagName === "SPAN") {
+              const text = document.createTextNode(insertedElement.textContent);
+              insertedElement.replaceWith(text);
+            }
           });
-      });
-      observer.observe(editor, { childList: true, subtree: true });
+        });
+    });
+    observer.observe(editor, { childList: true, subtree: true });
 
-      editor.addEventListener("paste", textPaste);
+    editor.addEventListener("paste", textPaste);
 
-      editor.addEventListener("input", (event) => {
-        // if (event.isComposing || event.keyCode === 229) {
-        //   return;
-        // }
-        // // console.log("altKey", event.altKey);
-        // // console.log("ctrlKey", event.ctrlKey);
-        // // console.log("key", event.key);
-        if (event.inputType === "deleteContentBackward") {
-          console.log("Backspace");
-          if (isEmpty(editor)) {
-            clearContainer(editor);
-          }
+    editor.addEventListener("input", (event) => {
+      // if (event.isComposing || event.keyCode === 229) {
+      //   return;
+      // }
+      // // console.log("altKey", event.altKey);
+      // // console.log("ctrlKey", event.ctrlKey);
+      // // console.log("key", event.key);
+      if (event.inputType === "deleteContentBackward") {
+        console.log("Backspace");
+        if (isEmpty(editor)) {
+          clearContainer(editor);
         }
+      }
 
-        unsaved.style.display = "inline-block";
-        helper.saveDebounce();
-      });
+      unsaved.style.display = "inline-block";
+      helper.saveDebounce();
+    });
 
-    </script>
-  </body>
+  </script>
+</body>
+
 </html>
