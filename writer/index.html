@@ -231,16 +231,29 @@
           // of the paragraph, and attach the first line; we then insert the middle lines
           // as new paragraphs. Then at the end we create a new paragraph from the extracted
           // last part of the paragraph, and attach the last line to it.
+          const isMultiLineSelection = elements.length > 1;
           const firstInlineNode = elements.shift();
           const lastInlineNode = elements.pop() || firstInlineNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
 
+          // return;
+
           const firstTextNode = document.createTextNode(lines.shift());
           startRange.setStartBefore(firstInlineNode.firstChild);
+          // this is needed because if the end of the selection is not 
+          // in the starting container it will encapsulate the complete block element.
+          // so if we have paragraphs, instead of getting a text node, we'd get the paragraph element
+          if (isMultiLineSelection) {
+            startRange.setEndAfter(firstInlineNode.lastChild);
+          }
           endRange.setEndAfter(lastInlineNode.lastChild);
-          const endContent = endRange.extractContents();
+          if (isMultiLineSelection) {
+            endRange.setStartBefore(lastInlineNode.firstChild);
+          }
           const startContent = startRange.extractContents();
+          const endContent = endRange.extractContents();
+
 
           const firstNode = document.createElement("p");
           // we check if there is any content before the selection
@@ -248,6 +261,7 @@
           // note that if we are appending a child from a htmlFragement (startContent)
           // then it will be gone from the htmlFragement,
           // so we keep using the firstChild until there is any left.
+
           if (!!startContent.textContent) {
             let node = startContent.firstChild;
             while (node) {
