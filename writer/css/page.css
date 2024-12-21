@@ -5,12 +5,12 @@
 @font-face {
   font-family: "RedHatDisplay";
   src: url("fonts/RedHatDisplay-Italic.ttf");
-  font-weight: bold;
+  font-style: italic;
 }
 @font-face {
   font-family: "RedHatDisplay";
   src: url("fonts/RedHatDisplay-Bold.ttf");
-  font-style: italic;
+  font-weight: bold;
 }
 
 #unsaved-button {

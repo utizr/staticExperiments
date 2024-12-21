@@ -72,45 +72,65 @@
 
     const editor = $("#container");
     // const elementWhitelist = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'UL', 'OL', 'LI', 'HR', 'BR', 'A', 'IMG', 'STRONG', 'EM', 'B', 'I', 'U', 'DEL', 'INS', 'CODE', 'MARK', 'SMALL', 'SUB', 'SUP', 'SPAN', 'DIV'];
-    const elementWhitelistBlockElements = ['P', 'B', 'I', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
     const elementWhitelistInlineElements = ['B', 'I'];
     // HELPERS >>>>>>>>>>>>>>>>>>
 
-    function walker(children) {
-      let result = '';
+
+    function htmlSanitizer(html) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+
+      const result = htmlWalker(tempDiv.childNodes);
+
+      if (!result.blockElementCount) {
+        result.html = `<p>${result.html}</p>`;
+      }
+      return result;
+    }
+
+    function htmlWalker(children, blockElementCount = 0) {
+      let resultHtml = '';
       if (!children?.length) {
-        return result;
+        return resultHtml;
       }
 
       for (let i = 0; i < children.length; i++) {
         const node = children[i];
         if (node.nodeType === Node.ELEMENT_NODE) {
-          let tag = 'p';
-          if (elementWhitelistBlockElements.includes(node.tagName) || elementWhitelistInlineElements.includes(node.tagName)) {
-            tag = node.tagName.toLowerCase();
-            result += `<${tag}>${walker(node.childNodes)}</${tag}>\n`;
+          const blockElement = elementWhitelistBlockElements.includes(node.tagName);
+          const inlineElement = elementWhitelistInlineElements.includes(node.tagName);
+
+          let newLine = '';
+          if (blockElement) {
+            newLine = `\n`;
+            blockElementCount++;
+          }
+          if (blockElement || inlineElement) {
+            const tag = node.tagName.toLowerCase();
+            const result = htmlWalker(node.childNodes);
+            blockElementCount += result.blockElementCount;
+            resultHtml += `<${tag}>${result.html}</${tag}>${newLine}`;
           } else {
-            result += walker(node.childNodes);
+            const result = htmlWalker(node.childNodes);
+            blockElementCount += result.blockElementCount;
+            resultHtml += result.html;
           }
         } else if (node.nodeType === Node.TEXT_NODE) {
-          result += node.nodeValue;
+          resultHtml += node.nodeValue;
         }
       }
 
-      return result;
+      return { html: resultHtml, blockElementCount };
     }
 
     function textPaste(e) {
       e.preventDefault();
       const text = e.clipboardData.getData("text/html");
       console.log(text);
-      // Create a temporary container
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = text; // Insert the pasted HTML string
-
       const container = document.createElement('div');
 
-      const result = walker(tempDiv.childNodes);
+      const result = htmlSanitizer(text);
 
       console.log(result);
     }

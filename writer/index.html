@@ -53,8 +53,8 @@
   <div id="page">
     <div id="container" contenteditable="true">
       <p>First paragraph which is awesome.</p>
-      <p>Second paragraph, <b>italic</b> and is even more awesome.</p>
-      <p>Third paragraph, <i>bold</i> that is even more awesome.</p>
+      <p>Second paragraph, <b>bold</b> and is even more awesome.</p>
+      <p>Third paragraph, <i>italic</i> that is even more awesome.</p>
     </div>
   </div>
 
@@ -191,10 +191,12 @@
       sel.addRange(rangeOnLastElement);
     }
 
-    function replaceSelectedText(replacementText) {
+    function replaceSelectedText(replacementText, htmlText) {
       const lines = replacementText.split("\n").filter((line) => {
         return line.length;
       });
+
+      console.log("htmlText", htmlText);
 
       let sel, range;
       sel = document.getSelection() || window.getSelection();
@@ -310,8 +312,11 @@
 
     function textPaste(e) {
       e.preventDefault();
-      var text = e.clipboardData.getData("text/plain").trim();
-      replaceSelectedText(text);
+      const text = e.clipboardData.getData("text/plain").trim();
+      const htmlText = e.clipboardData.getData("text/html");
+
+      const htmlResult = htmlSanitizer(htmlText);
+      replaceSelectedText(text, htmlResult);
       unsaved.style.display = "inline-block";
       helper.saveDebounce();
     }
@@ -319,6 +324,57 @@
     function hasAnySelectedTextNodes(container, range) {
       return !!getAllTextNodesInSelection(container, range, []).length;
     }
+
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    const elementWhitelistInlineElements = ['B', 'I'];
+
+    function htmlSanitizer(html) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+
+      const result = htmlWalker(tempDiv.childNodes);
+
+      if (!result.blockElementCount) {
+        result.html = `<p>${result.html}</p>`;
+      }
+      return result;
+    }
+
+    function htmlWalker(children, blockElementCount = 0) {
+      let resultHtml = '';
+      if (!children?.length) {
+        return resultHtml;
+      }
+
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const blockElement = elementWhitelistBlockElements.includes(node.tagName);
+          const inlineElement = elementWhitelistInlineElements.includes(node.tagName);
+
+          let newLine = '';
+          if (blockElement) {
+            newLine = `\n`;
+            blockElementCount++;
+          }
+          if (blockElement || inlineElement) {
+            const tag = node.tagName.toLowerCase();
+            const result = htmlWalker(node.childNodes);
+            blockElementCount += result.blockElementCount;
+            resultHtml += `<${tag}>${result.html}</${tag}>${newLine}`;
+          } else {
+            const result = htmlWalker(node.childNodes);
+            blockElementCount += result.blockElementCount;
+            resultHtml += result.html;
+          }
+        } else if (node.nodeType === Node.TEXT_NODE) {
+          resultHtml += node.nodeValue;
+        }
+      }
+
+      return { html: resultHtml, blockElementCount };
+    }
+
 
     function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
       selectionContainer.childNodes.forEach((node) => {
