@@ -177,14 +177,18 @@
 
     function clearContainer(container) {
       container.innerHTML = `<p><br/></p>`;
+      return putCursorAtFirstElement(container, 'br');
+    }
 
+    function putCursorAtFirstElement(rootElement, tagName) {
+      const firstElement = rootElement.querySelector(tagName);
       const sel = document.getSelection() || window.getSelection();
-      const rangeOnBr = new Range();
-      rangeOnBr.selectNode(container.children[0].children[0]);
-      rangeOnBr.collapse(false);
+      const rangeOnFirstElement = new Range();
+      rangeOnFirstElement.selectNode(firstElement);
+      rangeOnFirstElement.collapse(false);
       sel.removeAllRanges();
-      sel.addRange(rangeOnBr);
-      return rangeOnBr;
+      sel.addRange(rangeOnFirstElement);
+      return rangeOnFirstElement
     }
 
     function carretToTextNodeEnd(sel, textNode) {
@@ -487,6 +491,15 @@
             if (insertedElement.tagName === "SPAN") {
               const text = document.createTextNode(insertedElement.textContent);
               insertedElement.replaceWith(text);
+            }
+            if (insertedElement.tagName === "DIV") {
+              const pContent = insertedElement.textContent
+                ? document.createTextNode(insertedElement.textContent)
+                : document.createElement("br");
+              const paragraph = document.createElement("p");
+              paragraph.append(pContent);
+              insertedElement.replaceWith(paragraph);
+              putCursorAtFirstElement(paragraph, 'br');
             }
           });
         });
