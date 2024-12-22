@@ -109,14 +109,14 @@
           if (blockElement || inlineElement) {
             const tag = node.tagName.toLowerCase();
             const result = htmlWalker(node.childNodes);
-            blockElementCount += result.blockElementCount;
-            resultHtml += `<${tag}>${result.html}</${tag}>${newLine}`;
-          } else {
+            blockElementCount = blockElementCount + result.blockElementCount;
+            resultHtml += `<${tag}>${result.html}</${tag}>`;
+          } else if (node.childNodes.length) {
             const result = htmlWalker(node.childNodes);
-            blockElementCount += result.blockElementCount;
+            blockElementCount = blockElementCount + result.blockElementCount;
             resultHtml += result.html;
           }
-        } else if (node.nodeType === Node.TEXT_NODE) {
+        } else if (node.nodeType === Node.TEXT_NODE && node.nodeValue) {
           resultHtml += node.nodeValue;
         }
       }
@@ -127,12 +127,16 @@
     function textPaste(e) {
       e.preventDefault();
       const text = e.clipboardData.getData("text/html");
-      console.log(text);
-      const container = document.createElement('div');
-
       const result = htmlSanitizer(text);
 
-      console.log(result);
+      editor.innerHTML = '';
+
+      const htmlPasted = document.createElement('div');
+      htmlPasted.innerHTML = result.html;
+
+      while (htmlPasted.children.length > 0) {
+        editor.append(htmlPasted.firstChild);
+      }
     }
 
     editor.addEventListener("paste", textPaste);

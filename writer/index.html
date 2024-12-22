@@ -53,6 +53,9 @@
   <div id="page">
     <div id="container" contenteditable="true">
       <p>First paragraph which is awesome.</p>
+      <p>First a paragraph <b>bold</b> which is awesome.</p>
+      <p>First b paragraph <b>bold</b> which is awesome.</p>
+      <p>First c paragraph <b>bold</b> which is awesome.</p>
       <p>Second paragraph, <b>bold</b> and is even more awesome.</p>
       <p>Third paragraph, <i>italic</i> that is even more awesome.</p>
     </div>
@@ -195,8 +198,8 @@
       const lines = replacementText.split("\n").filter((line) => {
         return line.length;
       });
-
-      console.log("htmlText", htmlText);
+      const htmlPasted = document.createElement('div');
+      htmlPasted.innerHTML = htmlText.html;
 
       let sel, range;
       sel = document.getSelection() || window.getSelection();
@@ -208,17 +211,15 @@
         range.deleteContents();
 
         if (isEmpty(editor)) {
+
           container.innerHTML = "";
 
-          let lastTextNode, lastText;
-          for (const line of lines) {
-            const p = document.createElement("p");
-            const text = document.createTextNode(line);
-            lastText = line;
-            lastTextNode = text;
-            p.appendChild(text);
-            container.append(p);
+          while (htmlPasted.firstChild) {
+            editor.append(htmlPasted.firstChild);
           }
+
+          const lastTextNode = editor.lastElementChild.lastChild;
+          const lastText = lastTextNode.textContent;
 
           let rangeOnLastElement = new Range();
           rangeOnLastElement.setStart(lastTextNode, 0);
@@ -238,8 +239,8 @@
           const lastInlineNode = elements.pop() || firstInlineNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
-
-          // return;
+          const firstHtmlNodePasted = htmlPasted.firstChild;
+          htmlPasted.firstChild.remove();
 
           const firstTextNode = document.createTextNode(lines.shift());
           startRange.setStartBefore(firstInlineNode.firstChild);
@@ -265,35 +266,38 @@
           // so we keep using the firstChild until there is any left.
 
           if (!!startContent.textContent) {
-            let node = startContent.firstChild;
-            while (node) {
-              firstNode.append(node);
-              node = startContent.firstChild;
+            while (startContent.firstChild) {
+              firstNode.append(startContent.firstChild);
             }
           }
 
-          firstNode.append(firstTextNode);
-
+          while (firstHtmlNodePasted.firstChild) {
+            firstNode.append(firstHtmlNodePasted.firstChild);
+          }
           firstInlineNode.before(firstNode);
 
           let endNode = firstNode;
-          let endTextNode = firstTextNode;
-          for (const line of lines) {
-            const p = document.createElement("p");
-            const text = document.createTextNode(line);
-            endTextNode = text;
-            p.appendChild(text);
-            endNode.after(p);
-            endNode = p;
+          let endTextNode = firstNode.lastChild;
+
+
+          while (htmlPasted.firstChild) {
+            if (htmlPasted.firstChild.nodeType == textNodeType) {
+              htmlPasted.firstChild.remove();
+              continue;
+            }
+            const elem = htmlPasted.firstChild;
+            endNode.after(elem);
+            endNode = elem;
+            endTextNode = elem.lastChild;
           }
 
+          if (endTextNode.nodeType !== textNodeType) {
+            endTextNode = endTextNode.lastChild;
+          }
           if (!!endContent.textContent) {
-            let node = endContent.firstChild;
-            while (node) {
-              endNode.append(node);
-              node = endContent.firstChild;
+            while (endContent.firstChild) {
+              endNode.append(endContent.firstChild);
             }
-            // endNode.append(endContent.textContent);
           }
           range.collapse(false);
 
@@ -362,7 +366,7 @@
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
             resultHtml += `<${tag}>${result.html}</${tag}>${newLine}`;
-          } else {
+          } else if (node.childNodes.length) {
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
             resultHtml += result.html;
@@ -392,18 +396,30 @@
         collectedInlineNodes.push(selectionContainer);
       }
       selectionContainer.childNodes.forEach((node) => {
-        if (inlineContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range)) {
+        if (inlineContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range) && !collectedInlineNodes.includes(node)) {
           collectedInlineNodes.push(node);
-        } else if (node.nodeType != 3) {
+        } else if (node.nodeType != textNodeType) {
           const newNodes = getAllInlineInSelection(node, range, collectedInlineNodes);
         }
       });
       // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
       // so we are adding it manually if this is the commonAncestorContainer
-      if (!collectedInlineNodes.length && range.commonAncestorContainer.tagName === "P") {
+      if (!collectedInlineNodes.length && range.commonAncestorContainer.tagName === "P" && isEmptyBlockElement(range.commonAncestorContainer)) {
         collectedInlineNodes.push(range.commonAncestorContainer);
       }
       return collectedInlineNodes;
+    }
+
+    function isEmptyBlockElement(element) {
+      let isBlockEmpty = true;
+      for (let i = 0; i < element.childNodes.length; i++) {
+        const node = element.childNodes[i];
+        if (node.tagName !== "BR") {
+          isBlockEmpty = false;
+          break;
+        }
+      }
+      return isBlockEmpty;
     }
 
     function flattenInlineElements(container, elementType) {
