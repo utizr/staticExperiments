@@ -73,7 +73,7 @@
       return Array.from(element.querySelectorAll(selector));
     }
 
-    const inlineContainers = ["p"];
+    const blockContainers = ["p"];
     const textNodeType = 3;
     const documentFragmentType = 11;
 
@@ -212,7 +212,7 @@
       if (sel.rangeCount) {
         range = sel.getRangeAt(0);
 
-        const elements = getAllInlineInSelection(container, range, []);
+        const elements = getAllBlockElementsInSelection(container, range, []);
 
         range.deleteContents();
 
@@ -241,24 +241,29 @@
           // as new paragraphs. Then at the end we create a new paragraph from the extracted
           // last part of the paragraph, and attach the last line to it.
           const isMultiLineSelection = elements.length > 1;
-          const firstInlineNode = elements.shift();
-          const lastInlineNode = elements.pop() || firstInlineNode;
+          const firstBlockNode = elements.shift();
+          const lastBlockNode = elements.pop() || firstBlockNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
           const firstHtmlNodePasted = htmlPasted.firstChild;
           htmlPasted.firstChild.remove();
 
-          const firstTextNode = document.createTextNode(lines.shift());
-          startRange.setStartBefore(firstInlineNode.firstChild);
+          // if we select the complete paragraph (block element) in firefox all children are removed
+          // so we have to add a dummy one.
+          if (!firstBlockNode.firstChild) {
+            const dummyTextNode = document.createTextNode("");
+            firstBlockNode.append(dummyTextNode);
+          }
+          startRange.setStartBefore(firstBlockNode.firstChild);
           // this is needed because if the end of the selection is not 
           // in the starting container it will encapsulate the complete block element.
           // so if we have paragraphs, instead of getting a text node, we'd get the paragraph element
           if (isMultiLineSelection) {
-            startRange.setEndAfter(firstInlineNode.lastChild);
+            startRange.setEndAfter(firstBlockNode.lastChild);
           }
-          endRange.setEndAfter(lastInlineNode.lastChild);
+          endRange.setEndAfter(lastBlockNode.lastChild);
           if (isMultiLineSelection) {
-            endRange.setStartBefore(lastInlineNode.firstChild);
+            endRange.setStartBefore(lastBlockNode.firstChild);
           }
           const startContent = startRange.extractContents();
           const endContent = endRange.extractContents();
@@ -280,7 +285,7 @@
           while (firstHtmlNodePasted.firstChild) {
             firstNode.append(firstHtmlNodePasted.firstChild);
           }
-          firstInlineNode.before(firstNode);
+          firstBlockNode.before(firstNode);
 
           let endNode = firstNode;
           let endTextNode = firstNode.lastChild;
@@ -308,11 +313,11 @@
           range.collapse(false);
 
           carretToTextNodeEnd(sel, endTextNode);
-          if (!firstInlineNode.innerHTML) {
-            firstInlineNode.remove();
+          if (!firstBlockNode.innerHTML) {
+            firstBlockNode.remove();
           }
-          if (firstInlineNode != lastInlineNode && !lastInlineNode.innerHTML) {
-            lastInlineNode.remove();
+          if (firstBlockNode != lastBlockNode && !lastBlockNode.innerHTML) {
+            lastBlockNode.remove();
           }
           firstNode.normalize();
           endNode.normalize();
@@ -397,23 +402,23 @@
       return collectedTextNodes;
     }
 
-    function getAllInlineInSelection(selectionContainer, range, collectedInlineNodes) {
-      if (inlineContainers.includes(selectionContainer?.tagName.toLowerCase()) && hasAnySelectedTextNodes(selectionContainer, range)) {
-        collectedInlineNodes.push(selectionContainer);
+    function getAllBlockElementsInSelection(selectionContainer, range, collectedBlockNodes) {
+      if (blockContainers.includes(selectionContainer?.tagName.toLowerCase()) && hasAnySelectedTextNodes(selectionContainer, range)) {
+        collectedBlockNodes.push(selectionContainer);
       }
       selectionContainer.childNodes.forEach((node) => {
-        if (inlineContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range) && !collectedInlineNodes.includes(node)) {
-          collectedInlineNodes.push(node);
+        if (blockContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range) && !collectedBlockNodes.includes(node)) {
+          collectedBlockNodes.push(node);
         } else if (node.nodeType != textNodeType) {
-          const newNodes = getAllInlineInSelection(node, range, collectedInlineNodes);
+          const newNodes = getAllBlockElementsInSelection(node, range, collectedBlockNodes);
         }
       });
       // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
       // so we are adding it manually if this is the commonAncestorContainer
-      if (!collectedInlineNodes.length && range.commonAncestorContainer.tagName === "P" && isEmptyBlockElement(range.commonAncestorContainer)) {
-        collectedInlineNodes.push(range.commonAncestorContainer);
+      if (!collectedBlockNodes.length && range.commonAncestorContainer.tagName === "P" && isEmptyBlockElement(range.commonAncestorContainer)) {
+        collectedBlockNodes.push(range.commonAncestorContainer);
       }
-      return collectedInlineNodes;
+      return collectedBlockNodes;
     }
 
     function isEmptyBlockElement(element) {
