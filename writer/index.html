@@ -86,6 +86,9 @@
 
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
     const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
+    const flags = {
+      isPasting: false,
+    };
 
     // HELPERS >>>>>>>>>>>>>>>>>>
 
@@ -116,16 +119,26 @@
       // at least the empty b is not created, and we can also not observe a text node being removed from the b element (?)
       elementsCleanupDebounce: function (containerDom) {
         return this.debounce((containerDom) => {
+          if (flags.isPasting) {
+            return;
+          }
           inlineElements = $$(elementWhitelistInlineElements, containerDom);
 
           inlineElements.forEach((inlineElement) => {
             if (!inlineElement.textContent && inlineElement.parentNode) {
               const parentNode = inlineElement.parentNode;
               inlineElement.remove();
-              parentNode.normalize();
               if (!parentNode.firstChild) {
                 parentNode.innerHTML = "<br/>";
               }
+            }
+          });
+
+          blockElements = $$(elementWhitelistBlockElements, containerDom);
+
+          blockElements.forEach((blockElement) => {
+            if (!blockElement.textContent && !blockElement.firstChild) {
+              blockElement.remove();
             }
           });
         }, 500)
@@ -151,6 +164,7 @@
       }
       loadFromText(book, editor);
     }
+    // TODO turn this back on after testing
     // loadDataOnPageLoad();
 
     // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
@@ -313,21 +327,19 @@
           let endNode = firstNode;
           let endTextNode = firstNode.lastChild;
 
-
           while (htmlPasted.firstChild) {
             if (htmlPasted.firstChild.nodeType == textNodeType) {
               htmlPasted.firstChild.remove();
               continue;
             }
-            const elem = htmlPasted.firstChild;
+            const elem = htmlPasted.firstChild.cloneNode(true);
+            htmlPasted.firstChild.remove();
             endNode.after(elem);
             endNode = elem;
-            endTextNode = elem.lastChild || elem;
           }
 
-          if (endTextNode.nodeType !== textNodeType) {
-            endTextNode = endTextNode.lastChild;
-          }
+          endTextNode = lastTextNodeOf(endNode);
+
           if (!!endContent.textContent) {
             while (endContent.firstChild) {
               endNode.append(endContent.firstChild);
@@ -348,14 +360,29 @@
       }
     }
 
+    function lastTextNodeOf(el) {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      let lastNode = null;
+      while (walker.nextNode()) {
+        lastNode = walker.currentNode;
+      }
+      if (!lastNode) {
+        lastNode = document.createElement("br");
+        el.append(lastNode);
+      }
+      return lastNode;
+    }
+
     function textPaste(e) {
       e.preventDefault();
+      flags.isPasting = true;
       const text = e.clipboardData.getData("text/plain").trim();
       const htmlText = e.clipboardData.getData("text/html");
 
       const htmlResult = htmlSanitizer(htmlText);
       replaceSelectedText(text, htmlResult);
       unsaved.style.display = "inline-block";
+      flags.isPasting = false;
       helper.saveDebounce();
     }
 
@@ -378,15 +405,24 @@
     function htmlWalker(children, blockElementCount = 0) {
       let resultHtml = '';
       if (!children?.length) {
-        return resultHtml;
+        return { html: '', blockElementCount };
       }
 
       for (let i = 0; i < children.length; i++) {
+        const firstNode = i == 0;
+        const lastNode = i == children.length - 1;
         const node = children[i];
         if (node.nodeType === Node.ELEMENT_NODE) {
           const blockElement = elementWhitelistBlockElements.includes(node.tagName);
           const inlineElement = elementWhitelistInlineElements.includes(node.tagName);
 
+          // trim first and last node if empty
+          if (firstNode && !node.innerHTML) {
+            continue;
+          }
+          if (lastNode && !node.innerHTML) {
+            continue;
+          }
           let newLine = '';
           if (blockElement) {
             newLine = `\n`;
@@ -396,7 +432,7 @@
             const tag = node.tagName.toLowerCase();
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
-            resultHtml += `<${tag}>${result.html}</${tag}>${newLine}`;
+            resultHtml += `<${tag}>${result.html || '<br>'}</${tag}>${newLine}`;
           } else if (node.childNodes.length) {
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
@@ -467,11 +503,9 @@
       if (fullRange) {
         const range = fullRange.cloneRange();
         if (range.startContainer.parentNode == element) {
-          console.log("Starter node");
           // range.setStartBefore(inlineNode.firstChild)
         }
         if (range.endContainer.parentNode == element) {
-          console.log("Ender node");
           // range.setEndAfter(inlineNode.lastChild)
         }
       }
