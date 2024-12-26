@@ -299,7 +299,7 @@
             const elem = htmlPasted.firstChild;
             endNode.after(elem);
             endNode = elem;
-            endTextNode = elem.lastChild;
+            endTextNode = elem.lastChild || elem;
           }
 
           if (endTextNode.nodeType !== textNodeType) {
@@ -341,7 +341,7 @@
     }
 
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-    const elementWhitelistInlineElements = ['B', 'I'];
+    const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
 
     function htmlSanitizer(html) {
       const tempDiv = document.createElement('div');
