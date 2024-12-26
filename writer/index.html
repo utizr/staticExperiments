@@ -69,8 +69,8 @@
       return element.querySelector(selector);
     }
 
-    function $$(selector, element = document) {
-      return Array.from(element.querySelectorAll(selector));
+    function $$(selectors, element = document) {
+      return Array.from(element.querySelectorAll(selectors.join(",")));
     }
 
     const blockContainers = ["p"];
@@ -84,11 +84,15 @@
     const page = $("#page");
     const unsaved = $("#unsaved-button");
 
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
+
     // HELPERS >>>>>>>>>>>>>>>>>>
 
     const helper = {
       ini() {
         this.saveDebounce = this.saveDebounce();
+        this.elementsCleanupDebounce = this.elementsCleanupDebounce();
       },
       debounce: function (fn, delay) {
         var timer = null;
@@ -106,6 +110,25 @@
           localStorage.setItem("book", convertToText());
           unsaved.style.display = "none";
         }, 1000)
+      },
+      // needed for removing empty inline elements after modification of the editor
+      // unfortunately cannot be done on a mutattion observer because in firefox does not seem to work properly
+      // at least the empty b is not created, and we can also not observe a text node being removed from the b element (?)
+      elementsCleanupDebounce: function (containerDom) {
+        return this.debounce((containerDom) => {
+          inlineElements = $$(elementWhitelistInlineElements, containerDom);
+
+          inlineElements.forEach((inlineElement) => {
+            if (!inlineElement.textContent && inlineElement.parentNode) {
+              const parentNode = inlineElement.parentNode;
+              inlineElement.remove();
+              parentNode.normalize();
+              if (!parentNode.firstChild) {
+                parentNode.innerHTML = "<br/>";
+              }
+            }
+          });
+        }, 500)
       },
       encodeHTMLEntities(rawStr) {
         return rawStr.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
@@ -340,9 +363,6 @@
       return !!getAllTextNodesInSelection(container, range, []).length;
     }
 
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-    const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
-
     function htmlSanitizer(html) {
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
@@ -492,6 +512,9 @@
       mutationList
         .filter((m) => m.type === "childList")
         .forEach((m) => {
+          if (m.addedNodes.length) {
+            helper.elementsCleanupDebounce(editor);
+          }
           m.addedNodes.forEach((insertedElement) => {
             if (insertedElement.tagName === "SPAN") {
               const text = document.createTextNode(insertedElement.textContent);
