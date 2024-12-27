@@ -312,7 +312,6 @@
           // note that if we are appending a child from a htmlFragement (startContent)
           // then it will be gone from the htmlFragement,
           // so we keep using the firstChild until there is any left.
-
           if (!!startContent.textContent) {
             while (startContent.firstChild) {
               firstNode.append(startContent.firstChild);
@@ -323,6 +322,7 @@
             firstNode.append(firstHtmlNodePasted.firstChild);
           }
           firstBlockNode.before(firstNode);
+
 
           let endNode = firstNode;
           let endTextNode = firstNode.lastChild;
@@ -348,10 +348,8 @@
           range.collapse(false);
 
           carretToTextNodeEnd(sel, endTextNode);
-          if (!firstBlockNode.innerHTML) {
-            firstBlockNode.remove();
-          }
-          if (firstBlockNode != lastBlockNode && !lastBlockNode.innerHTML) {
+          firstBlockNode.remove();
+          if (firstBlockNode != lastBlockNode) {
             lastBlockNode.remove();
           }
           firstNode.normalize();
@@ -547,7 +545,8 @@
         .filter((m) => m.type === "childList")
         .forEach((m) => {
           if (m.addedNodes.length) {
-            helper.elementsCleanupDebounce(editor);
+            // TODO turn this back on after bugfix
+            // helper.elementsCleanupDebounce(editor);
           }
           m.addedNodes.forEach((insertedElement) => {
             if (insertedElement.tagName === "SPAN") {
