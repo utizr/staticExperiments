@@ -115,7 +115,7 @@
         }, 1000)
       },
       // needed for removing empty inline elements after modification of the editor
-      // unfortunately cannot be done on a mutattion observer because in firefox does not seem to work properly
+      // unfortunately cannot be done on a mutation observer because in firefox does not seem to work properly
       // at least the empty b is not created, and we can also not observe a text node being removed from the b element (?)
       elementsCleanupDebounce: function (containerDom) {
         return this.debounce((containerDom) => {
