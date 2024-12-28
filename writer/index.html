@@ -290,6 +290,7 @@
           if (!firstBlockNode.firstChild) {
             const dummyTextNode = document.createTextNode("");
             firstBlockNode.append(dummyTextNode);
+
           }
           startRange.setStartBefore(firstBlockNode.firstChild);
           // this is needed because if the end of the selection is not 
@@ -305,8 +306,11 @@
           const startContent = startRange.extractContents();
           const endContent = endRange.extractContents();
 
+          const firstBlockNodeEmpty = isEmptyBlockElement(firstBlockNode);
 
-          const firstNode = document.createElement("p");
+          const firstNode = firstBlockNodeEmpty
+            ? document.createElement(firstHtmlNodePasted.tagName)
+            : document.createElement("p");
           // we check if there is any content before the selection
           // if there is, we are adding them one by one to the new paragraph
           // note that if we are appending a child from a htmlFragement (startContent)
