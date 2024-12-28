@@ -310,7 +310,7 @@
 
           const firstNode = firstBlockNodeEmpty
             ? document.createElement(firstHtmlNodePasted.tagName)
-            : document.createElement("p");
+            : document.createElement(firstBlockNode.tagName);
           // we check if there is any content before the selection
           // if there is, we are adding them one by one to the new paragraph
           // note that if we are appending a child from a htmlFragement (startContent)
@@ -461,11 +461,11 @@
     }
 
     function getAllBlockElementsInSelection(selectionContainer, range, collectedBlockNodes) {
-      if (blockContainers.includes(selectionContainer?.tagName.toLowerCase()) && hasAnySelectedTextNodes(selectionContainer, range)) {
+      if (elementWhitelistBlockElements.includes(selectionContainer?.tagName) && hasAnySelectedTextNodes(selectionContainer, range)) {
         collectedBlockNodes.push(selectionContainer);
       }
       selectionContainer.childNodes.forEach((node) => {
-        if (blockContainers.includes(node.tagName?.toLowerCase()) && hasAnySelectedTextNodes(node, range) && !collectedBlockNodes.includes(node)) {
+        if (elementWhitelistBlockElements.includes(node.tagName) && hasAnySelectedTextNodes(node, range) && !collectedBlockNodes.includes(node)) {
           collectedBlockNodes.push(node);
         } else if (node.nodeType != textNodeType) {
           const newNodes = getAllBlockElementsInSelection(node, range, collectedBlockNodes);
