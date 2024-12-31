@@ -39,7 +39,9 @@
     <a id="bold-button" class="menu-button">
       <div class="lsf symbol">bold</div>
     </a>
-
+    <a id="italic-button" class="menu-button">
+      <div class="lsf symbol">italic</div>
+    </a>
     <a id="unsaved-button" class="menu-button">
       <div class="lsf symbol">etc</div>
     </a>
@@ -62,7 +64,9 @@
       <h1>Main title.</h1>
       <p>First paragraph which is awesome.</p>
       <h2>my title.</h2>
-      <p>second paragraph which is awesome.</p>
+      <p>1 paragraph which is awesome.</p>
+      <p>2 paragraph which is amazing.</p>
+      <p>3 paragraph which is great.</p>
       <p>First a paragraph <b>bold</b> which is awesome.</p>
       <p>First b paragraph <b>bold</b> which is awesome.</p>
       <p>First c paragraph <b>bold</b> which is awesome.</p>
@@ -87,6 +91,7 @@
     const dialogCloseButton = $("#dialog-close-button");
     const dialogSaveButton = $("#dialog-save-button");
     const boldButton = $("#bold-button");
+    const italicButton = $("#italic-button");
     const editor = $("#container");
     const page = $("#page");
     const unsaved = $("#unsaved-button");
@@ -260,6 +265,8 @@
         const startRange = range.cloneRange();
         const endRange = range.cloneRange();
 
+
+        // first line
         if (isMultiLineSelection) {
           startRange.setEndAfter(firstBlockNode.lastChild);
         }
@@ -275,6 +282,17 @@
 
         startRange.insertNode(firstLineWrapper);
 
+        // middle lines
+
+        elements.forEach((blockNode) => {
+          const inlineNode = document.createElement(tagName);
+          while (blockNode.firstChild) {
+            inlineNode.append(blockNode.firstChild);
+          }
+          blockNode.append(inlineNode);
+        });
+
+        // last line
         if (isMultiLineSelection) {
           endRange.setStartBefore(lastBlockNode.firstChild);
           const endContent = endRange.extractContents();
@@ -295,6 +313,12 @@
       wrapSelectionWithInlineElement("b");
       helper.saveDebounce();
     }
+    function makeItalic(e) {
+      e.preventDefault();
+      wrapSelectionWithInlineElement("i");
+      helper.saveDebounce();
+    }
+
 
     function replaceSelectedText(replacementText, htmlText) {
       const lines = replacementText.split("\n").filter((line) => {
@@ -595,6 +619,10 @@
     boldButton.addEventListener("click", function (e) {
       makeBold(e);
     });
+    italicButton.addEventListener("click", function (e) {
+      makeItalic(e);
+    });
+
 
 
     const bookButton = $("#book-button");

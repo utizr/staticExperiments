@@ -4,7 +4,6 @@ no bugs :) (known)
 
 INCOMPLETE:
 
-- inline replace to work on multiple lines. For now it works on 1 or two lines (first,last)
 - inline replace to remove same tagname node from children
 
 TODO:
