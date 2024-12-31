@@ -33,6 +33,13 @@
     <a id="clear-button" class="menu-button">
       <div class="lsf symbol">delete</div>
     </a>
+
+    <div class="menu-separator"></div>
+
+    <a id="bold-button" class="menu-button">
+      <div class="lsf symbol">bold</div>
+    </a>
+
     <a id="unsaved-button" class="menu-button">
       <div class="lsf symbol">etc</div>
     </a>
@@ -52,12 +59,14 @@
 
   <div id="page">
     <div id="container" contenteditable="true">
+      <h1>Main title.</h1>
       <p>First paragraph which is awesome.</p>
       <h2>my title.</h2>
       <p>second paragraph which is awesome.</p>
       <p>First a paragraph <b>bold</b> which is awesome.</p>
       <p>First b paragraph <b>bold</b> which is awesome.</p>
       <p>First c paragraph <b>bold</b> which is awesome.</p>
+      <h3>Footer title.</h3>
       <p>Third paragraph, <b>bold</b> and is even more awesome.</p>
       <p>4th paragraph, <i>italic</i> that is even more awesome.</p>
     </div>
@@ -73,17 +82,16 @@
       return Array.from(element.querySelectorAll(selectors.join(",")));
     }
 
-    const blockContainers = ["p"];
-    const textNodeType = 3;
-    const documentFragmentType = 11;
 
     const dialog = $("#dialog");
     const dialogCloseButton = $("#dialog-close-button");
     const dialogSaveButton = $("#dialog-save-button");
+    const boldButton = $("#bold-button");
     const editor = $("#container");
     const page = $("#page");
     const unsaved = $("#unsaved-button");
 
+    const textNodeType = 3;
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
     const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
     const flags = {
@@ -237,6 +245,57 @@
       sel.addRange(rangeOnLastElement);
     }
 
+    function wrapSelectionWithInlineElement(tagName) {
+      if (editor.lastSelection) {
+        range = editor.lastSelection;
+        const firstLineWrapper = document.createElement(tagName);
+        const lastLineWrapper = document.createElement(tagName);
+
+        const elements = getAllBlockElementsInSelection(editor, range, []);
+        const isMultiLineSelection = elements.length > 1;
+
+        const firstBlockNode = elements.shift();
+        const lastBlockNode = elements.pop() || firstBlockNode;
+
+        const startRange = range.cloneRange();
+        const endRange = range.cloneRange();
+
+        if (isMultiLineSelection) {
+          startRange.setEndAfter(firstBlockNode.lastChild);
+        }
+
+        const startContent = startRange.extractContents();
+
+        if (!!startContent.textContent) {
+          // firstChild is the <p>, firstChild.firstChild is the content within
+          while (startContent.firstChild) {
+            firstLineWrapper.append(startContent.firstChild);
+          }
+        }
+
+        startRange.insertNode(firstLineWrapper);
+
+        if (isMultiLineSelection) {
+          endRange.setStartBefore(lastBlockNode.firstChild);
+          const endContent = endRange.extractContents();
+
+          if (!!endContent.textContent) {
+            // firstChild is the <p>, firstChild.firstChild is the content within
+            while (endContent.firstChild) {
+              lastLineWrapper.append(endContent.firstChild);
+            }
+          }
+
+          endRange.insertNode(lastLineWrapper);
+        }
+      }
+    }
+    function makeBold(e) {
+      e.preventDefault();
+      wrapSelectionWithInlineElement("b");
+      helper.saveDebounce();
+    }
+
     function replaceSelectedText(replacementText, htmlText) {
       const lines = replacementText.split("\n").filter((line) => {
         return line.length;
@@ -290,7 +349,6 @@
           if (!firstBlockNode.firstChild) {
             const dummyTextNode = document.createTextNode("");
             firstBlockNode.append(dummyTextNode);
-
           }
           startRange.setStartBefore(firstBlockNode.firstChild);
           // this is needed because if the end of the selection is not 
@@ -534,6 +592,11 @@
       toggleDialog();
     });
 
+    boldButton.addEventListener("click", function (e) {
+      makeBold(e);
+    });
+
+
     const bookButton = $("#book-button");
     bookButton.addEventListener("click", function () {
       page.classList.toggle("book");
@@ -589,6 +652,23 @@
 
       unsaved.style.display = "inline-block";
       helper.saveDebounce();
+    });
+
+    // add an event listener when text is selected inside the editor
+    document.addEventListener("selectionchange", (event) => {
+      let sel, range;
+      sel = document.getSelection() || window.getSelection();
+      if (sel.rangeCount) {
+        range = sel.getRangeAt(0);
+        const isSelectionInEditor = hasAnySelectedTextNodes(editor, range);
+        // const newRange = range.cloneRange();
+        if (isSelectionInEditor) {
+          editor.lastSelection = range.cloneRange();
+        }
+        // console.log("isSelectionInEditor", isSelectionInEditor);
+      }
+
+
     });
 
   </script>

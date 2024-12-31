@@ -40,6 +40,11 @@ body {
   display: inline-block;
   padding: 5px 12px;
 }
+.menu-separator {
+  display: inline-block;
+  padding: 9px 1px;
+  border-left: 2px solid;
+}
 
 .menu-button.active {
   color: #00a4c1;
