@@ -262,13 +262,20 @@
         const firstBlockNode = elements.shift();
         const lastBlockNode = elements.pop() || firstBlockNode;
 
-        const startRange = range.cloneRange();
+        let startRange = range.cloneRange();
         const endRange = range.cloneRange();
-
 
         // first line
         if (isMultiLineSelection) {
           startRange.setEndAfter(firstBlockNode.lastChild);
+        } else {
+          // first for complete block selection, where it would not select the content
+          // of the node, but the complete node itself
+          const contentCopy = startRange.cloneContents();
+          if (contentCopy.firstChild.tagName === firstBlockNode.tagName) {
+            startRange.setStartBefore(firstBlockNode.firstChild);
+            startRange.setEndAfter(firstBlockNode.lastChild);
+          }
         }
 
         const startContent = startRange.extractContents();
@@ -283,7 +290,6 @@
         startRange.insertNode(firstLineWrapper);
 
         // middle lines
-
         elements.forEach((blockNode) => {
           const inlineNode = document.createElement(tagName);
           while (blockNode.firstChild) {
@@ -307,6 +313,7 @@
           endRange.insertNode(lastLineWrapper);
         }
       }
+      flattenInlineElements(editor, tagName);
     }
     function makeBold(e) {
       e.preventDefault();
@@ -573,27 +580,59 @@
       return isBlockEmpty;
     }
 
-    function flattenInlineElements(container, elementType) {
-      let inlineElements = container.querySelectorAll(elementType);
+    function flattenInlineElements(container, tagName) {
+      let inlineElements = container.querySelectorAll(tagName);
       inlineElements.forEach((elem) => {
-        if (elem.parentNode.tagName.toLowerCase() == elementType) {
+        if (elem.parentNode.tagName.toLowerCase() == tagName) {
           replaceInlineWithTextNode(elem);
         }
       });
+
+      // TOOD : use replaceInlineWithTextNode
+      const elements = getInlineElementsToMerge(container, tagName);
+      elements.forEach((elem) => {
+        mergeToInlineElements(elem);
+      });
     }
 
-    // replaces bold with simple textNode
-    function replaceInlineWithTextNode(element, fullRange) {
-      if (fullRange) {
-        const range = fullRange.cloneRange();
-        if (range.startContainer.parentNode == element) {
-          // range.setStartBefore(inlineNode.firstChild)
+    function getInlineElementsToMerge(container, tagName) {
+      let inlineElements = container.querySelectorAll(tagName);
+      let elementsToMerge = [];
+      inlineElements.forEach((elem) => {
+        if (elem.nextSibling?.tagName?.toLowerCase() == tagName
+          && elem.previousSibling?.tagName?.toLowerCase() !== tagName) {
+          elementsToMerge.push(elem);
         }
-        if (range.endContainer.parentNode == element) {
-          // range.setEndAfter(inlineNode.lastChild)
-        }
+      });
+      return elementsToMerge;
+    }
+
+    function mergeToInlineElements(elem1) {
+
+      const elem2 = elem1.nextSibling?.tagName?.toLowerCase() == elem1.tagName.toLowerCase()
+        ? elem1.nextSibling
+        : null;
+
+      if (!elem2) {
+        return;
       }
 
+      while (elem2.firstChild) {
+        elem1.append(elem2.firstChild);
+      };
+
+      nextElement = elem2.nextSibling?.tagName?.toLowerCase() == elem1.tagName.toLowerCase()
+        ? elem2.nextSibling
+        : null;
+      elem2.remove();
+      elem1.normalize();
+      if (nextElement) {
+        mergeToInlineElements(elem1, nextElement);
+      }
+    }
+
+    // replaces bold/italic/etc with simple textNode
+    function replaceInlineWithTextNode(element) {
       const newNode = document.createTextNode(element.textContent);
       const parentNode = element.parentNode;
       parentNode.replaceChild(newNode, element);
@@ -623,8 +662,6 @@
       makeItalic(e);
     });
 
-
-
     const bookButton = $("#book-button");
     bookButton.addEventListener("click", function () {
       page.classList.toggle("book");
@@ -640,7 +677,7 @@
         .filter((m) => m.type === "childList")
         .forEach((m) => {
           if (m.addedNodes.length) {
-            // TODO turn this back on after bugfix
+            // TODO probably not needed anymore and can be removed
             // helper.elementsCleanupDebounce(editor);
           }
           m.addedNodes.forEach((insertedElement) => {

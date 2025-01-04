@@ -4,7 +4,7 @@ no bugs :) (known)
 
 INCOMPLETE:
 
-- inline replace to remove same tagname node from children
+- test
 
 TODO:
 
