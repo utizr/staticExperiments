@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note Taking Layout style</title>
+    <link rel="stylesheet" href="./css/pure-min.css">
+    <link rel="stylesheet" href="./css/grids-responsive-min.css" />
+    <style>
+        @font-face {
+            font-family: "Source Sans 3";
+            src: url("fonts/Source_Sans_3/SourceSans3-VariableFont_wght.ttf");
+        }
+        @font-face {
+            font-family: "Source Sans 3";
+            src: url("fonts/Source_Sans_3/SourceSans3-Italic-VariableFont_wght.ttf");
+            font-style: italic;
+        }
+        body {
+            margin-top: 60px;
+        }
+        .container {
+            width: 70%;
+            margin: 0 auto;
+            border-bottom: dashed 3px #000;
+        }
+        .container-title {
+            display: inline-block;
+            padding: 0;
+            margin: 0;
+            font-family: "Source Sans 3", sans-serif;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .title-text {
+            padding-right: 36px;
+        }
+        .container-text {
+            display: inline-block;
+            padding: 0;
+            margin: 0;
+        }
+
+        p, b, li{
+            margin: 0;
+            font-family: "Source Sans 3", sans-serif;
+            font-size: 1.18em;
+            line-height: 1.1;
+        }
+        ul {
+            padding: 0;
+            margin: 0;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container pure-g">
+        <div class="container-title pure-u-6-24">
+            <div class="title-text">The most awesome list that ever happend to this note.</div>
+        </div>
+        <div class="container-text pure-u-18-24">
+            <ul>
+                <li>
+                    <p><b>Title of the note</b> Some very interesting text 1</p>
+                </li>
+                <li>
+                    <p><b>Title of the note</b> Some very interesting text 2</p>
+                </li>
+                <li>
+                    <p><b>Lorem Ipsum</b> is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.</p>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
