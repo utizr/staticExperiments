@@ -27,6 +27,9 @@
     <a id="book-button" class="menu-button">
       <div class="lsf symbol">book</div>
     </a>
+    <a id="edit-button" class="menu-button active">
+      <div class="lsf symbol">edit</div>
+    </a>
     <a id="convert-button" class="menu-button">
       <div class="lsf symbol">file</div>
     </a>
@@ -98,7 +101,7 @@
 
     const textNodeType = 3;
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-    const elementWhitelistInlineElements = ['B', 'STRONG', 'I'];
+    const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I'];
     const flags = {
       isPasting: false,
     };
@@ -315,6 +318,7 @@
       }
       flattenInlineElements(editor, tagName);
     }
+
     function makeBold(e) {
       e.preventDefault();
       wrapSelectionWithInlineElement("b");
@@ -325,7 +329,6 @@
       wrapSelectionWithInlineElement("i");
       helper.saveDebounce();
     }
-
 
     function replaceSelectedText(replacementText, htmlText) {
       const lines = replacementText.split("\n").filter((line) => {
@@ -523,7 +526,12 @@
             const tag = node.tagName.toLowerCase();
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
-            resultHtml += `<${tag}>${result.html || '<br>'}</${tag}>${newLine}`;
+            let attributes = '';
+            // TODO extend this and organize it better
+            if (tag === "a") {
+              attributes = ` href="${node.href}" target="_blank"`;
+            }
+            resultHtml += `<${tag}${attributes}>${result.html || '<br>'}</${tag}>${newLine}`;
           } else if (node.childNodes.length) {
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
@@ -667,6 +675,13 @@
       page.classList.toggle("book");
       bookButton.classList.toggle("active");
     });
+
+    const editButton = $("#edit-button");
+    editButton.addEventListener("click", function () {
+      editor.contentEditable = editor.contentEditable === "true" ? "false" : "true";
+      editButton.classList.toggle("active");
+    });
+
     const clearButton = $("#clear-button");
     clearButton.addEventListener("click", function () {
       clearContainer(editor);

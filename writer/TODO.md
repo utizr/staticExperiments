@@ -4,7 +4,7 @@ no bugs :) (known)
 
 INCOMPLETE:
 
-- test
+- make link with button
 
 TODO:
 
