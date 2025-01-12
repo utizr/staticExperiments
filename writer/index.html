@@ -67,15 +67,15 @@
       <h1>Main title.</h1>
       <p>First paragraph which is awesome.</p>
       <h2>my title.</h2>
-      <p>1 paragraph which is awesome.</p>
-      <p>2 paragraph which is amazing.</p>
-      <p>3 paragraph which is great.</p>
-      <p>First a paragraph <b>bold</b> which is awesome.</p>
-      <p>First b paragraph <b>bold</b> which is awesome.</p>
-      <p>First c paragraph <b>bold</b> which is awesome.</p>
+      <p>First paragraph which is awesome.</p>
+      <p>Second paragraph which is amazing.</p>
+      <p>Third paragraph which is great.</p>
+      <p>One a paragraph <strong>bold</strong> which is awesome.</p>
+      <p>Two b paragraph <strong>bold</strong> which is awesome.</p>
+      <p>Three c paragraph <strong>bold</strong> which is awesome.</p>
       <h3>Footer title.</h3>
-      <p>Third paragraph, <b>bold</b> and is even more awesome.</p>
-      <p>4th paragraph, <i>italic</i> that is even more awesome.</p>
+      <p>Third paragraph, <strong>bold</strong> and is even more awesome.</p>
+      <p>4th paragraph, <em>italic</em> that is even more awesome.</p>
     </div>
   </div>
 
@@ -101,7 +101,7 @@
 
     const textNodeType = 3;
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
-    const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I'];
+    const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
       isPasting: false,
     };
@@ -186,17 +186,60 @@
     // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
     function loadFromText(text, container) {
-      const lines = text.split("\n");
-      const htmlData = lines
-        .map((line) => {
-          let text = helper.encodeHTMLEntities(line);
-          if (text === "") {
-            text = "<br/>";
-          }
-          return `<p>${text}</p>`;
-        })
-        .join("\n");
-      container.innerHTML = htmlData;
+      const blocks = text.split("\n\n");
+      const blockType = {
+        "#": "H1",
+        "##": "H2",
+        "###": "H3",
+        "####": "H4",
+        "#####": "H5",
+        "######": "H6",
+      };
+      const blockElements = blocks.map((block) => {
+        const lines = block.split("\n");
+        let blockTypeKey = lines[0].match(/#+/);
+        let blockTypeValue = blockType[blockTypeKey];
+        if (!blockTypeValue) {
+          blockTypeValue = "P";
+        } else {
+          lines[0] = lines[0].replace(/#+/, "").trim();
+        }
+
+        const htmlLines = lines.map((line) => {
+          return parseInlineMarkdown(line);
+        });
+        blockContent = htmlLines.join("<br>");
+        return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
+      });
+
+      container.innerHTML = blockElements.join("\n");
+    }
+
+    function parseInlineMarkdown(text) {
+      let html = text;
+
+
+      // Parse inline code blocks: `code`
+      html = html.replace(/`([^`]+)`/g, (match, p1) => {
+        return `<code>${helper.encodeHTMLEntities(p1)}</code>`;
+      });
+
+      // Parse links: [link text](http://example.com)
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textContent, href) => {
+        return `<a href="${href}" target="_blank">${helper.encodeHTMLEntities(textContent)}</a>`;
+      });
+
+      // Parse bold text: **bold**
+      html = html.replace(/\*\*([^*]+)\*\*/g, (match, p1) => {
+        return `<strong>${helper.encodeHTMLEntities(p1)}</strong>`;
+      });
+
+      // Parse italic text: *italic*
+      html = html.replace(/\*([^*]+)\*/g, (match, p1) => {
+        return `<em>${helper.encodeHTMLEntities(p1)}</em>`;
+      });
+
+      return html;
     }
 
     // PASTE handler
@@ -211,8 +254,43 @@
       return text;
     }
 
+    function convertToText2() {
+      const text = Array.from(editor.children)
+        .map((block) => {
+          let prefix = "";
+          if (block.tagName.startsWith("H")) {
+            prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+          }
+          return prefix + convertInlineToText(Array.from(block.childNodes));
+        })
+        .join("\n\n");
+      return text;
+    }
+
+    function convertInlineToText(inlineElements) {
+      const text = inlineElements
+        .map((ie) => {
+          let prefix = "";
+          let postfix = "";
+          if (ie.tagName == 'B' || ie.tagName == 'STRONG') {
+            prefix = "**";
+            postfix = "**";
+          }
+          if (ie.tagName == 'I' || ie.tagName == 'EM') {
+            prefix = "*";
+            postfix = "*";
+          }
+          if (ie.tagName == 'A') {
+            return `[${ie.textContent}](${ie.href})`;
+          }
+          return prefix + ie.textContent + postfix;
+        })
+        .join("");
+      return text;
+    }
+
     function convertTextAndDisplay() {
-      $("#content-text").value = convertToText();
+      $("#content-text").value = convertToText2();
     }
 
     function isEmpty(editor) {
@@ -321,12 +399,12 @@
 
     function makeBold(e) {
       e.preventDefault();
-      wrapSelectionWithInlineElement("b");
+      wrapSelectionWithInlineElement("strong");
       helper.saveDebounce();
     }
     function makeItalic(e) {
       e.preventDefault();
-      wrapSelectionWithInlineElement("i");
+      wrapSelectionWithInlineElement("em");
       helper.saveDebounce();
     }
 
@@ -496,6 +574,15 @@
       return result;
     }
 
+    function tagReplacer(tagName) {
+      if (tagName === "b" || tagName === "strong") {
+        return "strong";
+      }
+      if (tagName === "i" || tagName === "em") {
+        return "em";
+      }
+      else return tagName;
+    }
     function htmlWalker(children, blockElementCount = 0) {
       let resultHtml = '';
       if (!children?.length) {
@@ -523,7 +610,8 @@
             blockElementCount++;
           }
           if (blockElement || inlineElement) {
-            const tag = node.tagName.toLowerCase();
+            let tag = node.tagName.toLowerCase();
+            tag = tagReplacer(tag);
             const result = htmlWalker(node.childNodes);
             blockElementCount += result.blockElementCount;
             let attributes = '';

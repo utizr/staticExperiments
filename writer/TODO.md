@@ -4,6 +4,8 @@ no bugs :) (known)
 
 INCOMPLETE:
 
+- cleanup parser
+- after changing style (bold/italic) put the cursor behind the element
 - make link with button
 
 TODO:
