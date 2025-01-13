@@ -181,7 +181,7 @@
       loadFromText(book, editor);
     }
     // TODO turn this back on after testing
-    // loadDataOnPageLoad();
+    loadDataOnPageLoad();
 
     // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
@@ -340,7 +340,33 @@
     }
 
     function clearContainer(container) {
-      container.innerHTML = `<p><br/></p>`;
+      // container.innerHTML = `<p><br/></p>`;
+      loadFromText(`
+# Main title.
+
+First paragraph which is awesome.
+
+## my title.
+
+First paragraph which is awesome.
+
+Second paragraph which is amazing.
+
+Third paragraph which is great.
+
+One a paragraph **bold** which is awesome.
+
+Two b paragraph **bold** which is awesome.
+
+Three c paragraph **bold** which is awesome.
+
+### Footer title.
+
+Third paragraph, **bold** and is even more awesome.
+
+4th paragraph, *italic* that is even more awesome.
+      `.trim(), editor);
+
       return putCursorAtFirstElement(container, 'br');
     }
 
