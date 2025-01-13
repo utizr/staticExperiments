@@ -224,19 +224,37 @@
         return `<code>${helper.encodeHTMLEntities(p1)}</code>`;
       });
 
+      // Parse images: ![alt text](imageURL)
+      //    The alt text can be optional (we’ll match even an empty alt: ![](imageURL)).
+      //    For example: ![A cat](https://example.com/cat.jpg)
+      html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, src) => {
+        return `<img src="${src}" alt="${altText}" />`;
+      });
+
       // Parse links: [link text](http://example.com)
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textContent, href) => {
         return `<a href="${href}" target="_blank">${helper.encodeHTMLEntities(textContent)}</a>`;
       });
 
       // Parse bold text: **bold**
-      html = html.replace(/\*\*([^*]+)\*\*/g, (match, p1) => {
-        return `<strong>${helper.encodeHTMLEntities(p1)}</strong>`;
+      // Only match if there's no space after the opening `**` and no space before the closing `**`.
+      //
+      // Explanation of the RegExp:
+      //   \*\*(?!\s)      => Match `**` that is NOT followed by a space
+      //   ([^*]+?)        => Capture one or more non-asterisk characters (lazy)
+      //   (?<!\s)\*\*     => Match `**` that is NOT preceded by a space (using a negative lookbehind if supported)
+      //
+      // For broad compatibility, we can do a slightly simpler pattern without the negative lookbehind,
+      // but the pattern shown here demonstrates the intent. If negative lookbehind isn't supported in your environment,
+      // consider alternative approaches or check browser compatibility.
+      html = html.replace(/\*\*(?!\s)([^*]+?)(?<!\s)\*\*/g, (match, p1) => {
+        return `<strong>${p1}</strong>`;
       });
 
-      // Parse italic text: *italic*
-      html = html.replace(/\*([^*]+)\*/g, (match, p1) => {
-        return `<em>${helper.encodeHTMLEntities(p1)}</em>`;
+      // 4. Parse italic text: *italic*
+      // Only match if there's no space after the opening `*` and no space before the closing `*`.
+      html = html.replace(/\*(?!\s)([^*]+?)(?<!\s)\*/g, (match, p1) => {
+        return `<em>${p1}</em>`;
       });
 
       return html;
