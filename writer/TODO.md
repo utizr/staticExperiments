@@ -1,10 +1,9 @@
 BUGS:
 
-no bugs :) (known)
+- when coming from a paragraph that is completely bold, and hitting enter to create a new paragraph, pasting will not work.
 
 INCOMPLETE:
 
-- cleanup parser
 - after changing style (bold/italic) put the cursor behind the element
 - make link with button
 

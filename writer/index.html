@@ -236,6 +236,12 @@
         return `<a href="${href}" target="_blank">${helper.encodeHTMLEntities(textContent)}</a>`;
       });
 
+
+      // Parse italic text: *italic*
+      // Only match if there's no space after the opening `*` and no space before the closing `*`.
+      html = html.replace(/(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)/g, (match, p1) => {
+        return `<em>${p1}</em>`;
+      });
       // Parse bold text: **bold**
       // Only match if there's no space after the opening `**` and no space before the closing `**`.
       //
@@ -247,14 +253,30 @@
       // For broad compatibility, we can do a slightly simpler pattern without the negative lookbehind,
       // but the pattern shown here demonstrates the intent. If negative lookbehind isn't supported in your environment,
       // consider alternative approaches or check browser compatibility.
-      html = html.replace(/\*\*(?!\s)([^*]+?)(?<!\s)\*\*/g, (match, p1) => {
+      html = html.replace(/(?<!\*)\*\*(?!\s)([^*]+?)(?<!\s)\*\*(?!\*)/g, (match, p1) => {
         return `<strong>${p1}</strong>`;
       });
 
-      // 4. Parse italic text: *italic*
-      // Only match if there's no space after the opening `*` and no space before the closing `*`.
-      html = html.replace(/\*(?!\s)([^*]+?)(?<!\s)\*/g, (match, p1) => {
+      // see explanation below
+      html = html.replace(/\*\*\*(?!\s)([^*]+?)(?<!\s)\*\*\*/g, (match, p1) => {
+        return `<em><strong>${p1}</strong></em>`;
+      });
+       
+      // Parse italic with _: _italic_
+      //    Same logic, but with underscores.
+      html = html.replace(/(?<!_)_(?!\s)([^_]+?)(?<!\s)_(?!_)/g, (match, p1) => {
         return `<em>${p1}</em>`;
+      });
+
+      // Parse bold with __: __bold__
+      //    Same logic, but with underscores.
+      html = html.replace(/(?<!_)__(?!\s)([^_]+?)(?<!\s)__(?!_)/g, (match, p1) => {
+        return `<strong>${p1}</strong>`;
+      });
+ 
+      // see explanation below
+      html = html.replace(/___(?!\s)([^_]+?)(?<!\s)___/g, (match, p1) => {
+        return `<em><strong>${p1}</strong></em>`;
       });
 
       return html;
@@ -262,17 +284,8 @@
 
     // PASTE handler
 
-    function convertToText() {
-      const inlineElements = Array.from(editor.children);
-      const text = inlineElements
-        .map((ie) => {
-          return ie.textContent;
-        })
-        .join("\n");
-      return text;
-    }
 
-    function convertToText2() {
+    function convertToText() {
       const text = Array.from(editor.children)
         .map((block) => {
           let prefix = "";
@@ -293,22 +306,24 @@
           if (ie.tagName == 'B' || ie.tagName == 'STRONG') {
             prefix = "**";
             postfix = "**";
+            return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'I' || ie.tagName == 'EM') {
             prefix = "*";
             postfix = "*";
+            return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'A') {
             return `[${ie.textContent}](${ie.href})`;
           }
-          return prefix + ie.textContent + postfix;
+          return ie.textContent;
         })
         .join("");
       return text;
     }
 
     function convertTextAndDisplay() {
-      $("#content-text").value = convertToText2();
+      $("#content-text").value = convertToText();
     }
 
     function isEmpty(editor) {
