@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<!-- csss framework documentation -->
+<!-- css framework documentation -->
 <!-- https://purecss.io/grids/ -->
 
 <head>
@@ -45,6 +45,13 @@
     <a id="italic-button" class="menu-button">
       <div class="lsf symbol">italic</div>
     </a>
+    <!-- NEW: List buttons -->
+    <a id="ul-button" class="menu-button">
+      <div class="lsf symbol">format_list_bulleted</div>
+    </a>
+    <a id="ol-button" class="menu-button">
+      <div class="lsf symbol">format_list_numbered</div>
+    </a>
     <a id="unsaved-button" class="menu-button">
       <div class="lsf symbol">etc</div>
     </a>
@@ -80,7 +87,6 @@
   </div>
 
   <script>
-
     function $(selector, element = document) {
       return element.querySelector(selector);
     }
@@ -89,25 +95,26 @@
       return Array.from(element.querySelectorAll(selectors.join(",")));
     }
 
-
     const dialog = $("#dialog");
     const dialogCloseButton = $("#dialog-close-button");
     const dialogSaveButton = $("#dialog-save-button");
     const boldButton = $("#bold-button");
     const italicButton = $("#italic-button");
+    // NEW: List buttons
+    const ulButton = $("#ul-button");
+    const olButton = $("#ol-button");
     const editor = $("#container");
     const page = $("#page");
     const unsaved = $("#unsaved-button");
 
     const textNodeType = 3;
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'LI'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
       isPasting: false,
     };
 
     // HELPERS >>>>>>>>>>>>>>>>>>
-
     const helper = {
       ini() {
         this.saveDebounce = this.saveDebounce();
@@ -167,7 +174,6 @@
     helper.ini();
 
     // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
-
     function toggleDialog() {
       dialog.classList.toggle("active");
     }
@@ -185,6 +191,7 @@
 
     // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
+    // EXTENDED loadFromText: now handles lists!
     function loadFromText(text, container) {
       const blocks = text.split("\n\n");
       const blockType = {
@@ -197,19 +204,32 @@
       };
       const blockElements = blocks.map((block) => {
         const lines = block.split("\n");
-        let blockTypeKey = lines[0].match(/#+/);
-        let blockTypeValue = blockType[blockTypeKey];
-        if (!blockTypeValue) {
-          blockTypeValue = "P";
+        // Check if this block is a list block (e.g. lines starting with "- " or "1. ")
+        if (/^(\-|\*|\+|\d+\.)\s+/.test(lines[0])) {
+          const isOrdered = /^\d+\./.test(lines[0]);
+          const listTag = isOrdered ? "OL" : "UL";
+          const listItems = lines.map(line => {
+            const match = line.match(/^(\-|\*|\+|\d+\.)\s+(.*)$/);
+            if (match) {
+              return `<li>${parseInlineMarkdown(match[2])}</li>`;
+            }
+            return `<li>${parseInlineMarkdown(line)}</li>`;
+          }).join("\n");
+          return `<${listTag}>${listItems}</${listTag}>`;
         } else {
-          lines[0] = lines[0].replace(/#+/, "").trim();
+          let blockTypeKey = lines[0].match(/#+/);
+          let blockTypeValue = blockType[blockTypeKey];
+          if (!blockTypeValue) {
+            blockTypeValue = "P";
+          } else {
+            lines[0] = lines[0].replace(/#+/, "").trim();
+          }
+          const htmlLines = lines.map((line) => {
+            return parseInlineMarkdown(line);
+          });
+          const blockContent = htmlLines.join("<br>");
+          return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
         }
-
-        const htmlLines = lines.map((line) => {
-          return parseInlineMarkdown(line);
-        });
-        blockContent = htmlLines.join("<br>");
-        return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
       });
 
       container.innerHTML = blockElements.join("\n");
@@ -217,7 +237,6 @@
 
     function parseInlineMarkdown(text) {
       let html = text;
-
 
       // Parse inline code blocks: `code`
       html = html.replace(/`([^`]+)`/g, (match, p1) => {
@@ -283,16 +302,27 @@
     }
 
     // PASTE handler
-
-
     function convertToText() {
       const text = Array.from(editor.children)
         .map((block) => {
-          let prefix = "";
-          if (block.tagName.startsWith("H")) {
-            prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+          // NEW: Handle UL lists
+          if (block.tagName === "UL") {
+            return Array.from(block.children)
+              .map(li => `- ${convertInlineToText(Array.from(li.childNodes))}`)
+              .join("\n");
           }
-          return prefix + convertInlineToText(Array.from(block.childNodes));
+          // NEW: Handle OL lists
+          else if (block.tagName === "OL") {
+            return Array.from(block.children)
+              .map((li, index) => `${index + 1}. ${convertInlineToText(Array.from(li.childNodes))}`)
+              .join("\n");
+          } else {
+            let prefix = "";
+            if (block.tagName.startsWith("H")) {
+              prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+            }
+            return prefix + convertInlineToText(Array.from(block.childNodes));
+          }
         })
         .join("\n\n");
       return text;
@@ -360,12 +390,15 @@ Two b paragraph **bold** which is awesome.
 
 Three c paragraph **bold** which is awesome.
 
+- List item one
+- List item two
+
 ### Footer title.
 
 Third paragraph, **bold** and is even more awesome.
 
 4th paragraph, *italic* that is even more awesome.
-      `.trim(), editor);
+        `.trim(), editor);
 
       helper.saveDebounce();
       return putCursorAtFirstElement(container, 'br');
@@ -468,6 +501,26 @@ Third paragraph, **bold** and is even more awesome.
       helper.saveDebounce();
     }
 
+    // NEW: Wrap the selected block elements in a list element.
+    function wrapSelectionWithList(listType) {
+      if (editor.lastSelection) {
+        const range = editor.lastSelection;
+        const blocks = getAllBlockElementsInSelection(editor, range, []);
+        if (blocks.length === 0) {
+          return;
+        }
+        const listElem = document.createElement(listType);
+        // Insert the new list element before the first selected block.
+        blocks[0].parentNode.insertBefore(listElem, blocks[0]);
+        blocks.forEach((block) => {
+          const li = document.createElement("li");
+          li.innerHTML = block.innerHTML;
+          listElem.appendChild(li);
+          block.remove();
+        });
+      }
+    }
+
     function replaceSelectedText(replacementText, htmlText) {
       const lines = replacementText.split("\n").filter((line) => {
         return line.length;
@@ -556,7 +609,6 @@ Third paragraph, **bold** and is even more awesome.
             firstNode.append(firstHtmlNodePasted.firstChild);
           }
           firstBlockNode.before(firstNode);
-
 
           let endNode = firstNode;
           let endTextNode = firstNode.lastChild;
@@ -693,13 +745,12 @@ Third paragraph, **bold** and is even more awesome.
       return { html: resultHtml, blockElementCount };
     }
 
-
     function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
       selectionContainer.childNodes.forEach((node) => {
         if (node.nodeType === textNodeType && range.intersectsNode(node)) {
           collectedTextNodes.push(node);
         } else {
-          const newNodes = getAllTextNodesInSelection(node, range, collectedTextNodes);
+          getAllTextNodesInSelection(node, range, collectedTextNodes);
         }
       });
       return collectedTextNodes;
@@ -764,7 +815,6 @@ Third paragraph, **bold** and is even more awesome.
     }
 
     function mergeToInlineElements(elem1) {
-
       const elem2 = elem1.nextSibling?.tagName?.toLowerCase() == elem1.tagName.toLowerCase()
         ? elem1.nextSibling
         : null;
@@ -817,6 +867,17 @@ Third paragraph, **bold** and is even more awesome.
     });
     italicButton.addEventListener("click", function (e) {
       makeItalic(e);
+    });
+    // NEW: List button event listeners
+    ulButton.addEventListener("click", function (e) {
+      e.preventDefault();
+      wrapSelectionWithList("ul");
+      helper.saveDebounce();
+    });
+    olButton.addEventListener("click", function (e) {
+      e.preventDefault();
+      wrapSelectionWithList("ol");
+      helper.saveDebounce();
     });
 
     const bookButton = $("#book-button");
