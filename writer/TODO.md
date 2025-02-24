@@ -1,5 +1,6 @@
 BUGS:
 
+- pasting a single line into an empty list item does not work. It should convert the pasted element into a list.
 - when coming from a paragraph that is completely bold, and hitting enter to create a new paragraph, pasting will not work.
 
 INCOMPLETE:

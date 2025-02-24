@@ -47,10 +47,10 @@
     </a>
     <!-- NEW: List buttons -->
     <a id="ul-button" class="menu-button">
-      <div class="lsf symbol">format_list_bulleted</div>
+      <div class="lsf symbol">list</div>
     </a>
     <a id="ol-button" class="menu-button">
-      <div class="lsf symbol">format_list_numbered</div>
+      <div class="lsf symbol">list</div>
     </a>
     <a id="unsaved-button" class="menu-button">
       <div class="lsf symbol">etc</div>
@@ -109,6 +109,7 @@
 
     const textNodeType = 3;
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'LI'];
+    const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
       isPasting: false,
@@ -541,6 +542,10 @@ Third paragraph, **bold** and is even more awesome.
 
         range.deleteContents();
 
+        const mergeLogic = "merge with beginning and end";
+        const newBlocksLogic = "when pasting multiple lines create new blocks";
+        const logic = newBlocksLogic;
+
         if (isEmpty(editor)) {
 
           container.innerHTML = "";
@@ -561,7 +566,97 @@ Third paragraph, **bold** and is even more awesome.
 
           // if we pasted multiple lines, the pasted contant will
           // determin the content element type
-        } else if (elements.length > 0 && lines.length > 1) {
+        } else if (logic === newBlocksLogic && elements.length > 0 && lines.length > 1) {
+          // if we are inserting to the middle of a paragraph
+          // and we are inserting more lines.
+          // In this case we are creating a new paragraph from the extracted first part
+          // of the paragraph, and attach the first line; we then insert the middle lines
+          // as new paragraphs. Then at the end we create a new paragraph from the extracted
+          // last part of the paragraph, and attach the last line to it.
+          const isMultiLineSelection = elements.length > 1;
+          const firstBlockNode = elements.shift();
+          const lastBlockNode = elements.pop() || firstBlockNode;
+          const startRange = range.cloneRange();
+          const endRange = range.cloneRange();
+          const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
+
+          // if we select the complete paragraph (block element) in firefox all children are removed
+          // so we have to add a dummy one.
+          if (!firstBlockNode.firstChild) {
+            const dummyTextNode = document.createTextNode("");
+            firstBlockNode.append(dummyTextNode);
+          }
+          startRange.setStartBefore(firstBlockNode.firstChild);
+          // this is needed because if the end of the selection is not 
+          // in the starting container it will encapsulate the complete block element.
+          // so if we have paragraphs, instead of getting a text node, we'd get the paragraph element
+          if (isMultiLineSelection) {
+            startRange.setEndAfter(firstBlockNode.lastChild);
+          }
+          endRange.setEndAfter(lastBlockNode.lastChild);
+          if (isMultiLineSelection) {
+            endRange.setStartBefore(lastBlockNode.firstChild);
+          }
+          const startContent = startRange.extractContents();
+          const endContent = endRange.extractContents();
+
+          // we check if there is any content before the selection
+          // if there is, we are adding them one by one to the new paragraph
+          // note that if we are appending a child from a htmlFragement (startContent)
+          // then it will be gone from the htmlFragement,
+          // so we keep using the firstChild until there is any left.
+
+          let endNode = firstBlockNode;
+          let endTextNode = null;
+          if (!!startContent.textContent) {
+            const firstNode = document.createElement(firstBlockNode.tagName);
+
+            while (startContent.firstChild) {
+              firstNode.append(startContent.firstChild);
+            }
+            firstBlockNode.before(firstNode);
+            firstNode.normalize();
+            endNode = firstNode;
+            endTextNode = firstNode.lastChild;
+          }
+
+          while (htmlPasted.firstChild) {
+            if (htmlPasted.firstChild.nodeType == textNodeType) {
+              htmlPasted.firstChild.remove();
+              continue;
+            }
+            const newElemTagname = pastingIntoUlist ? 'LI' : htmlPasted.firstChild.tagName;
+            const newElem = document.createElement(newElemTagname);
+            while (htmlPasted.firstChild.firstChild) {
+              newElem.append(htmlPasted.firstChild.firstChild);
+            }
+            htmlPasted.firstChild.remove();
+            endNode.after(newElem);
+            endNode = newElem;
+          }
+          if (endNode.tagName === 'LI') {
+            endNode = endNode.parentNode;
+          }
+
+          endTextNode = lastTextNodeOf(endNode);
+
+          if (!!endContent.textContent) {
+            const closingNode = document.createElement(lastBlockNode.tagName);
+            while (endContent.firstChild) {
+              closingNode.append(endContent.firstChild);
+            }
+            endNode.after(closingNode);
+            endNode = closingNode;
+          }
+          range.collapse(false);
+
+          carretToTextNodeEnd(sel, endTextNode);
+          firstBlockNode.remove();
+          if (firstBlockNode != lastBlockNode) {
+            lastBlockNode.remove();
+          }
+          endNode.normalize();
+        } else if (logic === mergeLogic && elements.length > 0 && lines.length > 1) {
           // if we are inserting to the middle of a paragraph
           // and we are inserting more lines.
           // In this case we are creating a new paragraph from the extracted first part
@@ -852,11 +947,11 @@ Third paragraph, **bold** and is even more awesome.
     }
 
     function getAllBlockElementsInSelection(selectionContainer, range, collectedBlockNodes) {
-      if (elementWhitelistBlockElements.includes(selectionContainer?.tagName) && hasAnySelectedTextNodes(selectionContainer, range)) {
+      if (elementWhitelistBlockElementsInSelection.includes(selectionContainer?.tagName) && hasAnySelectedTextNodes(selectionContainer, range)) {
         collectedBlockNodes.push(selectionContainer);
       }
       selectionContainer.childNodes.forEach((node) => {
-        if (elementWhitelistBlockElements.includes(node.tagName) && hasAnySelectedTextNodes(node, range) && !collectedBlockNodes.includes(node)) {
+        if (elementWhitelistBlockElementsInSelection.includes(node.tagName) && hasAnySelectedTextNodes(node, range) && !collectedBlockNodes.includes(node)) {
           collectedBlockNodes.push(node);
         } else if (node.nodeType != textNodeType) {
           const newNodes = getAllBlockElementsInSelection(node, range, collectedBlockNodes);
@@ -864,7 +959,7 @@ Third paragraph, **bold** and is even more awesome.
       });
       // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
       // so we are adding it manually if this is the commonAncestorContainer
-      if (!collectedBlockNodes.length && range.commonAncestorContainer.tagName === "P" && isEmptyBlockElement(range.commonAncestorContainer)) {
+      if (!collectedBlockNodes.length && ["P", "LI"].includes(range.commonAncestorContainer.tagName) && isEmptyBlockElement(range.commonAncestorContainer)) {
         collectedBlockNodes.push(range.commonAncestorContainer);
       }
       return collectedBlockNodes;
