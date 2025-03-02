@@ -193,7 +193,26 @@
     // ENCODER DECODER <<<<<<<<<<<<<<<<<<<<<
 
     // EXTENDED loadFromText: now handles lists!
-    function loadFromText(text, container) {
+
+    function isValidHttpUrl(text) {
+      if (!text.match(/^https?:\/\/.+/)) {
+        return false;
+      }
+
+      try {
+        new URL(text);
+      } catch (_) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function convertTextToHTML(text) {
+      // first if the pasted text is a url, we return it as a link
+      if (isValidHttpUrl(text)) {
+        return `<a href="${text}" target="_blank">${text}</a>`;
+      }
       const blocks = text.split("\n\n");
       const blockType = {
         "#": "H1",
@@ -233,7 +252,11 @@
         }
       });
 
-      container.innerHTML = blockElements.join("\n");
+      return blockElements.join("\n");
+    }
+
+    function loadFromText(text, container) {
+      container.innerHTML = convertTextToHTML(text);
     }
 
     function parseInlineMarkdown(text) {
@@ -853,8 +876,11 @@ Third paragraph, **bold** and is even more awesome.
       e.preventDefault();
       flags.isPasting = true;
       const text = e.clipboardData.getData("text/plain").trim();
-      const htmlText = e.clipboardData.getData("text/html");
+      let htmlText = e.clipboardData.getData("text/html");
 
+      if (!htmlText) {
+        htmlText = convertTextToHTML(text);
+      }
       const htmlResult = htmlSanitizer(htmlText);
       replaceSelectedText(text, htmlResult);
       unsaved.style.display = "inline-block";
