@@ -1,6 +1,7 @@
 BUGS:
 
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.
+  - select a list item, paste it into an empty list item (enter on another list item) will not wrap the ul into a li
 - when coming from a paragraph that is completely bold, and hitting enter to create a new paragraph, pasting will not work.
 
 INCOMPLETE:

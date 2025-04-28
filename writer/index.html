@@ -804,7 +804,9 @@ Third paragraph, **bold** and is even more awesome.
 
           const firstBlockNodeEmpty = isEmptyBlockElement(firstBlockNode);
 
-          const firstNode = firstBlockNodeEmpty
+          // pasting a list item into an empty list item is still an issue, so this needs a different solution
+          // something like 'mergeLists' special case
+          const firstNode = firstBlockNodeEmpty && firstBlockNode.tagName !== 'LI'
             ? document.createElement(firstHtmlNodePasted.tagName)
             : document.createElement(firstBlockNode.tagName);
           // we check if there is any content before the selection
