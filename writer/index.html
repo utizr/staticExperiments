@@ -418,8 +418,10 @@ Two b paragraph **bold** which is awesome.
 
 Three c paragraph **bold** which is awesome.
 
-- List item one
-- List item two
+- List item **one** ends here.
+- List item **two** ends here.
+- List item **three** ends here.
+- List item **four** ends here.
 
 ### Footer title.
 
@@ -600,7 +602,17 @@ Third paragraph, **bold** and is even more awesome.
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
           const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
+          const pastedAList = htmlPasted.firstChild?.tagName === 'UL';
 
+          if (pastingIntoUlist && pastedAList) {
+            const tempDiv = document.createElement('div');
+            const ul = htmlPasted.firstChild;
+            while (ul.firstChild) {
+              tempDiv.append(ul.firstChild);
+            }
+            htmlPasted.innerHTML = tempDiv.innerHTML;
+            // we need to make the htmlPasted the list items themselfs
+          }
           // if we select the complete paragraph (block element) in firefox all children are removed
           // so we have to add a dummy one.
           if (!firstBlockNode.firstChild) {
@@ -654,9 +666,6 @@ Third paragraph, **bold** and is even more awesome.
             htmlPasted.firstChild.remove();
             endNode.after(newElem);
             endNode = newElem;
-          }
-          if (endNode.tagName === 'LI') {
-            endNode = endNode.parentNode;
           }
 
           endTextNode = lastTextNodeOf(endNode);
