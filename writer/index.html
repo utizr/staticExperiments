@@ -604,6 +604,7 @@ Third paragraph, **bold** and is even more awesome.
           const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
           const pastedAList = htmlPasted.firstChild?.tagName === 'UL';
 
+          // we need to make the htmlPasted the list items themselfs
           if (pastingIntoUlist && pastedAList) {
             const tempDiv = document.createElement('div');
             const ul = htmlPasted.firstChild;
@@ -611,7 +612,6 @@ Third paragraph, **bold** and is even more awesome.
               tempDiv.append(ul.firstChild);
             }
             htmlPasted.innerHTML = tempDiv.innerHTML;
-            // we need to make the htmlPasted the list items themselfs
           }
           // if we select the complete paragraph (block element) in firefox all children are removed
           // so we have to add a dummy one.
@@ -698,7 +698,24 @@ Third paragraph, **bold** and is even more awesome.
           const lastBlockNode = elements.pop() || firstBlockNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
+
+
+          // this block is duplicated from above, so we should refactor it
+          const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
+          const pastedAList = htmlPasted.firstChild?.tagName === 'UL';
+
+          // we need to make the htmlPasted the list items themselfs
+          if (pastingIntoUlist && pastedAList) {
+            const tempDiv = document.createElement('div');
+            const ul = htmlPasted.firstChild;
+            while (ul.firstChild) {
+              tempDiv.append(ul.firstChild);
+            }
+            htmlPasted.innerHTML = tempDiv.innerHTML;
+          }
+
           const firstHtmlNodePasted = htmlPasted.firstChild;
+
           htmlPasted.firstChild.remove();
 
           // if we select the complete paragraph (block element) in firefox all children are removed
@@ -725,7 +742,7 @@ Third paragraph, **bold** and is even more awesome.
 
           // pasting a list item into an empty list item is still an issue, so this needs a different solution
           // something like 'mergeLists' special case
-          const firstNode = firstBlockNodeEmpty && firstBlockNode.tagName !== 'LI'
+          const firstNode = firstBlockNodeEmpty && !pastingIntoUlist
             ? document.createElement(firstHtmlNodePasted.tagName)
             : document.createElement(firstBlockNode.tagName);
           // we check if there is any content before the selection
