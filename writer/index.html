@@ -929,15 +929,34 @@ Third paragraph, **bold** and is even more awesome.
     }
 
     function isEmptyBlockElement(element) {
-      let isBlockEmpty = true;
+      // Check each child node recursively
       for (let i = 0; i < element.childNodes.length; i++) {
         const node = element.childNodes[i];
-        if (node.tagName !== "BR") {
-          isBlockEmpty = false;
-          break;
+        
+        // Skip BR elements
+        if (node.tagName === "BR") {
+          continue;
+        }
+
+        // If it's a text node with content, element is not empty
+        if (node.nodeType === textNodeType && node.textContent.trim()) {
+          return false;
+        }
+
+        // For inline elements, check their contents recursively
+        if (elementWhitelistInlineElements.includes(node.tagName)) {
+          if (!isEmptyBlockElement(node)) {
+            return false;
+          }
+          continue;
+        }
+
+        // For any other element type that has content
+        if (node.textContent.trim()) {
+          return false;
         }
       }
-      return isBlockEmpty;
+      return true;
     }
 
     function flattenInlineElements(container, tagName) {
@@ -1062,6 +1081,15 @@ Third paragraph, **bold** and is even more awesome.
             if (insertedElement.tagName === "SPAN") {
               const text = document.createTextNode(insertedElement.textContent);
               insertedElement.replaceWith(text);
+            }
+            // this is needed because if we are in a list and at the end there is a bold element
+            // and we press enter, the bold element is not removed and we end up with a list item with an empty bold element
+            // this causes issues at pasting and it is not desired
+            if (insertedElement.tagName === "LI") {
+              console.log("inserted LI",insertedElement);
+              if (isEmptyBlockElement(insertedElement)) {
+                insertedElement.innerHTML = "";
+              }
             }
             if (insertedElement.tagName === "DIV") {
               const pContent = insertedElement.textContent
