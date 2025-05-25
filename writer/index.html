@@ -429,8 +429,10 @@ Two b paragraph **bold** which is awesome.
 
 Three c paragraph **bold** which is awesome.
 
-- List item one
-- List item two
+- List item **one** ends here.
+- List item **two** ends here.
+- List item **three** ends here.
+- List item **four** ends here.
 
 ### Footer title.
 
@@ -577,7 +579,6 @@ Third paragraph, **bold** and is even more awesome.
 
         const mergeLogic = "merge with beginning and end";
         const newBlocksLogic = "when pasting multiple lines create new blocks";
-        const logic = newBlocksLogic;
 
         if (isEmpty(editor)) {
 
@@ -597,9 +598,9 @@ Third paragraph, **bold** and is even more awesome.
           sel.removeAllRanges();
           sel.addRange(rangeOnLastElement);
 
-          // if we pasted multiple lines, the pasted contant will
-          // determin the content element type
-        } else if (logic === newBlocksLogic && elements.length > 0 && lines.length > 1) {
+          // if we pasted multiple lines, the pasted content will
+          // determine the content element type
+        } else if (elements.length > 0 && lines.length > 1) {
           // if we are inserting to the middle of a paragraph
           // and we are inserting more lines.
           // In this case we are creating a new paragraph from the extracted first part
@@ -611,8 +612,19 @@ Third paragraph, **bold** and is even more awesome.
           const lastBlockNode = elements.pop() || firstBlockNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
-          const pastingIntoList = firstBlockNode.tagName === 'LI' && (firstBlockNode.parentNode.tagName === 'UL' || firstBlockNode.parentNode.tagName === 'OL');
 
+          const pastingIntoList = firstBlockNode.tagName === 'LI' && (firstBlockNode.parentNode.tagName === 'UL' || firstBlockNode.parentNode.tagName === 'OL');
+          const pastedAList = htmlPasted.firstChild?.tagName === 'UL' || htmlPasted.firstChild?.tagName === 'OL';
+
+          // we need to make the htmlPasted the list items themselfs
+          if (pastingIntoList && pastedAList) {
+            const tempDiv = document.createElement('div');
+            const ul = htmlPasted.firstChild;
+            while (ul.firstChild) {
+              tempDiv.append(ul.firstChild);
+            }
+            htmlPasted.innerHTML = tempDiv.innerHTML;
+          }
           // if we select the complete paragraph (block element) in firefox all children are removed
           // so we have to add a dummy one.
           if (!firstBlockNode.firstChild) {
@@ -667,9 +679,6 @@ Third paragraph, **bold** and is even more awesome.
             endNode.after(newElem);
             endNode = newElem;
           }
-          if (endNode.tagName === 'LI') {
-            endNode = endNode.parentNode;
-          }
 
           endTextNode = lastTextNodeOf(endNode);
 
@@ -689,95 +698,6 @@ Third paragraph, **bold** and is even more awesome.
             lastBlockNode.remove();
           }
           endNode.normalize();
-        } else if (logic === mergeLogic && elements.length > 0 && lines.length > 1) {
-          // if we are inserting to the middle of a paragraph
-          // and we are inserting more lines.
-          // In this case we are creating a new paragraph from the extracted first part
-          // of the paragraph, and attach the first line; we then insert the middle lines
-          // as new paragraphs. Then at the end we create a new paragraph from the extracted
-          // last part of the paragraph, and attach the last line to it.
-          const firstBlockNode = elements.shift();
-          const lastBlockNode = elements.pop() || firstBlockNode;
-          const startRange = range.cloneRange();
-          const endRange = range.cloneRange();
-
-          let firstHtmlNodePasted = htmlPasted.firstChild;
-          let lastHtmlNodePasted = htmlPasted.lastChild;
-
-          if (['UL', 'OL'].includes(htmlPasted.firstChild.tagName)) {
-            firstHtmlNodePasted = htmlPasted.firstChild.firstChild;
-          }
-          if (['UL', 'OL'].includes(htmlPasted.lastChild.tagName)) {
-            lastHtmlNodePasted = htmlPasted.lastChild.lastChild;
-          }
-
-          // if we select the complete paragraph (block element) in firefox all children are removed
-          // so we have to add a dummy one.
-          if (!firstBlockNode.firstChild) {
-            const dummyTextNode = document.createTextNode("");
-            firstBlockNode.append(dummyTextNode);
-          }
-          startRange.setStartBefore(firstBlockNode.firstChild);
-          // this is needed because if the end of the selection is not 
-          // in the starting container it will encapsulate the complete block element.
-          // so if we have paragraphs, instead of getting a text node, we'd get the paragraph element
-          startRange.setEndAfter(firstBlockNode.lastChild);
-          endRange.setEndAfter(lastBlockNode.lastChild);
-          endRange.setStartBefore(lastBlockNode.firstChild);
-          const startContent = startRange.extractContents();
-          const endContent = endRange.extractContents();
-
-
-          // we are adding the content before the selection from the first block element
-          // to the beginning of the first pasted node.
-          const tempDiv = document.createElement('div');
-          while (firstHtmlNodePasted.firstChild) {
-            tempDiv.append(firstHtmlNodePasted.firstChild);
-          }
-          if (!!startContent.textContent) {
-            while (startContent.firstChild) {
-              firstHtmlNodePasted.append(startContent.firstChild);
-            }
-          }
-          while (tempDiv.firstChild) {
-            firstHtmlNodePasted.append(tempDiv.firstChild);
-          }
-          firstHtmlNodePasted.normalize();
-
-          tempDiv.remove();
-
-          let endNode = firstBlockNode;
-          while (htmlPasted.firstChild) {
-            if (htmlPasted.firstChild.nodeType == textNodeType) {
-              htmlPasted.firstChild.remove();
-              continue;
-            }
-            const elem = htmlPasted.firstChild.cloneNode(true);
-            htmlPasted.firstChild.remove();
-            endNode.after(elem);
-            endNode = elem;
-            endNode.normalize();
-          }
-
-          if (['UL', 'OL'].includes(endNode.tagName)) {
-            endNode = endNode.lastChild;
-          }
-          endTextNode = lastTextNodeOf(endNode);
-
-          if (!!endContent.textContent) {
-            while (endContent.firstChild) {
-              endNode.append(endContent.firstChild);
-            }
-          }
-          endNode.normalize();
-
-          range.collapse(false);
-
-          carretToTextNodeEnd(sel, endTextNode);
-          firstBlockNode.remove();
-          if (firstBlockNode != lastBlockNode) {
-            lastBlockNode.remove();
-          }
         } else if (elements.length > 0 && lines.length > 0) {
           // if we are inserting to the middle of a paragraph
           // and we are inserting more lines.
@@ -790,7 +710,24 @@ Third paragraph, **bold** and is even more awesome.
           const lastBlockNode = elements.pop() || firstBlockNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
+
+
+          // this block is duplicated from above, so we should refactor it
+          const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
+          const pastedAList = htmlPasted.firstChild?.tagName === 'UL';
+
+          // we need to make the htmlPasted the list items themselfs
+          if (pastingIntoUlist && pastedAList) {
+            const tempDiv = document.createElement('div');
+            const ul = htmlPasted.firstChild;
+            while (ul.firstChild) {
+              tempDiv.append(ul.firstChild);
+            }
+            htmlPasted.innerHTML = tempDiv.innerHTML;
+          }
+
           const firstHtmlNodePasted = htmlPasted.firstChild;
+
           htmlPasted.firstChild.remove();
 
           // if we select the complete paragraph (block element) in firefox all children are removed
@@ -817,7 +754,7 @@ Third paragraph, **bold** and is even more awesome.
 
           // pasting a list item into an empty list item is still an issue, so this needs a different solution
           // something like 'mergeLists' special case
-          const firstNode = firstBlockNodeEmpty && firstBlockNode.tagName !== 'LI'
+          const firstNode = firstBlockNodeEmpty && !pastingIntoUlist
             ? document.createElement(firstHtmlNodePasted.tagName)
             : document.createElement(firstBlockNode.tagName);
           // we check if there is any content before the selection
@@ -1004,15 +941,34 @@ Third paragraph, **bold** and is even more awesome.
     }
 
     function isEmptyBlockElement(element) {
-      let isBlockEmpty = true;
+      // Check each child node recursively
       for (let i = 0; i < element.childNodes.length; i++) {
         const node = element.childNodes[i];
-        if (node.tagName !== "BR") {
-          isBlockEmpty = false;
-          break;
+
+        // Skip BR elements
+        if (node.tagName === "BR") {
+          continue;
+        }
+
+        // If it's a text node with content, element is not empty
+        if (node.nodeType === textNodeType && node.textContent.trim()) {
+          return false;
+        }
+
+        // For inline elements, check their contents recursively
+        if (elementWhitelistInlineElements.includes(node.tagName)) {
+          if (!isEmptyBlockElement(node)) {
+            return false;
+          }
+          continue;
+        }
+
+        // For any other element type that has content
+        if (node.textContent.trim()) {
+          return false;
         }
       }
-      return isBlockEmpty;
+      return true;
     }
 
     function flattenInlineElements(container, tagName) {
@@ -1137,6 +1093,15 @@ Third paragraph, **bold** and is even more awesome.
             if (insertedElement.tagName === "SPAN") {
               const text = document.createTextNode(insertedElement.textContent);
               insertedElement.replaceWith(text);
+            }
+            // this is needed because if we are in a list and at the end there is a bold element
+            // and we press enter, the bold element is not removed and we end up with a list item with an empty bold element
+            // this causes issues at pasting and it is not desired
+            if (insertedElement.tagName === "LI") {
+              console.log("inserted LI", insertedElement);
+              if (isEmptyBlockElement(insertedElement)) {
+                insertedElement.innerHTML = "";
+              }
             }
             if (insertedElement.tagName === "DIV") {
               const pContent = insertedElement.textContent
