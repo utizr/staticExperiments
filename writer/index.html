@@ -358,7 +358,6 @@
       textParts = textParts.filter((part) => {
         return part?.length > 0;
       });
-      console.log(`textParts`, textParts);
       const text = textParts.join("\n\n");
       return text;
     }
@@ -672,10 +671,18 @@ Third paragraph, **bold** and is even more awesome.
             }
             const newElemTagname = pastingIntoList ? 'LI' : htmlPasted.firstChild.tagName;
             const newElem = document.createElement(newElemTagname);
-            while (htmlPasted.firstChild.firstChild) {
-              newElem.append(htmlPasted.firstChild.firstChild);
+            if (pastingIntoList && htmlPasted.firstChild.tagName === 'P') {
+              // if we are pasting a list, we need to move the children of the list
+              // to the new element, so that we can insert it as a list item
+              newElem.append(htmlPasted.firstChild);
+            } else {
+              // otherwise we just append the first child
+              while (htmlPasted.firstChild.firstChild) {
+                newElem.append(htmlPasted.firstChild.firstChild);
+              }
+              htmlPasted.firstChild.remove();
             }
-            htmlPasted.firstChild.remove();
+
             endNode.after(newElem);
             endNode = newElem;
           }
