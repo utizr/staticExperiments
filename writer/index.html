@@ -108,7 +108,7 @@
     const unsaved = $("#unsaved-button");
 
     const textNodeType = 3;
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'LI'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
     const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
@@ -134,7 +134,7 @@
       },
       saveDebounce: function () {
         return this.debounce(() => {
-          localStorage.setItem("book", convertToText());
+          localStorage.setItem("book", convertToText(Array.from(editor.children)));
           unsaved.style.display = "none";
         }, 1000)
       },
@@ -231,9 +231,9 @@
           const listItems = lines.map(line => {
             const match = line.match(/^(\-|\*|\+|\d+\.)\s+(.*)$/);
             if (match) {
-              return `<li>${parseInlineMarkdown(match[2])}</li>`;
+              return `<li>${convertTextToHTML(match[2])}</li>`;
             }
-            return `<li>${parseInlineMarkdown(line)}</li>`;
+            return `<li>${convertTextToHTML(line)}</li>`;
           }).join("\n");
           return `<${listTag}>${listItems}</${listTag}>`;
         } else {
@@ -326,19 +326,25 @@
     }
 
     // PASTE handler
-    function convertToText() {
-      const text = Array.from(editor.children)
+    function convertToText(nodes) {
+      let textParts = nodes
         .map((block) => {
           // NEW: Handle UL lists
+          // if statement when the block is an textnode
+          if (block.nodeType === textNodeType) {
+            const textContent = block.textContent.trim();
+            console.log(`textContent`, textContent);
+            return textContent;
+          }
           if (block.tagName === "UL") {
             return Array.from(block.children)
-              .map(li => `- ${convertInlineToText(Array.from(li.childNodes))}`)
+              .map(li => `- ${convertToText(Array.from(li.childNodes))}`)
               .join("\n");
           }
           // NEW: Handle OL lists
           else if (block.tagName === "OL") {
             return Array.from(block.children)
-              .map((li, index) => `${index + 1}. ${convertInlineToText(Array.from(li.childNodes))}`)
+              .map((li, index) => `${index + 1}. ${convertToText(Array.from(li.childNodes))}`)
               .join("\n");
           } else {
             let prefix = "";
@@ -347,8 +353,13 @@
             }
             return prefix + convertInlineToText(Array.from(block.childNodes));
           }
-        })
-        .join("\n\n");
+        });
+
+      textParts = textParts.filter((part) => {
+        return part?.length > 0;
+      });
+      console.log(`textParts`, textParts);
+      const text = textParts.join("\n\n");
       return text;
     }
 
@@ -368,16 +379,16 @@
             return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'A') {
-            return `[${ie.textContent}](${ie.href})`;
+            return `[${ie.textContent.replace(/\n/g, '')}](${ie.href})`;
           }
-          return ie.textContent;
+          return ie.textContent.replace(/\n/g, '');
         })
         .join("");
       return text;
     }
 
     function convertTextAndDisplay() {
-      $("#content-text").value = convertToText();
+      $("#content-text").value = convertToText(Array.from(editor.children));
     }
 
     function isEmpty(editor) {
@@ -600,7 +611,7 @@ Third paragraph, **bold** and is even more awesome.
           const lastBlockNode = elements.pop() || firstBlockNode;
           const startRange = range.cloneRange();
           const endRange = range.cloneRange();
-          const pastingIntoUlist = firstBlockNode.tagName === 'LI' && firstBlockNode.parentNode.tagName === 'UL';
+          const pastingIntoList = firstBlockNode.tagName === 'LI' && (firstBlockNode.parentNode.tagName === 'UL' || firstBlockNode.parentNode.tagName === 'OL');
 
           // if we select the complete paragraph (block element) in firefox all children are removed
           // so we have to add a dummy one.
@@ -647,7 +658,7 @@ Third paragraph, **bold** and is even more awesome.
               htmlPasted.firstChild.remove();
               continue;
             }
-            const newElemTagname = pastingIntoUlist ? 'LI' : htmlPasted.firstChild.tagName;
+            const newElemTagname = pastingIntoList ? 'LI' : htmlPasted.firstChild.tagName;
             const newElem = document.createElement(newElemTagname);
             while (htmlPasted.firstChild.firstChild) {
               newElem.append(htmlPasted.firstChild.firstChild);
@@ -693,10 +704,10 @@ Third paragraph, **bold** and is even more awesome.
           let firstHtmlNodePasted = htmlPasted.firstChild;
           let lastHtmlNodePasted = htmlPasted.lastChild;
 
-          if (htmlPasted.firstChild.tagName === 'UL') {
+          if (['UL', 'OL'].includes(htmlPasted.firstChild.tagName)) {
             firstHtmlNodePasted = htmlPasted.firstChild.firstChild;
           }
-          if (htmlPasted.lastChild.tagName === 'UL') {
+          if (['UL', 'OL'].includes(htmlPasted.lastChild.tagName)) {
             lastHtmlNodePasted = htmlPasted.lastChild.lastChild;
           }
 
@@ -748,7 +759,7 @@ Third paragraph, **bold** and is even more awesome.
             endNode.normalize();
           }
 
-          if (endNode.tagName === 'UL') {
+          if (['UL', 'OL'].includes(endNode.tagName)) {
             endNode = endNode.lastChild;
           }
           endTextNode = lastTextNodeOf(endNode);
