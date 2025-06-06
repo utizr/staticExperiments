@@ -208,7 +208,7 @@
       return true;
     }
 
-    function convertTextToHTML(text) {
+    function convertTextToHTML(text, insideList = false) {
       // first if the pasted text is a url, we return it as a link
       if (isValidHttpUrl(text)) {
         return `<a href="${text}" target="_blank">${text}</a>`;
@@ -231,9 +231,9 @@
           const listItems = lines.map(line => {
             const match = line.match(/^(\-|\*|\+|\d+\.)\s+(.*)$/);
             if (match) {
-              return `<li>${convertTextToHTML(match[2])}</li>`;
+              return `<li>${convertTextToHTML(match[2], true)}</li>`;
             }
-            return `<li>${convertTextToHTML(line)}</li>`;
+            return `<li>${convertTextToHTML(line, true)}</li>`;
           }).join("\n");
           return `<${listTag}>${listItems}</${listTag}>`;
         } else {
@@ -248,6 +248,10 @@
             return parseInlineMarkdown(line);
           });
           const blockContent = htmlLines.join("<br>");
+
+          if (insideList && blockTypeValue === "P") {
+            return blockContent; // If inside a list, return just the content without wrapping in a <p>
+          }
           return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
         }
       });
@@ -326,39 +330,50 @@
     }
 
     // PASTE handler
-    function convertToText(nodes) {
+    function convertToText(nodes, insideList = false) {
+
+      let joiner = "\n\n";
+      if (insideList) {
+        joiner = ""
+      }
       let textParts = nodes
         .map((block) => {
           // NEW: Handle UL lists
           // if statement when the block is an textnode
           if (block.nodeType === textNodeType) {
             const textContent = block.textContent.trim();
-            console.log(`textContent`, textContent);
             return textContent;
           }
           if (block.tagName === "UL") {
             return Array.from(block.children)
-              .map(li => `- ${convertToText(Array.from(li.childNodes))}`)
+              .map(li => `- ${convertToText(Array.from(li.childNodes), true)}`)
               .join("\n");
           }
           // NEW: Handle OL lists
           else if (block.tagName === "OL") {
             return Array.from(block.children)
-              .map((li, index) => `${index + 1}. ${convertToText(Array.from(li.childNodes))}`)
+              .map((li, index) => `${index + 1}. ${convertToText(Array.from(li.childNodes), true)}`)
               .join("\n");
           } else {
-            let prefix = "";
             if (block.tagName.startsWith("H")) {
-              prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+              const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+              return prefix + convertInlineToText(Array.from(block.childNodes));
             }
-            return prefix + convertInlineToText(Array.from(block.childNodes));
+            // this is the case where we only have a normal text node if we are inside a list
+            // or other inline nodes
+            if (insideList) {
+              return convertInlineToText([block]);
+            }
+            // here we have a p element, so we dont have any prefix
+            // we just loop over it's children and treat them as inline elements
+            return convertInlineToText(Array.from(block.childNodes));
           }
         });
 
       textParts = textParts.filter((part) => {
         return part?.length > 0;
       });
-      const text = textParts.join("\n\n");
+      const text = textParts.join(joiner);
       return text;
     }
 
@@ -671,17 +686,10 @@ Third paragraph, **bold** and is even more awesome.
             }
             const newElemTagname = pastingIntoList ? 'LI' : htmlPasted.firstChild.tagName;
             const newElem = document.createElement(newElemTagname);
-            if (pastingIntoList && htmlPasted.firstChild.tagName === 'P') {
-              // if we are pasting a list, we need to move the children of the list
-              // to the new element, so that we can insert it as a list item
-              newElem.append(htmlPasted.firstChild);
-            } else {
-              // otherwise we just append the first child
-              while (htmlPasted.firstChild.firstChild) {
-                newElem.append(htmlPasted.firstChild.firstChild);
-              }
-              htmlPasted.firstChild.remove();
+            while (htmlPasted.firstChild.firstChild) {
+              newElem.append(htmlPasted.firstChild.firstChild);
             }
+            htmlPasted.firstChild.remove();
 
             endNode.after(newElem);
             endNode = newElem;
