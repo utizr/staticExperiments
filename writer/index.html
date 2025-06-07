@@ -1160,6 +1160,59 @@ Third paragraph, **bold** and is even more awesome.
           clearContainer(editor);
         }
       }
+      if (event.inputType === "insertText" && event.data === "-") {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        let container = range.startContainer;
+
+        // Find the closest element node (p or li)
+        while (container && container.nodeType !== 1) {
+          container = container.parentNode;
+        }
+        if (!container) return;
+
+        // Only proceed if the element is empty except for the dash
+        if (
+          container.childNodes.length === 1 &&
+          container.textContent === "-"
+        ) {
+          // Remove the dash
+          container.textContent = "";
+
+          // Create UL/LI
+          const ul = document.createElement("ul");
+          const li = document.createElement("li");
+          ul.appendChild(li);
+
+          if (container.tagName === "P") {
+            // Replace <p> with <ul>
+            container.parentNode.replaceChild(ul, container);
+          } else if (container.tagName === "LI") {
+            // Insert <ul> after previous <li> and remove current <li>
+            const prevLi = container.previousElementSibling;
+            container.parentNode.removeChild(container);
+            if (prevLi) {
+              prevLi.appendChild(ul);
+            } else {
+              // If no previous li, insert at the start of the list
+              container.parentNode.parentNode.insertBefore(ul, container.parentNode.nextSibling);
+            }
+          } else {
+            // Fallback: just insert at caret
+            range.insertNode(ul);
+          }
+
+          // Move caret inside the new LI
+          const newRange = document.createRange();
+          newRange.selectNodeContents(li);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          return;
+        }
+      }
 
       unsaved.style.display = "inline-block";
       helper.saveDebounce();

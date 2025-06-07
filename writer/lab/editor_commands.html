@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<!-- csss framework documentation -->
+<!-- https://purecss.io/grids/ -->
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Writer</title>
+
+    <link rel="stylesheet" href="../css/icons/style.css" />
+    <link rel="stylesheet" href="../css/page.css" />
+    <link rel="stylesheet" href="../css/colors-light.css" />
+
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>" />
+</head>
+
+<style></style>
+
+<body>
+    <div id="main-menu">
+        <a class="menu-button">
+            <div class="lsf symbol">menu</div>
+        </a>
+        <a id="book-button" class="menu-button">
+            <div class="lsf symbol">book</div>
+        </a>
+        <a id="convert-button" class="menu-button">
+            <div class="lsf symbol">file</div>
+        </a>
+        <a id="clear-button" class="menu-button">
+            <div class="lsf symbol">delete</div>
+        </a>
+        <a id="unsaved-button" class="menu-button">
+            <div class="lsf symbol">etc</div>
+        </a>
+    </div>
+
+    <div id="dialog" class="">
+        <div id="dialog-button-container">
+            <a id="dialog-close-button" class="dialog-button">
+                <div class="lsf symbol">close</div>
+            </a>
+            <a id="dialog-save-button" class="dialog-button">
+                <div class="lsf symbol">check</div>
+            </a>
+        </div>
+        <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
+    </div>
+
+    <div id="page">
+        <div id="container" contenteditable="true">
+            <p>First a paragraph which is awesome.</p>
+            <p>First b paragraph which is awesome.</p>
+            <p>First c paragraph which is awesome.</p>
+            <p>Second paragraph, and is even more awesome.</p>
+            <p>Third paragraph, <b>inside text</b> that is even more awesome.</p>
+        </div>
+    </div>
+
+    <script>
+
+        function $(selector, element = document) {
+            return element.querySelector(selector);
+        }
+
+        function $$(selector, element = document) {
+            return Array.from(element.querySelectorAll(selector));
+        }
+
+        const editor = $("#container");
+
+        // // this works
+        // editor.addEventListener("input", (event) => {
+        //     if (event.inputType === "insertText" && event.data === "-") {
+        //         const sel = window.getSelection();
+        //         if (sel.rangeCount > 0) {
+        //             const range = sel.getRangeAt(0);
+
+        //             // Move range to just before the dash
+        //             range.setStart(range.startContainer, range.startOffset - 1);
+        //             range.deleteContents(); // Remove the dash
+
+        //             // Create UL/LI
+        //             const ul = document.createElement("ul");
+        //             const li = document.createElement("li");
+        //             ul.appendChild(li);
+
+        //             // Insert UL at caret
+        //             range.insertNode(ul);
+
+        //             // Move caret inside the new LI
+        //             const newRange = document.createRange();
+        //             newRange.selectNodeContents(li);
+        //             newRange.collapse(true);
+        //             sel.removeAllRanges();
+        //             sel.addRange(newRange);
+        //         }
+        //         return; // Prevent further handling
+        //     }
+        //     // ...existing code...
+        //     if (event.inputType === "insertText") {
+        //         console.log("insertText", event.data);
+        //         console.log("event", event);
+        //     }
+        // });
+
+        // ...existing code...
+        editor.addEventListener("input", (event) => {
+            if (event.inputType === "insertText" && event.data === "-") {
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                let container = range.startContainer;
+
+                // Find the closest element node (p or li)
+                while (container && container.nodeType !== 1) {
+                    container = container.parentNode;
+                }
+                if (!container) return;
+
+                // Only proceed if the element is empty except for the dash
+                if (
+                    container.childNodes.length === 1 &&
+                    container.textContent === "-"
+                ) {
+                    // Remove the dash
+                    container.textContent = "";
+
+                    // Create UL/LI
+                    const ul = document.createElement("ul");
+                    const li = document.createElement("li");
+                    ul.appendChild(li);
+
+                    if (container.tagName === "P") {
+                        // Replace <p> with <ul>
+                        container.parentNode.replaceChild(ul, container);
+                    } else if (container.tagName === "LI") {
+                        // Insert <ul> after previous <li> and remove current <li>
+                        const prevLi = container.previousElementSibling;
+                        container.parentNode.removeChild(container);
+                        if (prevLi) {
+                            prevLi.appendChild(ul);
+                        } else {
+                            // If no previous li, insert at the start of the list
+                            container.parentNode.parentNode.insertBefore(ul, container.parentNode.nextSibling);
+                        }
+                    } else {
+                        // Fallback: just insert at caret
+                        range.insertNode(ul);
+                    }
+
+                    // Move caret inside the new LI
+                    const newRange = document.createRange();
+                    newRange.selectNodeContents(li);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+
+                    return;
+                }
+            }
+            // ...existing code...
+            if (event.inputType === "insertText") {
+                console.log("insertText", event.data);
+                console.log("event", event);
+            }
+        });
+
+    </script>
+</body>
+
+</html>
