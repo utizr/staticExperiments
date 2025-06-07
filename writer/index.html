@@ -340,7 +340,7 @@
         .map((block) => {
           // NEW: Handle UL lists
           // if statement when the block is an textnode
-          if (block.nodeType === textNodeType) {
+          if (block.nodeType === textNodeType && !insideList) {
             const textContent = block.textContent.trim();
             return textContent;
           }
@@ -355,7 +355,7 @@
               .map((li, index) => `${index + 1}. ${convertToText(Array.from(li.childNodes), true)}`)
               .join("\n");
           } else {
-            if (block.tagName.startsWith("H")) {
+            if (block.tagName?.startsWith("H")) {
               const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
               return prefix + convertInlineToText(Array.from(block.childNodes));
             }
@@ -877,7 +877,8 @@ Third paragraph, **bold** and is even more awesome.
       }
       else return tagName;
     }
-    function htmlWalker(children, blockElementCount = 0) {
+    // todo, have an insideList parameter, so that P elements are not created
+    function htmlWalker(children, blockElementCount = 0, insideList = false) {
       let resultHtml = '';
       if (!children?.length) {
         return { html: '', blockElementCount };
@@ -890,6 +891,8 @@ Third paragraph, **bold** and is even more awesome.
         if (node.nodeType === Node.ELEMENT_NODE) {
           const blockElement = elementWhitelistBlockElements.includes(node.tagName);
           const inlineElement = elementWhitelistInlineElements.includes(node.tagName);
+
+          const isList = node.tagName === "UL" || node.tagName === "OL";
 
           // trim first and last node if empty
           if (firstNode && !node.innerHTML) {
@@ -904,17 +907,26 @@ Third paragraph, **bold** and is even more awesome.
           if (blockElement || inlineElement) {
             let tag = node.tagName.toLowerCase();
             tag = tagReplacer(tag);
-            const result = htmlWalker(node.childNodes);
+            const result = htmlWalker(node.childNodes, 0, isList || insideList);
             blockElementCount += result.blockElementCount;
             let attributes = '';
             // TODO extend this and organize it better
             if (tag === "a") {
               attributes = ` href="${node.href}" target="_blank"`;
             }
-            resultHtml += `<${tag}${attributes}>${result.html || '<br>'}</${tag}>`;
+            // TODO test: image for later
+            if (tag === "img") {
+              attributes = ` src="${node.src}" alt="${node.alt || ''}"`;
+            }
+            if (tag === "p" && insideList) {
+              // if we are inside a list, we dont want to create a paragraph
+              resultHtml += result.html;
+            } else {
+              resultHtml += `<${tag}${attributes}>${result.html || '<br>'}</${tag}>`;
+            }
           } else if (node.childNodes.length) {
             // TODO if linebreak <br> we have to handle that somewhere here
-            const result = htmlWalker(node.childNodes);
+            const result = htmlWalker(node.childNodes, 0, isList || insideList);
             blockElementCount += result.blockElementCount;
             resultHtml += result.html;
           }
