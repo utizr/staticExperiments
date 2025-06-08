@@ -72,42 +72,6 @@
 
         const editor = $("#container");
 
-        // // this works
-        // editor.addEventListener("input", (event) => {
-        //     if (event.inputType === "insertText" && event.data === "-") {
-        //         const sel = window.getSelection();
-        //         if (sel.rangeCount > 0) {
-        //             const range = sel.getRangeAt(0);
-
-        //             // Move range to just before the dash
-        //             range.setStart(range.startContainer, range.startOffset - 1);
-        //             range.deleteContents(); // Remove the dash
-
-        //             // Create UL/LI
-        //             const ul = document.createElement("ul");
-        //             const li = document.createElement("li");
-        //             ul.appendChild(li);
-
-        //             // Insert UL at caret
-        //             range.insertNode(ul);
-
-        //             // Move caret inside the new LI
-        //             const newRange = document.createRange();
-        //             newRange.selectNodeContents(li);
-        //             newRange.collapse(true);
-        //             sel.removeAllRanges();
-        //             sel.addRange(newRange);
-        //         }
-        //         return; // Prevent further handling
-        //     }
-        //     // ...existing code...
-        //     if (event.inputType === "insertText") {
-        //         console.log("insertText", event.data);
-        //         console.log("event", event);
-        //     }
-        // });
-
-        // ...existing code...
         editor.addEventListener("input", (event) => {
             if (event.inputType === "insertText" && event.data === "-") {
                 const sel = window.getSelection();
@@ -162,11 +126,50 @@
                     return;
                 }
             }
-            // ...existing code...
-            if (event.inputType === "insertText") {
-                console.log("insertText", event.data);
-                console.log("event", event);
+            // New command: handle \\b for bold
+            if (event.inputType === "insertText" && event.data === "b") {
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                let container = range.startContainer;
+                // Check if the previous two characters are '\\b'
+                if (container.nodeType === 3) { // text node
+                    const text = container.textContent;
+                    const offset = range.startOffset;
+                    if (offset >= 2 && text.substring(offset - 2, offset) === "\\b") {
+                        // Remove the '\\b'
+                        container.textContent = text.substring(0, offset - 2) + text.substring(offset);
+                        // Create <b> element with an empty text node
+                        const b = document.createElement("b");
+                        // we should add a non breaking space into the emtpyTextNode
+                        const emptyText = document.createTextNode("\u00A0");
+
+                        b.appendChild(emptyText);
+                        // Insert <b> at the correct position
+                        const newRange = document.createRange();
+                        newRange.setStart(container, offset - 2);
+                        newRange.collapse(true);
+                        newRange.insertNode(b);
+                        // this will be used so that we can press the arrow keys to move
+                        // the caret after the b element
+                        const emptyTextAfterB = document.createTextNode("\u00A0");
+                        // insert the emptyTextAfterB after the b element
+                        b.parentNode.insertBefore(emptyTextAfterB, b.nextSibling);
+
+                        // Move caret inside the new <b> (inside the text node)
+                        sel.removeAllRanges();
+                        const caretRange = document.createRange();
+                        caretRange.setStart(b, b.childNodes.length);
+                        caretRange.collapse(true);
+                        sel.addRange(caretRange);
+                        return;
+                    }
+                }
             }
+            // if (event.inputType === "insertText") {
+            //     console.log("insertText", event.data);
+            //     console.log("event", event);
+            // }
         });
 
     </script>

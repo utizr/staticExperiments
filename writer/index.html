@@ -408,7 +408,7 @@
     function isEmpty(editor) {
       if (editor.children.length === 1) {
         const p = editor.children[0];
-        if (editor.children[0].tagName !== "P") {
+        if (editor.firstChild.textContent.trim() === "") {
           return true;
         }
       }
@@ -419,6 +419,9 @@
     }
 
     function clearContainer(container) {
+      container.innerHTML = `<p><br/></p>`;
+    }
+    function loadDefaultData(container) {
       // container.innerHTML = `<p><br/></p>`;
       loadFromText(`
 # Main title.
@@ -1106,7 +1109,7 @@ Third paragraph, **bold** and is even more awesome.
 
     const clearButton = $("#clear-button");
     clearButton.addEventListener("click", function () {
-      clearContainer(editor);
+      loadDefaultData(editor);
     });
 
     const observer = new MutationObserver((mutationList) => {
@@ -1157,6 +1160,7 @@ Third paragraph, **bold** and is even more awesome.
       if (event.inputType === "deleteContentBackward") {
         console.log("Backspace");
         if (isEmpty(editor)) {
+          // TODO, check why this was here. I guess we have to 'reset' the editor
           clearContainer(editor);
         }
       }
@@ -1174,7 +1178,6 @@ Third paragraph, **bold** and is even more awesome.
 
         // Only proceed if the element is empty except for the dash
         if (
-          container.childNodes.length === 1 &&
           container.textContent === "-"
         ) {
           // Remove the dash
@@ -1214,6 +1217,46 @@ Third paragraph, **bold** and is even more awesome.
         }
       }
 
+      // New command: handle \\b for bold
+      if (event.inputType === "insertText" && event.data === "b") {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        let container = range.startContainer;
+        // Check if the previous two characters are '\\b'
+        if (container.nodeType === 3) { // text node
+          const text = container.textContent;
+          const offset = range.startOffset;
+          if (offset >= 2 && text.substring(offset - 2, offset) === "\\b") {
+            // Remove the '\\b'
+            container.textContent = text.substring(0, offset - 2) + text.substring(offset);
+            // Create <b> element with an empty text node
+            const b = document.createElement("b");
+            // we should add a non breaking space into the emtpyTextNode
+            const emptyText = document.createTextNode("\u200B");
+
+            b.appendChild(emptyText);
+            // Insert <b> at the correct position
+            const newRange = document.createRange();
+            newRange.setStart(container, offset - 2);
+            newRange.collapse(true);
+            newRange.insertNode(b);
+            // this will be used so that we can press the arrow keys to move
+            // the caret after the b element
+            const emptyTextAfterB = document.createTextNode("\u200B");
+            // insert the emptyTextAfterB after the b element
+            b.parentNode.insertBefore(emptyTextAfterB, b.nextSibling);
+
+            // Move caret inside the new <b> (inside the text node)
+            sel.removeAllRanges();
+            const caretRange = document.createRange();
+            caretRange.setStart(b, b.childNodes.length);
+            caretRange.collapse(true);
+            sel.addRange(caretRange);
+            return;
+          }
+        }
+      }
       unsaved.style.display = "inline-block";
       helper.saveDebounce();
     });
