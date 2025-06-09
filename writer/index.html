@@ -1220,7 +1220,18 @@ Third paragraph, **bold** and is even more awesome.
       }
 
       // New command: handle \\b for bold
-      if (event.inputType === "insertText" && event.data === "b") {
+      if (event.inputType === "insertText" && ['b', 'i'].includes(event.data)) {
+        const inlineElementCommands = {
+          'b': {
+            command: "b",
+            element: "strong",
+          },
+          'i': {
+            command: "i",
+            element: "em",
+          }
+        }
+        const command = inlineElementCommands[event.data];
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
         const range = sel.getRangeAt(0);
@@ -1229,24 +1240,24 @@ Third paragraph, **bold** and is even more awesome.
         if (container.nodeType === 3) { // text node
           const text = container.textContent;
           const offset = range.startOffset;
-          if (offset >= 2 && text.substring(offset - 2, offset) === "\.b") {
+          if (offset >= 2 && text.substring(offset - 2, offset) === `\.${command.command}`) {
             // Remove the '\\b'
             container.textContent = text.substring(0, offset - 2) + text.substring(offset);
             // Create <b> element with an empty text node
-            const b = document.createElement("b");
+            const inlineElement = document.createElement(command.element);
             // we should add a non breaking space into the emtpyTextNode
             const emptyText = document.createTextNode("\u200B");
 
-            b.appendChild(emptyText);
+            inlineElement.appendChild(emptyText);
             // Insert <b> at the correct position
             const newRange = document.createRange();
             newRange.setStart(container, offset - 2);
             newRange.collapse(true);
-            newRange.insertNode(b);
+            newRange.insertNode(inlineElement);
             // Move caret inside the new <b> (inside the text node)
             sel.removeAllRanges();
             const caretRange = document.createRange();
-            caretRange.setStart(b, b.childNodes.length);
+            caretRange.setStart(inlineElement, inlineElement.childNodes.length);
             caretRange.collapse(true);
             sel.addRange(caretRange);
             return;
@@ -1266,7 +1277,7 @@ Third paragraph, **bold** and is even more awesome.
           // Check for double space
           if (offset >= 2 && /\s\s/.test(text.substring(offset - 2, offset))) {
             // Check if parent is <b>
-            if (container.parentNode && container.parentNode.tagName === "B") {
+            if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
               // Remove the both spaces
               container.textContent = text.substring(0, offset - 2) + text.substring(offset);
               // Move caret after the <b> element
