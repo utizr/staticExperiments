@@ -429,7 +429,7 @@ First paragraph which is awesome.
 
 One two three.
 
-link: [/lab/editor-commands.html](/writer/lab/editor-commands.html)
+link: [/lab/editor-commands.html](./lab/editor-commands.html)
 
 Four five six.
 
@@ -1288,42 +1288,6 @@ Third paragraph, **bold** and is even more awesome.
           }
         }
       }
-      // // New command: handle double space inside <b> to move caret after <b>
-      // if (event.inputType === "insertText" && event.data === " ") {
-      //   const sel = window.getSelection();
-      //   if (!sel.rangeCount) return;
-      //   const range = sel.getRangeAt(0);
-      //   let container = range.startContainer;
-      //   let offset = range.startOffset;
-      //   // Only check if inside a text node
-      //   if (container.nodeType === 3) {
-      //     const text = container.textContent;
-      //     // Check for double space
-      //     if (offset >= 2 && /\s\s/.test(text.substring(offset - 2, offset))) {
-      //       // Check if parent is <b>
-      //       if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
-      //         // Remove the both spaces
-      //         container.textContent = text.substring(0, offset - 2) + text.substring(offset);
-      //         // Move caret after the <b> element
-      //         const bElem = container.parentNode;
-      //         sel.removeAllRanges();
-      //         const afterBRange = document.createRange();
-      //         // Otherwise, insert a text node after <b> and place caret there
-      //         // we should adda &nbsp; here:
-      //         const textNode = document.createTextNode("\u00A0");
-      //         if (bElem.nextSibling) {
-      //           bElem.parentNode.insertBefore(textNode, bElem.nextSibling);
-      //         } else {
-      //           bElem.parentNode.appendChild(textNode);
-      //         }
-      //         afterBRange.setStart(textNode, textNode.textContent.length);
-      //         afterBRange.collapse(true);
-      //         sel.addRange(afterBRange);
-      //         return;
-      //       }
-      //     }
-      //   }
-      // }
       unsaved.style.display = "inline-block";
       helper.saveDebounce();
     });
