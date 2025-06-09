@@ -132,11 +132,11 @@
                 if (!sel.rangeCount) return;
                 const range = sel.getRangeAt(0);
                 let container = range.startContainer;
-                // Check if the previous two characters are '\\b'
+                // Check if the previous two characters are '\.b'
                 if (container.nodeType === 3) { // text node
                     const text = container.textContent;
                     const offset = range.startOffset;
-                    if (offset >= 2 && text.substring(offset - 2, offset) === "\\b") {
+                    if (offset >= 2 && text.substring(offset - 2, offset) === "\.b") {
                         // Remove the '\\b'
                         container.textContent = text.substring(0, offset - 2) + text.substring(offset);
                         // Create <b> element with an empty text node
@@ -150,12 +150,6 @@
                         newRange.setStart(container, offset - 2);
                         newRange.collapse(true);
                         newRange.insertNode(b);
-                        // this will be used so that we can press the arrow keys to move
-                        // the caret after the b element
-                        const emptyTextAfterB = document.createTextNode("\u200B");
-                        // insert the emptyTextAfterB after the b element
-                        b.parentNode.insertBefore(emptyTextAfterB, b.nextSibling);
-
                         // Move caret inside the new <b> (inside the text node)
                         sel.removeAllRanges();
                         const caretRange = document.createRange();
@@ -163,6 +157,47 @@
                         caretRange.collapse(true);
                         sel.addRange(caretRange);
                         return;
+                    }
+                }
+            }
+            // New command: handle double space inside <b> to move caret after <b>
+            if (event.inputType === "insertText" && event.data === " ") {
+                const sel = window.getSelection();
+                if (!sel.rangeCount) return;
+                const range = sel.getRangeAt(0);
+                let container = range.startContainer;
+                let offset = range.startOffset;
+                // Only check if inside a text node
+                if (container.nodeType === 3) {
+                    const text = container.textContent;
+                    // Check for double space
+                    if (offset >= 2 && /\s\s/.test(text.substring(offset - 2, offset))) {
+                        // Check if parent is <b>
+                        if (container.parentNode && container.parentNode.tagName === "B") {
+                            // Remove the both spaces
+                            container.textContent = text.substring(0, offset - 2) + text.substring(offset);
+                            // Move caret after the <b> element
+                            const bElem = container.parentNode;
+                            sel.removeAllRanges();
+                            const afterBRange = document.createRange();
+                            if (false && bElem.nextSibling && bElem.nextSibling.nodeType === 3) {
+                                // If there is a text node after <b>, place caret at its start
+                                afterBRange.setStart(bElem.nextSibling, bElem.nextSibling.textContent.length);
+                            } else {
+                                // Otherwise, insert a text node after <b> and place caret there
+                                // we should adda &nbsp; here:
+                                const textNode = document.createTextNode("\u00A0");
+                                if (bElem.nextSibling) {
+                                    bElem.parentNode.insertBefore(textNode, bElem.nextSibling);
+                                } else {
+                                    bElem.parentNode.appendChild(textNode);
+                                }
+                                afterBRange.setStart(textNode, textNode.textContent.length);
+                            }
+                            afterBRange.collapse(true);
+                            sel.addRange(afterBRange);
+                            return;
+                        }
                     }
                 }
             }
