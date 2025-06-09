@@ -17,7 +17,12 @@
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>" />
 </head>
 
-<style></style>
+<style>
+    #ts-console {
+        width: 95%;
+        height: 800px;
+    }
+</style>
 
 <body>
     <div id="main-menu">
@@ -60,7 +65,10 @@
         </div>
     </div>
 
+    <textarea name="" id="ts-console"></textarea>
+
     <script>
+
 
         function $(selector, element = document) {
             return element.querySelector(selector);
@@ -71,6 +79,13 @@
         }
 
         const editor = $("#container");
+
+        const tsConsole = $("#ts-console");
+
+        function tsLog(...args) {
+            tsConsole.value += args.join(" ") + "\n";
+            tsConsole.scrollTop = tsConsole.scrollHeight; // Scroll to the bottom
+        }
 
         editor.addEventListener("input", (event) => {
             if (event.inputType === "insertText" && event.data === "-") {
@@ -126,19 +141,21 @@
                     return;
                 }
             }
+
             // New command: handle \\b for bold
-            if (event.inputType === "insertText" && ['b', 'i'].includes(event.data)) {
+
+            tsLog("inputType:", event.inputType, "data:", event.data);
+            if (event.inputType === "insertText") {
                 const inlineElementCommands = {
-                    'b': {
-                        command: "b",
+                    '.b': {
+                        command: ".b",
                         element: "strong",
                     },
-                    'i': {
-                        command: "i",
+                    '.i': {
+                        command: ".i",
                         element: "em",
                     }
                 }
-                const command = inlineElementCommands[event.data];
                 const sel = window.getSelection();
                 if (!sel.rangeCount) return;
                 const range = sel.getRangeAt(0);
@@ -147,54 +164,41 @@
                 if (container.nodeType === 3) { // text node
                     const text = container.textContent;
                     const offset = range.startOffset;
-                    if (offset >= 2 && text.substring(offset - 2, offset) === `\.${command.command}`) {
-                        // Remove the '\\b'
-                        container.textContent = text.substring(0, offset - 2) + text.substring(offset);
-                        // Create <b> element with an empty text node
-                        const inlineElement = document.createElement(command.element);
-                        // we should add a non breaking space into the emtpyTextNode
-                        const emptyText = document.createTextNode("\u200B");
+                    if (offset >= 2) {
+                        const lastTwoChars = text.substring(offset - 2, offset);
+                        const command = inlineElementCommands[lastTwoChars];
 
-                        inlineElement.appendChild(emptyText);
-                        // Insert <b> at the correct position
-                        const newRange = document.createRange();
-                        newRange.setStart(container, offset - 2);
-                        newRange.collapse(true);
-                        newRange.insertNode(inlineElement);
-                        // Move caret inside the new <b> (inside the text node)
-                        sel.removeAllRanges();
-                        const caretRange = document.createRange();
-                        caretRange.setStart(inlineElement, inlineElement.childNodes.length);
-                        caretRange.collapse(true);
-                        sel.addRange(caretRange);
-                        return;
-                    }
-                }
-            }
-            // New command: handle double space inside <b> to move caret after <b>
-            if (event.inputType === "insertText" && event.data === " ") {
-                const sel = window.getSelection();
-                if (!sel.rangeCount) return;
-                const range = sel.getRangeAt(0);
-                let container = range.startContainer;
-                let offset = range.startOffset;
-                // Only check if inside a text node
-                if (container.nodeType === 3) {
-                    const text = container.textContent;
-                    // Check for double space
-                    if (offset >= 2 && /\s\s/.test(text.substring(offset - 2, offset))) {
-                        // Check if parent is <b>
-                        if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
-                            // Remove the both spaces
+                        tsLog("lastTwoChars:", lastTwoChars, !!command);
+
+                        if (command) {
+                            // Remove the '\\b'
                             container.textContent = text.substring(0, offset - 2) + text.substring(offset);
-                            // Move caret after the <b> element
-                            const bElem = container.parentNode;
+                            // Create <b> element with an empty text node
+                            const inlineElement = document.createElement(command.element);
+                            // we should add a non breaking space into the emtpyTextNode
+                            const emptyText = document.createTextNode("\u200B");
+
+                            inlineElement.appendChild(emptyText);
+                            // Insert <b> at the correct position
+                            const newRange = document.createRange();
+                            newRange.setStart(container, offset - 2);
+                            newRange.collapse(true);
+                            newRange.insertNode(inlineElement);
+                            // Move caret inside the new <b> (inside the text node)
                             sel.removeAllRanges();
-                            const afterBRange = document.createRange();
-                            if (false && bElem.nextSibling && bElem.nextSibling.nodeType === 3) {
-                                // If there is a text node after <b>, place caret at its start
-                                afterBRange.setStart(bElem.nextSibling, bElem.nextSibling.textContent.length);
-                            } else {
+                            const caretRange = document.createRange();
+                            caretRange.setStart(inlineElement, inlineElement.childNodes.length);
+                            caretRange.collapse(true);
+                            sel.addRange(caretRange);
+                        } else if (/\s\s/.test(lastTwoChars)) {
+                            // Check if parent is <b>
+                            if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
+                                // Remove the both spaces
+                                container.textContent = text.substring(0, offset - 2) + text.substring(offset);
+                                // Move caret after the <b> element
+                                const bElem = container.parentNode;
+                                sel.removeAllRanges();
+                                const afterBRange = document.createRange();
                                 // Otherwise, insert a text node after <b> and place caret there
                                 // we should adda &nbsp; here:
                                 const textNode = document.createTextNode("\u00A0");
@@ -204,11 +208,12 @@
                                     bElem.parentNode.appendChild(textNode);
                                 }
                                 afterBRange.setStart(textNode, textNode.textContent.length);
+                                afterBRange.collapse(true);
+                                sel.addRange(afterBRange);
+                                return;
                             }
-                            afterBRange.collapse(true);
-                            sel.addRange(afterBRange);
-                            return;
                         }
+
                     }
                 }
             }
