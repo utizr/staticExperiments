@@ -145,7 +145,7 @@
             // New command: handle \\b for bold
 
             tsLog("inputType:", event.inputType, "data:", event.data);
-            if (event.inputType === "insertText") {
+            if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
                 const inlineElementCommands = {
                     '.b': {
                         command: ".b",
