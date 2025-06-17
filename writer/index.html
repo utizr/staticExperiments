@@ -1312,7 +1312,7 @@ Third paragraph, **bold** and is even more awesome.
 
     function getSelectionContainerBockElement(range) {
       let element = range.startContainer;
-      console.log("first selected element:",element);
+      console.log("first selected element:", element);
       while (element.nodeType === textNodeType || !elementWhitelistBlockElementsInSelection.includes(element.tagName)) {
         element = element.parentNode;
       }
@@ -1342,8 +1342,8 @@ Third paragraph, **bold** and is even more awesome.
         const { firstElement, lastElement } = getAllFirstLevelTextNodes(containerBlockElement);
 
         const newRange = document.createRange();
-        newRange.setStart(start, 0);
-        newRange.setEnd(end, 0);
+        newRange.setStart(firstElement, 0);
+        newRange.setEnd(lastElement, 0);
         newRange.setStartBefore(firstElement);
         newRange.setEndAfter(lastElement);
         document.getSelection().removeAllRanges();
