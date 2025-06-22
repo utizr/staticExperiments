@@ -8,17 +8,20 @@ a,
 html,
 body {
   display: block;
-  margin: 0px;
-  padding: 0px;
-  border: 0px;
+  margin: 0rem;
+  padding: 0rem;
+  border: 0rem;
   text-decoration: none;
-  outline: 0px;
+  outline: 0rem;
+}
+
+html {
+  font-size: 14px;
 }
 
 body {
   background: #413f3f;
   text-align: center;
-  padding-top: 20px;
 }
 /* 
 a:focus{
@@ -30,8 +33,7 @@ a:focus{
   text-align: left;
 }
 .calendarContainer {
-  width: 224px;
-  margin: 10px;
+  margin: 4rem 0rem;
 }
 
 .c_monthTitle,
@@ -46,22 +48,22 @@ a:focus{
 .c_yearTitle {
   color: #afafaf;
   text-align: right;
-  padding-left: 6px;
+  padding-left: 0.6rem;
   font-family: "Times New Roman", Georgia, Times, serif;
-  letter-spacing: 2px;
+  letter-spacing: 0.2rem;
   font-weight: bold;
-  font-size: 15px;
-  line-height: 15px;
+  font-size: 1.5rem;
+  line-height: 1.5rem;
 }
 
 .c_monthTitle {
   color: #afafaf;
-  padding-bottom: 4px;
+  padding-bottom: 0.4rem;
   font-family: Georgia, Times, serif;
-  letter-spacing: 0px;
+  letter-spacing: 0rem;
   font-weight: bold;
-  font-size: 22px;
-  line-height: 22px;
+  font-size: 2.2rem;
+  line-height: 2.2rem;
 }
 
 .c_month,
@@ -76,28 +78,28 @@ a:focus{
 }
 
 .c_first_week .c_sunday {
-  border-top-right-radius: 10px;
+  border-top-right-radius: 1rem;
 }
 
 .c_last_week .c_sunday {
-  border-bottom-right-radius: 10px;
+  border-bottom-right-radius: 1rem;
 }
 .c_first_week .c_saturday {
-  border-top-left-radius: 10px;
+  border-top-left-radius: 1rem;
 }
 
 .c_last_week .c_saturday {
-  border-bottom-left-radius: 10px;
+  border-bottom-left-radius: 1rem;
 }
 
 .c_columnHeading td a {
   text-align: center;
-  border: 0px;
-  padding-bottom: 1px;
+  border: 0rem;
+  padding-bottom: 0.1rem;
   font-family: Georgia, Times, serif;
-  letter-spacing: 0px;
+  letter-spacing: 0rem;
   font-weight: normal;
-  font-size: 12px;
+  font-size: 1.2rem;
   color: #939393;
   text-decoration: none;
   display: block;
@@ -106,19 +108,19 @@ a:focus{
 .c_week td {
   text-align: center;
   color: #9d9d9d;
-  width: 28px;
-  height: 28px;
+  width: 2.8rem;
+  height: 2.8rem;
 }
 
 .c_week td a {
   display: block;
   font-family: "Times New Roman", Georgia, Times, serif;
-  letter-spacing: 0px;
+  letter-spacing: 0rem;
   font-weight: bold;
-  font-size: 20px;
-  line-height: 32px;
-  width: 32px;
-  height: 32px;
+  font-size: 2rem;
+  line-height: 3.2rem;
+  width: 3.2rem;
+  height: 3.2rem;
 }
 
 .c_columnHeading td a:hover {
@@ -155,5 +157,5 @@ a:focus{
   color: #fff;
   background: #27ac0c;
   text-decoration: none;
-  border-radius: 16px;
+  border-radius: 1.6rem;
 }
