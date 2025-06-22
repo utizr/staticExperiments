@@ -9,10 +9,9 @@ Calendar.printRange = function (startDateUnix, endDateUnix) {
 
     var month = 60 * 60 * 24 * 30
 
-    startDateUnix = startDateUnix - month
+    startDateUnix = startDateUnix
     endDateUnix = endDateUnix + month
 
-    var startDate = new Date(startDateUnix * 1000);
     var endDate = new Date(endDateUnix * 1000);
     var actualDate = new Date(startDateUnix * 1000);
 
