@@ -16,7 +16,7 @@ body {
 }
 
 html {
-  font-size: 14px;
+  font-size: clamp(14px, 3.2vw, 124px);
 }
 
 body {
@@ -32,8 +32,9 @@ a:focus{
   display: inline-block;
   text-align: left;
 }
+
 .calendarContainer {
-  margin: 4rem 0rem;
+  margin: 1rem 0rem 3rem 0rem;
 }
 
 .c_monthTitle,
