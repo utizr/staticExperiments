@@ -222,17 +222,9 @@
       const blockElements = blocks.map((block) => {
         const lines = block.split("\n");
         // Check if this block is a list block (e.g. lines starting with "- " or "1. ")
-        if (/^(\-|\*|\+|\d+\.)\s+/.test(lines[0])) {
-          const isOrdered = /^\d+\./.test(lines[0]);
-          const listTag = isOrdered ? "OL" : "UL";
-          const listItems = lines.map(line => {
-            const match = line.match(/^(\-|\*|\+|\d+\.)\s+(.*)$/);
-            if (match) {
-              return `<li>${convertTextToHTML(match[2], true)}</li>`;
-            }
-            return `<li>${convertTextToHTML(line, true)}</li>`;
-          }).join("\n");
-          return `<${listTag}>${listItems}</${listTag}>`;
+        // Supports nested lists with indentation (2 spaces or tabs per level)
+        if (/^(\-|\*|\+|\d+\.)\s+/.test(lines[0]) && !insideList) {
+          return parseListBlock(lines);
         } else {
           let blockTypeKey = lines[0].match(/#+/);
           let blockTypeValue = blockType[blockTypeKey];
@@ -256,6 +248,128 @@
       return blockElements.join("\n");
     }
 
+    function parseListBlock(lines) {
+      // Parse nested lists by analyzing indentation levels
+      const listItems = [];
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const listMatch = line.match(/^(\s*)(\-|\*|\+|\d+\.)\s+(.*)$/);
+        
+        if (listMatch) {
+          const [, indentation, marker, content] = listMatch;
+          // Convert tabs to spaces and calculate level
+          // Standard markdown uses 2 spaces per level, but we'll be flexible
+          const normalizedIndent = indentation.replace(/\t/g, '  '); // Convert tabs to 2 spaces
+          const level = Math.floor(normalizedIndent.length / 2); // Assuming 2 spaces per level
+          const isOrdered = /^\d+\./.test(marker);
+        
+          if (level > 1 && !listItems.length) {
+            const lastItem = listItems[listItems.length - 1];
+            lastItem.content += '\n' + line;
+            continue;
+          }
+          listItems.push({
+            level,
+            indentation,
+            isOrdered,
+            content: content.trim(),
+            originalLine: line
+          });
+        } else if (line.trim() === '') {
+          // Empty line - continue to next line
+          continue;
+        } else {
+          // Non-list line - treat as continuation of previous list item
+          if (listItems.length > 0) {
+            const lastItem = listItems[listItems.length - 1];
+            lastItem.content += '\n' + line;
+          }
+        }
+      }
+      
+      return buildNestedList(listItems);
+    }
+
+    function buildNestedList(items, startLevel = 0) {
+      if (items.length === 0) return '';
+      
+      const result = [];
+      let i = 0;
+      
+      while (i < items.length) {
+        const currentItem = items[i];
+        
+        if (currentItem.level === startLevel) {
+          // Group consecutive items of the same type at this level
+          const levelGroups = [];
+          let currentGroup = {
+            isOrdered: currentItem.isOrdered,
+            items: []
+          };
+          
+          let j = i;
+          while (j < items.length && items[j].level >= startLevel) {
+            if (items[j].level === startLevel) {
+              // If we encounter a different list type, start a new group
+              if (items[j].isOrdered !== currentGroup.isOrdered && currentGroup.items.length > 0) {
+                levelGroups.push(currentGroup);
+                currentGroup = {
+                  isOrdered: items[j].isOrdered,
+                  items: []
+                };
+              }
+              
+              // Find all nested items for this list item
+              const nestedItems = [];
+              let k = j + 1;
+              while (k < items.length && items[k].level > startLevel) {
+                nestedItems.push(items[k]);
+                k++;
+              }
+              
+              // Build the nested list for this item
+              const nestedList = buildNestedList(nestedItems, startLevel + 1);
+              const itemContent = convertTextToHTML(items[j].content, true);
+              
+              currentGroup.items.push({
+                content: itemContent,
+                nestedList: nestedList
+              });
+              
+              j = k - 1; // Skip the nested items we just processed
+            }
+            j++;
+          }
+          
+          // Add the last group
+          if (currentGroup.items.length > 0) {
+            levelGroups.push(currentGroup);
+          }
+          
+          // Build HTML for each group
+          levelGroups.forEach(group => {
+            const listTag = group.isOrdered ? "OL" : "UL";
+            const groupItems = group.items.map(item => {
+              if (item.nestedList) {
+                return `<li>${item.content}${item.nestedList}</li>`;
+              } else {
+                return `<li>${item.content}</li>`;
+              }
+            }).join('\n');
+            result.push(`<${listTag}>${groupItems}</${listTag}>`);
+          });
+          
+          i = j;
+        } else {
+          // This item is at a deeper level, skip it (it will be handled by recursion)
+          i++;
+        }
+      }
+      
+      return result.join('\n');
+    }
+
     function loadFromText(text, container) {
       container.innerHTML = convertTextToHTML(text);
     }
@@ -269,7 +383,7 @@
       });
 
       // Parse images: ![alt text](imageURL)
-      //    The alt text can be optional (we’ll match even an empty alt: ![](imageURL)).
+      //    The alt text can be optional (we'll match even an empty alt: ![](imageURL)).
       //    For example: ![A cat](https://example.com/cat.jpg)
       html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, src) => {
         return `<img src="${src}" alt="${altText}" />`;
@@ -327,7 +441,7 @@
     }
 
     // PASTE handler
-    function convertToText(nodes, insideList = false) {
+    function convertToText(nodes, insideList = false, level = 0) {
 
       let joiner = "\n\n";
       if (insideList) {
@@ -343,13 +457,21 @@
           }
           if (block.tagName === "UL") {
             return Array.from(block.children)
-              .map(li => `- ${convertToText(Array.from(li.childNodes), true)}`)
+              .map(li => {
+                const indent = "  ".repeat(level);
+                const itemText = convertListItemToText(li, level);
+                return `${indent}- ${itemText}`;
+              })
               .join("\n");
           }
           // NEW: Handle OL lists
           else if (block.tagName === "OL") {
             return Array.from(block.children)
-              .map((li, index) => `${index + 1}. ${convertToText(Array.from(li.childNodes), true)}`)
+              .map((li, index) => {
+                const indent = "  ".repeat(level);
+                const itemText = convertListItemToText(li, level);
+                return `${indent}${index + 1}. ${itemText}`;
+              })
               .join("\n");
           } else {
             if (block.tagName?.startsWith("H")) {
@@ -359,7 +481,7 @@
             // this is the case where we only have a normal text node if we are inside a list
             // or other inline nodes
             if (insideList) {
-              return convertInlineToText([block]);
+              return convertInlineToText(Array.from(block.childNodes));
             }
             // here we have a p element, so we dont have any prefix
             // we just loop over it's children and treat them as inline elements
@@ -372,6 +494,47 @@
       });
       const text = textParts.join(joiner);
       return text;
+    }
+
+    function convertListItemToText(li, level) {
+      const textParts = [];
+      const nestedLists = [];
+      
+      // Process each child node of the list item
+      Array.from(li.childNodes).forEach(child => {
+        if (child.nodeType === textNodeType) {
+          // Text node - add the text content
+          const text = child.textContent.trim();
+          if (text) {
+            textParts.push(text);
+          }
+        } else if (child.tagName === 'UL' || child.tagName === 'OL') {
+          // Nested list - convert it with proper indentation
+          // This should be treated as a block element, not inline content
+          const nestedList = convertToText([child], true, level + 1);
+          if (nestedList) {
+            nestedLists.push(nestedList);
+          }
+        } else {
+          // Other inline elements (bold, italic, etc.)
+          const inlineText = convertInlineToText([child]);
+          if (inlineText) {
+            textParts.push(inlineText);
+          }
+        }
+      });
+      
+      // Combine text content
+      let result = textParts.join(' ');
+      
+      // Add nested lists with proper line breaks and indentation
+      if (nestedLists.length > 0) {
+        // Add a line break before the nested list
+        // The nested list already has the correct indentation from convertToText
+        result += '\n' + nestedLists.join('\n');
+      }
+      
+      return result;
     }
 
     function convertInlineToText(inlineElements) {
@@ -447,8 +610,32 @@ Three c paragraph **bold** which is awesome.
 
 - List item **one** ends here.
 - List item **two** ends here.
+  - Nested item 2.1
+  - Nested item 2.2
+    - Deeply nested item 2.2.1
+    - Deeply nested item 2.2.2
 - List item **three** ends here.
 - List item **four** ends here.
+
+1. Ordered list item one
+2. Ordered list item two
+  1. Nested ordered item 2.1
+  2. Nested ordered item 2.2
+    1. Deeply nested ordered item 2.2.1
+    2. Deeply nested ordered item 2.2.2
+3. Ordered list item three
+
+Mixed list example:
+
+- Unordered item 1
+1. Ordered item 1
+2. Ordered item 2
+  - Nested unordered in ordered
+  - Another nested unordered
+- Back to unordered
+  - Nested unordered
+    1. Deeply nested ordered
+    2. Another deeply nested ordered
 
 ### Footer title.
 
