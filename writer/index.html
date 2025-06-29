@@ -251,11 +251,11 @@
     function parseListBlock(lines) {
       // Parse nested lists by analyzing indentation levels
       const listItems = [];
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const listMatch = line.match(/^(\s*)(\-|\*|\+|\d+\.)\s+(.*)$/);
-        
+
         if (listMatch) {
           const [, indentation, marker, content] = listMatch;
           // Convert tabs to spaces and calculate level
@@ -263,7 +263,7 @@
           const normalizedIndent = indentation.replace(/\t/g, '  '); // Convert tabs to 2 spaces
           const level = Math.floor(normalizedIndent.length / 2); // Assuming 2 spaces per level
           const isOrdered = /^\d+\./.test(marker);
-        
+
           if (level > 1 && !listItems.length) {
             const lastItem = listItems[listItems.length - 1];
             lastItem.content += '\n' + line;
@@ -287,19 +287,19 @@
           }
         }
       }
-      
+
       return buildNestedList(listItems);
     }
 
     function buildNestedList(items, startLevel = 0) {
       if (items.length === 0) return '';
-      
+
       const result = [];
       let i = 0;
-      
+
       while (i < items.length) {
         const currentItem = items[i];
-        
+
         if (currentItem.level === startLevel) {
           // Group consecutive items of the same type at this level
           const levelGroups = [];
@@ -307,7 +307,7 @@
             isOrdered: currentItem.isOrdered,
             items: []
           };
-          
+
           let j = i;
           while (j < items.length && items[j].level >= startLevel) {
             if (items[j].level === startLevel) {
@@ -319,7 +319,7 @@
                   items: []
                 };
               }
-              
+
               // Find all nested items for this list item
               const nestedItems = [];
               let k = j + 1;
@@ -327,26 +327,26 @@
                 nestedItems.push(items[k]);
                 k++;
               }
-              
+
               // Build the nested list for this item
               const nestedList = buildNestedList(nestedItems, startLevel + 1);
               const itemContent = convertTextToHTML(items[j].content, true);
-              
+
               currentGroup.items.push({
                 content: itemContent,
                 nestedList: nestedList
               });
-              
+
               j = k - 1; // Skip the nested items we just processed
             }
             j++;
           }
-          
+
           // Add the last group
           if (currentGroup.items.length > 0) {
             levelGroups.push(currentGroup);
           }
-          
+
           // Build HTML for each group
           levelGroups.forEach(group => {
             const listTag = group.isOrdered ? "OL" : "UL";
@@ -359,14 +359,14 @@
             }).join('\n');
             result.push(`<${listTag}>${groupItems}</${listTag}>`);
           });
-          
+
           i = j;
         } else {
           // This item is at a deeper level, skip it (it will be handled by recursion)
           i++;
         }
       }
-      
+
       return result.join('\n');
     }
 
@@ -499,7 +499,7 @@
     function convertListItemToText(li, level) {
       const textParts = [];
       const nestedLists = [];
-      
+
       // Process each child node of the list item
       Array.from(li.childNodes).forEach(child => {
         if (child.nodeType === textNodeType) {
@@ -523,17 +523,17 @@
           }
         }
       });
-      
+
       // Combine text content
       let result = textParts.join(' ');
-      
+
       // Add nested lists with proper line breaks and indentation
       if (nestedLists.length > 0) {
         // Add a line break before the nested list
         // The nested list already has the correct indentation from convertToText
         result += '\n' + nestedLists.join('\n');
       }
-      
+
       return result;
     }
 
@@ -582,8 +582,7 @@
       container.innerHTML = `<p><br/></p>`;
     }
     function loadDefaultData(container) {
-      // container.innerHTML = `<p><br/></p>`;
-      loadFromText(`
+      const defaultText = `
 # Main title.
 
 First paragraph which is awesome.
@@ -642,7 +641,20 @@ Mixed list example:
 Third paragraph, **bold** and is even more awesome.
 
 4th paragraph, *italic* that is even more awesome.
-        `.trim(), editor);
+`
+
+      const troubleshootingText = `
+- main 1
+  - sub 1
+  - sub 2
+- something else
+  - sub something
+  - and more
+
+Some text
+        `
+
+      loadFromText(troubleshootingText.trim(), editor);
 
       helper.saveDebounce();
     }
@@ -1053,7 +1065,8 @@ Third paragraph, **bold** and is even more awesome.
     }
 
     function isNodeInSelection(node, range) {
-      return range.intersectsNode(node);
+      // return range.intersectsNode(node);
+      return range.startContainer.contains(node) || range.endContainer.contains(node) || range.commonAncestorContainer === node || range.commonAncestorContainer.contains(node);
     }
 
     function htmlSanitizer(html) {
@@ -1159,24 +1172,25 @@ Third paragraph, **bold** and is even more awesome.
       return lastNode;
     }
 
-    function getAllBlockElementsInSelection(selectionContainer, range, collectedBlockNodes) {
-      if (elementWhitelistBlockElementsInSelection.includes(selectionContainer?.tagName) && isNodeInSelection(selectionContainer, range)) {
-        collectedBlockNodes.push(selectionContainer);
+    function getAllBlockElementsInSelection(actualContainer, range, collectedBlockNodes) {
+      if (elementWhitelistBlockElementsInSelection.includes(actualContainer?.tagName) && isNodeInSelection(actualContainer, range) && !collectedBlockNodes.includes(actualContainer)) {
+        collectedBlockNodes.push(actualContainer);
+        console.log("pushing selectionContainer", actualContainer);
       }
 
-      selectionContainer.childNodes.forEach((node) => {
-        if (elementWhitelistBlockElementsInSelection.includes(node.tagName) && isNodeInSelection(node, range) && !collectedBlockNodes.includes(node)) {
-          collectedBlockNodes.push(node);
-        } else if (node.nodeType != textNodeType) {
-          const newNodes = getAllBlockElementsInSelection(node, range, collectedBlockNodes);
+      // run the same recursively for children
+      actualContainer.childNodes.forEach((node) => {
+        if (node.nodeType != textNodeType) {
+          getAllBlockElementsInSelection(node, range, collectedBlockNodes);
         }
       });
 
       // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
       // so we are adding it manually if this is the commonAncestorContainer
-      if (!collectedBlockNodes.length && ["P", "LI"].includes(range.commonAncestorContainer.tagName) && isEmptyBlockElement(range.commonAncestorContainer)) {
-        collectedBlockNodes.push(range.commonAncestorContainer);
-      }
+      // if (!collectedBlockNodes.length && ["P"].includes(range.commonAncestorContainer.tagName) && isEmptyBlockElement(range.commonAncestorContainer)) {
+      //   collectedBlockNodes.push(range.commonAncestorContainer);
+      // }
+
       return collectedBlockNodes;
     }
 
