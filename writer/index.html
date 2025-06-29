@@ -1066,6 +1066,12 @@ Some text
 
     function isNodeInSelection(node, range) {
       // return range.intersectsNode(node);
+      if (range.startContainer.nodeType === textNodeType && range.startContainer.parentNode === node) {
+        return true;
+      }
+      if (range.endContainer.nodeType === textNodeType && range.endContainer.parentNode === node) {
+        return true;
+      }
       return range.startContainer.contains(node) || range.endContainer.contains(node) || range.commonAncestorContainer === node || range.commonAncestorContainer.contains(node);
     }
 
