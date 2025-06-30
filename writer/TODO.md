@@ -1,3 +1,7 @@
+NEXT:
+
+- Add a paragraph on the end of the editor to always be able to 'exit' from a blockquote, or codeblock element with the arrow down
+
 BUGS:
 
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.

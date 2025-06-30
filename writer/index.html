@@ -105,8 +105,8 @@
     const unsaved = $("#unsaved-button");
 
     const textNodeType = 3;
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
-    const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE'];
+    const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
       isPasting: false,
@@ -210,7 +210,31 @@
       if (isValidHttpUrl(text)) {
         return `<a href="${text}" target="_blank">${text}</a>`;
       }
-      const blocks = text.split("\n\n");
+      // Blockquote support: group consecutive lines starting with '>'
+      function extractBlockquotes(blocks) {
+        const result = [];
+        let i = 0;
+        while (i < blocks.length) {
+          if (/^>\s?/.test(blocks[i])) {
+            let bqLines = [];
+            while (i < blocks.length && /^>\s?/.test(blocks[i])) {
+              bqLines.push(blocks[i].replace(/^>\s?/, ""));
+              i++;
+            }
+            // Recursively parse the blockquote content
+            const bqContent = convertTextToHTML(bqLines.join("\n"), false);
+            result.push(`<blockquote>${bqContent}</blockquote>`);
+          } else {
+            result.push(blocks[i]);
+            i++;
+          }
+        }
+        return result;
+      }
+      // Split into blocks, but keep blockquotes together
+      let blocks = text.split(/\n\n/);
+      // Flatten blockquotes into their own blocks
+      blocks = extractBlockquotes(blocks);
       const blockType = {
         "#": "H1",
         "##": "H2",
@@ -237,14 +261,12 @@
             return parseInlineMarkdown(line);
           });
           const blockContent = htmlLines.join("<br>");
-
           if (insideList && blockTypeValue === "P") {
             return blockContent; // If inside a list, return just the content without wrapping in a <p>
           }
           return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
         }
       });
-
       return blockElements.join("\n");
     }
 
@@ -478,6 +500,11 @@
               const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
               return prefix + convertInlineToText(Array.from(block.childNodes));
             }
+            if (block.tagName === "BLOCKQUOTE") {
+              // Blockquote handling
+              const blockquoteContent = convertInlineToText(Array.from(block.childNodes));
+              return `> ${blockquoteContent}`;
+            }
             // this is the case where we only have a normal text node if we are inside a list
             // or other inline nodes
             if (insideList) {
@@ -651,7 +678,9 @@ Third paragraph, **bold** and is even more awesome.
   - sub something
   - and more
 
-Some text
+> The obstacle is the way.
+
+Footer text.
         `
 
       loadFromText(troubleshootingText.trim(), editor);

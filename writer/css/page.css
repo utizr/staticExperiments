@@ -28,6 +28,15 @@ body {
   display: none;
 }
 
+blockquote {
+  margin: 0;
+  padding: 0;
+  font-style: italic;
+  color: #414141;
+  border-left: 4px solid #ccc;
+  padding-left: 1rem;
+}
+
 #main-menu {
   position: fixed;
   left: 0px;
