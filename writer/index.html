@@ -394,6 +394,7 @@
 
     function loadFromText(text, container) {
       container.innerHTML = convertTextToHTML(text);
+      fixLastElementOfEditor(container);
     }
 
     function parseInlineMarkdown(text) {
@@ -677,6 +678,8 @@ Third paragraph, **bold** and is even more awesome.
 - something else
   - sub something
   - and more
+
+End of list.
 
 > The obstacle is the way.
 
@@ -1207,10 +1210,34 @@ Footer text.
       return lastNode;
     }
 
+
+    function fixLastElementOfEditor(editor) {
+      const lastTextNode = getLastBlockElementOfContainer(editor);
+      if (lastTextNode && lastTextNode.tagName === "BLOCKQUOTE") {
+        console.log("last blockquote", lastTextNode);
+        // add an empty p node after the blockquote
+        const emptyParagraph = document.createElement("p");
+        const emptyTextNode = document.createTextNode("\u200B");
+        emptyParagraph.append(emptyTextNode);
+        lastTextNode.after(emptyParagraph);
+      }
+    }
+
+    // change this so that it only returns first child elements of element
+    function getLastBlockElementOfContainer(container) {
+      const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT)
+      let lastNode = null;
+      while (walker.nextNode()) {
+        if (walker.currentNode.parentNode === container && elementWhitelistBlockElementsInSelection.includes(walker.currentNode.tagName)) {
+          lastNode = walker.currentNode;
+        }
+      }
+      return lastNode;
+    }
+
     function getAllBlockElementsInSelection(actualContainer, range, collectedBlockNodes) {
       if (elementWhitelistBlockElementsInSelection.includes(actualContainer?.tagName) && isNodeInSelection(actualContainer, range) && !collectedBlockNodes.includes(actualContainer)) {
         collectedBlockNodes.push(actualContainer);
-        console.log("pushing selectionContainer", actualContainer);
       }
 
       // run the same recursively for children
@@ -1409,6 +1436,23 @@ Footer text.
               paragraph.append(pContent);
               insertedElement.replaceWith(paragraph);
               putCursorAtFirstElement(paragraph, 'br');
+            }
+
+            // find the last element in the editor
+            if (insertedElement.tagName === "BLOCKQUOTE") {
+              fixLastElementOfEditor(editor);
+            }
+            if (insertedElement.tagName === "UL") {
+              console.log("inserted UL", insertedElement);
+              const ulElementsAfterLi = editor.querySelectorAll('li + ul');
+              ulElementsAfterLi.forEach((ulElem) => {
+                // if the ul is after a li, we should move the complete ul inside the li
+                // this seem to happen when we are inside a nested list, and we press enter twice to go back one level
+                const liElem = ulElem.previousElementSibling;
+                if (liElem && liElem.tagName === "LI") {
+                  liElem.append(ulElem);
+                }
+              });
             }
           });
         });
