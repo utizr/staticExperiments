@@ -39,7 +39,7 @@ body {
 
 h3 {
   color: var(--section_title_color);
-  font-size: 1.3em;
+  font-size: 1.7em;
   padding-left: 5px;
   font-variant: small-caps;
   font-family: Georgia;
@@ -68,7 +68,7 @@ h3 {
   padding: 0 4px;
 
   font-family: Georgia;
-  font-size: 1.04em;
+  font-size: 1.34em;
   box-shadow: rgba(60, 64, 67, 0.3) 0px 1px 2px 0px, rgba(60, 64, 67, 0.15) 0px 2px 6px 2px;
 }
 .lilbox p {
@@ -117,7 +117,7 @@ h3 {
   color: var(--paragraph_color8);
   font-variant: small-caps;
   font-weight: bold;
-  font-size: 1.25em;
+  font-size: 1.45em;
   box-shadow: none;
 }
 
@@ -129,7 +129,7 @@ h3 {
   background-color:var(--paragraph_bg9);
   color: var(--paragraph_color9);
   border: 1px solid #888;
-  font-size: 1em;
+  font-size: 1.2em;
   box-shadow: none;
 }
 
