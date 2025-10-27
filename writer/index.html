@@ -105,8 +105,8 @@
     const unsaved = $("#unsaved-button");
 
     const textNodeType = 3;
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE'];
-    const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
+    const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const flags = {
       isPasting: false,
@@ -210,31 +210,7 @@
       if (isValidHttpUrl(text)) {
         return `<a href="${text}" target="_blank">${text}</a>`;
       }
-      // Blockquote support: group consecutive lines starting with '>'
-      function extractBlockquotes(blocks) {
-        const result = [];
-        let i = 0;
-        while (i < blocks.length) {
-          if (/^>\s?/.test(blocks[i])) {
-            let bqLines = [];
-            while (i < blocks.length && /^>\s?/.test(blocks[i])) {
-              bqLines.push(blocks[i].replace(/^>\s?/, ""));
-              i++;
-            }
-            // Recursively parse the blockquote content
-            const bqContent = convertTextToHTML(bqLines.join("\n"), false);
-            result.push(`<blockquote>${bqContent}</blockquote>`);
-          } else {
-            result.push(blocks[i]);
-            i++;
-          }
-        }
-        return result;
-      }
-      // Split into blocks, but keep blockquotes together
-      let blocks = text.split(/\n\n/);
-      // Flatten blockquotes into their own blocks
-      blocks = extractBlockquotes(blocks);
+      const blocks = text.split("\n\n");
       const blockType = {
         "#": "H1",
         "##": "H2",
@@ -261,12 +237,14 @@
             return parseInlineMarkdown(line);
           });
           const blockContent = htmlLines.join("<br>");
+
           if (insideList && blockTypeValue === "P") {
             return blockContent; // If inside a list, return just the content without wrapping in a <p>
           }
           return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
         }
       });
+
       return blockElements.join("\n");
     }
 
@@ -394,7 +372,6 @@
 
     function loadFromText(text, container) {
       container.innerHTML = convertTextToHTML(text);
-      fixLastElementOfEditor(container);
     }
 
     function parseInlineMarkdown(text) {
@@ -501,11 +478,6 @@
               const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
               return prefix + convertInlineToText(Array.from(block.childNodes));
             }
-            if (block.tagName === "BLOCKQUOTE") {
-              // Blockquote handling
-              const blockquoteContent = convertInlineToText(Array.from(block.childNodes));
-              return `> ${blockquoteContent}`;
-            }
             // this is the case where we only have a normal text node if we are inside a list
             // or other inline nodes
             if (insideList) {
@@ -610,7 +582,8 @@
       container.innerHTML = `<p><br/></p>`;
     }
     function loadDefaultData(container) {
-      const defaultText = `
+      // container.innerHTML = `<p><br/></p>`;
+      loadFromText(`
 # Main title.
 
 First paragraph which is awesome.
@@ -669,24 +642,7 @@ Mixed list example:
 Third paragraph, **bold** and is even more awesome.
 
 4th paragraph, *italic* that is even more awesome.
-`
-
-      const troubleshootingText = `
-- main 1
-  - sub 1
-  - sub 2
-- something else
-  - sub something
-  - and more
-
-End of list.
-
-> The obstacle is the way.
-
-Footer text.
-        `
-
-      loadFromText(troubleshootingText.trim(), editor);
+        `.trim(), editor);
 
       helper.saveDebounce();
     }
@@ -1097,14 +1053,7 @@ Footer text.
     }
 
     function isNodeInSelection(node, range) {
-      // return range.intersectsNode(node);
-      if (range.startContainer.nodeType === textNodeType && range.startContainer.parentNode === node) {
-        return true;
-      }
-      if (range.endContainer.nodeType === textNodeType && range.endContainer.parentNode === node) {
-        return true;
-      }
-      return range.startContainer.contains(node) || range.endContainer.contains(node) || range.commonAncestorContainer === node || range.commonAncestorContainer.contains(node);
+      return range.intersectsNode(node);
     }
 
     function htmlSanitizer(html) {
@@ -1210,49 +1159,24 @@ Footer text.
       return lastNode;
     }
 
-
-    function fixLastElementOfEditor(editor) {
-      const lastTextNode = getLastBlockElementOfContainer(editor);
-      if (lastTextNode && lastTextNode.tagName === "BLOCKQUOTE") {
-        console.log("last blockquote", lastTextNode);
-        // add an empty p node after the blockquote
-        const emptyParagraph = document.createElement("p");
-        const emptyTextNode = document.createTextNode("\u200B");
-        emptyParagraph.append(emptyTextNode);
-        lastTextNode.after(emptyParagraph);
-      }
-    }
-
-    // change this so that it only returns first child elements of element
-    function getLastBlockElementOfContainer(container) {
-      const walker = document.createTreeWalker(container, NodeFilter.SHOW_ELEMENT)
-      let lastNode = null;
-      while (walker.nextNode()) {
-        if (walker.currentNode.parentNode === container && elementWhitelistBlockElementsInSelection.includes(walker.currentNode.tagName)) {
-          lastNode = walker.currentNode;
-        }
-      }
-      return lastNode;
-    }
-
-    function getAllBlockElementsInSelection(actualContainer, range, collectedBlockNodes) {
-      if (elementWhitelistBlockElementsInSelection.includes(actualContainer?.tagName) && isNodeInSelection(actualContainer, range) && !collectedBlockNodes.includes(actualContainer)) {
-        collectedBlockNodes.push(actualContainer);
+    function getAllBlockElementsInSelection(selectionContainer, range, collectedBlockNodes) {
+      if (elementWhitelistBlockElementsInSelection.includes(selectionContainer?.tagName) && isNodeInSelection(selectionContainer, range)) {
+        collectedBlockNodes.push(selectionContainer);
       }
 
-      // run the same recursively for children
-      actualContainer.childNodes.forEach((node) => {
-        if (node.nodeType != textNodeType) {
-          getAllBlockElementsInSelection(node, range, collectedBlockNodes);
+      selectionContainer.childNodes.forEach((node) => {
+        if (elementWhitelistBlockElementsInSelection.includes(node.tagName) && isNodeInSelection(node, range) && !collectedBlockNodes.includes(node)) {
+          collectedBlockNodes.push(node);
+        } else if (node.nodeType != textNodeType) {
+          const newNodes = getAllBlockElementsInSelection(node, range, collectedBlockNodes);
         }
       });
 
       // if we are on an empty paragraph that only has a <br> we dont get it as an inline node
       // so we are adding it manually if this is the commonAncestorContainer
-      // if (!collectedBlockNodes.length && ["P"].includes(range.commonAncestorContainer.tagName) && isEmptyBlockElement(range.commonAncestorContainer)) {
-      //   collectedBlockNodes.push(range.commonAncestorContainer);
-      // }
-
+      if (!collectedBlockNodes.length && ["P", "LI"].includes(range.commonAncestorContainer.tagName) && isEmptyBlockElement(range.commonAncestorContainer)) {
+        collectedBlockNodes.push(range.commonAncestorContainer);
+      }
       return collectedBlockNodes;
     }
 
@@ -1436,23 +1360,6 @@ Footer text.
               paragraph.append(pContent);
               insertedElement.replaceWith(paragraph);
               putCursorAtFirstElement(paragraph, 'br');
-            }
-
-            // find the last element in the editor
-            if (insertedElement.tagName === "BLOCKQUOTE") {
-              fixLastElementOfEditor(editor);
-            }
-            if (insertedElement.tagName === "UL") {
-              console.log("inserted UL", insertedElement);
-              const ulElementsAfterLi = editor.querySelectorAll('li + ul');
-              ulElementsAfterLi.forEach((ulElem) => {
-                // if the ul is after a li, we should move the complete ul inside the li
-                // this seem to happen when we are inside a nested list, and we press enter twice to go back one level
-                const liElem = ulElem.previousElementSibling;
-                if (liElem && liElem.tagName === "LI") {
-                  liElem.append(ulElem);
-                }
-              });
             }
           });
         });
