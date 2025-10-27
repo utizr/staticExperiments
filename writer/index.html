@@ -1336,7 +1336,7 @@ Third paragraph, **bold** and is even more awesome.
             }
             if (insertedElement.tagName === "P") {
               if (isEmptyBlockElement(insertedElement)) {
-                const emptyText = document.createTextNode("\u200B");
+                const emptyText = document.createTextNode("");
                 // we should append this to the front of the paragraph
                 insertedElement.insertBefore(emptyText, insertedElement.firstChild);
                 const sel = document.getSelection() || window.getSelection();
