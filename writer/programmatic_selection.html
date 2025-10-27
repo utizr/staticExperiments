@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<!-- csss framework documentation -->
+<!-- https://purecss.io/grids/ -->
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Writer</title>
+
+  <link rel="stylesheet" href="./css/icons/style.css" />
+  <link rel="stylesheet" href="./css/page.css" />
+  <link rel="stylesheet" href="./css/colors-light.css" />
+
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📋</text></svg>" />
+</head>
+
+<style></style>
+
+<body>
+  <div id="main-menu">
+    <a class="menu-button">
+      <div class="lsf symbol">menu</div>
+    </a>
+    <a id="select-button" class="menu-button">
+      <div class="lsf symbol">magic</div>
+    </a>
+  </div>
+
+  <div id="page">
+    <div id="container" contenteditable="true">
+      <p>First a world which is awesome.</p>
+      <p>First b paragraph which is awesome.</p>
+      <p>First c paragraph which is awesome.</p>
+      <p>Second paragraph, and is even more awesome.</p>
+      <p>Third paragraph, <b>inside text</b> that is even more awesome.</p>
+    </div>
+  </div>
+
+  <script>
+
+    function $(selector, element = document) {
+      return element.querySelector(selector);
+    }
+
+    function $$(selector, element = document) {
+      return Array.from(element.querySelectorAll(selector));
+    }
+
+    const editor = $("#container");
+    const button = $("#select-button");
+   
+
+    button.addEventListener("click", () => {
+      // For simplicity, assume "Hello world, ..." is a single text node.
+      const textNode1 = editor.querySelectorAll('p')[0].firstChild;
+      const textNode2 = editor.querySelectorAll('p')[1].firstChild;
+      
+      // // Let's find the substring "world"
+      // const textContent = textNode.nodeValue; // "Hello world, how are you doing?"
+      // const searchTerm = "world";
+      // const startIndex = textContent.indexOf(searchTerm);
+      // const endIndex = startIndex + searchTerm.length;
+
+      // Create a range
+      const range = document.createRange();
+      range.setStart(textNode1, 4);
+      range.setEnd(textNode2, 8);
+
+      // Get the current selection and clear existing ranges
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+
+      // Apply our new range
+      selection.addRange(range);
+    });
+
+  </script>
+</body>
+
+</html>
