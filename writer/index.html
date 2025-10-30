@@ -1060,12 +1060,19 @@ Third paragraph, **bold** and is even more awesome.
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
 
+      console.log("tempDiv", tempDiv);
       const result = htmlWalker(tempDiv.childNodes);
 
       if (!result.blockElementCount) {
         result.html = `<p>${result.html}</p>`;
       }
-      return result;
+      // second run of htmlWalker:
+      // this is needed to replace <br> with </p><p>
+      // because we only know if the root element will be a p after the first run
+      const tempDiv2 = document.createElement('div');
+      tempDiv2.innerHTML = result.html;
+      const result2 = htmlWalker(tempDiv2.childNodes);
+      return result2;
     }
 
     function tagReplacer(tagName) {
@@ -1075,10 +1082,13 @@ Third paragraph, **bold** and is even more awesome.
       if (tagName === "i" || tagName === "em") {
         return "em";
       }
+      if (tagName === "span") {
+        return "p";
+      }
       else return tagName;
     }
     // todo, have an insideList parameter, so that P elements are not created
-    function htmlWalker(children, blockElementCount = 0, insideList = false) {
+    function htmlWalker(children, blockElementCount = 0, insideList = false, parentTagName = null) {
       let resultHtml = '';
       if (!children?.length) {
         return { html: '', blockElementCount };
@@ -1104,10 +1114,12 @@ Third paragraph, **bold** and is even more awesome.
           if (blockElement) {
             blockElementCount++;
           }
+          let tag = node.tagName.toLowerCase();
+          tag = tagReplacer(tag);
+
           if (blockElement || inlineElement) {
             let tag = node.tagName.toLowerCase();
-            tag = tagReplacer(tag);
-            const result = htmlWalker(node.childNodes, 0, isList || insideList);
+            const result = htmlWalker(node.childNodes, 0, isList || insideList, tag);
             blockElementCount += result.blockElementCount;
             let attributes = '';
             // TODO extend this and organize it better
@@ -1126,9 +1138,15 @@ Third paragraph, **bold** and is even more awesome.
             }
           } else if (node.childNodes.length) {
             // TODO if linebreak <br> we have to handle that somewhere here
-            const result = htmlWalker(node.childNodes, 0, isList || insideList);
+            const result = htmlWalker(node.childNodes, 0, isList || insideList, tag);
             blockElementCount += result.blockElementCount;
             resultHtml += result.html;
+          } else if (tag === "br") {
+            if (parentTagName === "p") {
+              resultHtml += '</p><p>';
+            } else {
+              resultHtml += '<br>';
+            }
           }
         } else if (node.nodeType === Node.TEXT_NODE) {
           resultHtml += node.nodeValue;
