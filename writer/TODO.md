@@ -1,5 +1,6 @@
 BUGS:
 
+- after pasting clear up empty inline elements like links without text etc. Example was pasting from moly.hu
 - we should escape text at converting to html
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.
   - select a list item, paste it into an empty list item (enter on another list item) will not wrap the ul into a li
