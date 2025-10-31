@@ -107,6 +107,7 @@
     const textNodeType = 3;
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
     const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
+    const elementsCannotBeEmptyText = ['A', 'B', 'STRONG', 'I', 'EM', 'LI']
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
     const brMarkerInText = "---";
     const flags = {
@@ -1069,7 +1070,6 @@ Third paragraph, **bold** and is even more awesome.
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
 
-      console.log("tempDiv", tempDiv);
       const result = htmlWalker(tempDiv.childNodes);
 
       if (!result.blockElementCount) {
@@ -1118,6 +1118,10 @@ Third paragraph, **bold** and is even more awesome.
             continue;
           }
           if (lastNode && !node.innerHTML) {
+            continue;
+          }
+
+          if (elementsCannotBeEmptyText.includes(node.tagName) && !node.textContent.trim()) {
             continue;
           }
           if (blockElement) {
