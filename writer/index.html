@@ -108,6 +108,7 @@
     const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
     const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
     const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
+    const brMarkerInText = "---";
     const flags = {
       isPasting: false,
     };
@@ -232,6 +233,9 @@
             blockTypeValue = "P";
           } else {
             lines[0] = lines[0].replace(/#+/, "").trim();
+          }
+          if (blockTypeValue === "P" && lines[0] === brMarkerInText && lines.length === 1) {
+            return "<p><br/></p>";
           }
           const htmlLines = lines.map((line) => {
             return parseInlineMarkdown(line);
@@ -485,7 +489,12 @@
             }
             // here we have a p element, so we dont have any prefix
             // we just loop over it's children and treat them as inline elements
-            return convertInlineToText(Array.from(block.childNodes));
+            const nodeContent = convertInlineToText(Array.from(block.childNodes));
+            // if we are in an empty P element, we just add an empty space
+            if (block.tagName === "P" && !nodeContent.trim()) {
+              return brMarkerInText;
+            }
+            return nodeContent;
           }
         });
 
@@ -1502,7 +1511,7 @@ Third paragraph, **bold** and is even more awesome.
             } else if (/\s\s/.test(lastTwoChars)) {
               // Check if parent is <b>
               if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
-                // Remove the both spaces
+                // Remove the 2 spaces
                 container.textContent = text.substring(0, offset - 2) + text.substring(offset);
                 // Move caret after the <b> element
                 const bElem = container.parentNode;
