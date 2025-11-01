@@ -21,19 +21,9 @@
 
 <body>
   <div id="main-menu">
-    <a class="menu-button">
+    <a id="hamburger" class="menu-button">
       <div class="lsf symbol">menu</div>
     </a>
-    <a id="edit-button" class="menu-button active">
-      <div class="lsf symbol">edit</div>
-    </a>
-    <a id="convert-button" class="menu-button">
-      <div class="lsf symbol">file</div>
-    </a>
-    <a id="clear-button" class="menu-button">
-      <div class="lsf symbol">delete</div>
-    </a>
-
     <div class="menu-separator"></div>
 
     <a id="bold-button" class="menu-button">
@@ -61,6 +51,18 @@
       </a>
       <a id="dialog-save-button" class="dialog-button">
         <div class="lsf symbol">check</div>
+      </a>
+    </div>
+
+    <div id="dialog-menu">
+      <a id="edit-button" class="menu-button active">
+        <div class="lsf symbol">edit</div>
+      </a>
+      <a id="convert-button" class="menu-button">
+        <div class="lsf symbol">file</div>
+      </a>
+      <a id="clear-button" class="menu-button">
+        <div class="lsf symbol">delete</div>
       </a>
     </div>
     <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
@@ -1308,8 +1310,8 @@ Third paragraph, **bold** and is even more awesome.
       toggleDialog();
     });
 
-    const convertButton = $("#convert-button");
-    convertButton.addEventListener("click", function () {
+    const hamburgerButton = $("#hamburger");
+    hamburgerButton.addEventListener("click", function () {
       toggleDialog();
       convertTextAndDisplay();
     });

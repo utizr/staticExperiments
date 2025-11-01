@@ -63,6 +63,10 @@ blockquote {
   font-size: 1.7rem;
 }
 
+#dialog-menu .menu-button {
+  font-size: 1.7rem;
+}
+
 #main-menu .symbol {
   text-transform: none;
 }
