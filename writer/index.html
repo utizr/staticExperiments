@@ -1367,9 +1367,12 @@ Third paragraph, **bold** and is even more awesome.
             }
             if (insertedElement.tagName === "P") {
               if (isEmptyBlockElement(insertedElement)) {
+                // this fixes the issue when we are creating a title with just a bold text
+                // then press enter at the end, and the next line would have an empty <p> with a <strong> in it
+                insertedElement.innerHTML = '<br>';
                 const emptyText = document.createTextNode("");
                 // we should append this to the front of the paragraph
-                insertedElement.insertBefore(emptyText, insertedElement.firstChild);
+                insertedElement.appendChild(emptyText);
                 const sel = document.getSelection() || window.getSelection();
                 carretToTextNodeEnd(sel, emptyText);
               }
