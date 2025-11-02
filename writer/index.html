@@ -230,12 +230,12 @@
         if (/^(\-|\*|\+|\d+\.)\s+/.test(lines[0]) && !insideList) {
           return parseListBlock(lines);
         } else {
-          let blockTypeKey = lines[0].match(/#+/);
+          let blockTypeKey = lines[0].match(/^#+/);
           let blockTypeValue = blockType[blockTypeKey];
           if (!blockTypeValue) {
             blockTypeValue = "P";
           } else {
-            lines[0] = lines[0].replace(/#+/, "").trim();
+            lines[0] = lines[0].replace(/^#+/, "").trim();
           }
           if (blockTypeValue === "P" && lines[0] === brMarkerInText && lines.length === 1) {
             return "<p><br/></p>";
