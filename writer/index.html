@@ -65,7 +65,12 @@
         <div class="lsf symbol">delete</div>
       </a>
     </div>
+    <h3>Text Content</h3>
     <textarea name="content-text" id="content-text" cols="30" rows="10"></textarea>
+    <h3>Last Pasted HTML (syles removed)</h3>
+    <textarea name="content-text" id="last-pasted-html" cols="30" rows="10"></textarea>
+    <h3>Sanitized HTML</h3>
+    <textarea name="content-text" id="sanitized-html" cols="30" rows="10"></textarea>
   </div>
 
   <div id="page">
@@ -1050,10 +1055,15 @@ Third paragraph, **bold** and is even more awesome.
       const text = e.clipboardData.getData("text/plain").trim();
       let htmlText = e.clipboardData.getData("text/html");
 
+      $("#last-pasted-html").value = htmlText.replace(
+        /\s*style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi,
+        ''
+      );
       if (!htmlText) {
         htmlText = convertTextToHTML(text);
       }
       const htmlResult = htmlSanitizer(htmlText);
+      $("#sanitized-html").value = htmlResult.html;
       replaceSelectedText(text, htmlResult);
       unsaved.style.display = "inline-block";
       flags.isPasting = false;
