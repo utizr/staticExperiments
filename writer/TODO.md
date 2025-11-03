@@ -1,5 +1,7 @@
 BUGS:
 
+- remove these links `<a href="javascript:void(0)"`
+- wrap root inline elements into p
 - we should escape text at converting to html
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.
   - select a list item, paste it into an empty list item (enter on another list item) will not wrap the ul into a li

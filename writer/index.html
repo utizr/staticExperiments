@@ -112,10 +112,10 @@
     const unsaved = $("#unsaved-button");
 
     const textNodeType = 3;
-    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI'];
+    const elementWhitelistBlockElements = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'PRE'];
     const elementWhitelistBlockElementsInSelection = ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI'];
     const elementsCannotBeEmptyText = ['A', 'B', 'STRONG', 'I', 'EM', 'LI']
-    const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'I', 'EM'];
+    const elementWhitelistInlineElements = ['B', 'A', 'STRONG', 'CODE', 'I', 'EM'];
     const brMarkerInText = "---";
     const flags = {
       isPasting: false,
@@ -1529,7 +1529,7 @@ Third paragraph, **bold** and is even more awesome.
               sel.addRange(caretRange);
             } else if (/\s\s/.test(lastTwoChars)) {
               // Check if parent is <b>
-              if (container.parentNode && ['em', 'strong'].includes(container.parentNode.tagName.toLowerCase())) {
+              if (container.parentNode && ['em', 'strong', 'code'].includes(container.parentNode.tagName.toLowerCase())) {
                 // Remove the 2 spaces
                 container.textContent = text.substring(0, offset - 2) + text.substring(offset);
                 // Move caret after the <b> element
