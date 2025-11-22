@@ -1,6 +1,8 @@
 BUGS:
 
 - remove these links `<a href="javascript:void(0)"`
+- bold and italic together is not ok. Eg paste this: <https://magazin.libri.hu/fikcio/szeretnem-hinni-hogy-a-regenyem-melto-kovetoje-a-hunyadi-sorozat-hagyomanyanak/>
+  A new pasing method should be created without regexp.
 - wrap root inline elements into p
 - we should escape text at converting to html
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.

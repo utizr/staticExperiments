@@ -406,12 +406,11 @@
         return `<a href="${href}" target="_blank">${helper.encodeHTMLEntities(textContent)}</a>`;
       });
 
-
-      // Parse italic text: *italic*
-      // Only match if there's no space after the opening `*` and no space before the closing `*`.
-      html = html.replace(/(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)/g, (match, p1) => {
-        return `<em>${p1}</em>`;
+      // see explanation below
+      html = html.replace(/\*\*\*(?!\s)([^*]+?)(?<!\s)\*\*\*/g, (match, p1) => {
+        return `<em><strong>${p1}</strong></em>`;
       });
+
       // Parse bold text: **bold**
       // Only match if there's no space after the opening `**` and no space before the closing `**`.
       //
@@ -427,15 +426,15 @@
         return `<strong>${p1}</strong>`;
       });
 
-      // see explanation below
-      html = html.replace(/\*\*\*(?!\s)([^*]+?)(?<!\s)\*\*\*/g, (match, p1) => {
-        return `<em><strong>${p1}</strong></em>`;
+      // Parse italic text: *italic*
+      // Only match if there's no space after the opening `*` and no space before the closing `*`.
+      html = html.replace(/(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)/g, (match, p1) => {
+        return `<em>${p1}</em>`;
       });
 
-      // Parse italic with _: _italic_
-      //    Same logic, but with underscores.
-      html = html.replace(/(?<!_)_(?!\s)([^_]+?)(?<!\s)_(?!_)/g, (match, p1) => {
-        return `<em>${p1}</em>`;
+      // see explanation below
+      html = html.replace(/___(?!\s)([^_]+?)(?<!\s)___/g, (match, p1) => {
+        return `<em><strong>${p1}</strong></em>`;
       });
 
       // Parse bold with __: __bold__
@@ -444,9 +443,10 @@
         return `<strong>${p1}</strong>`;
       });
 
-      // see explanation below
-      html = html.replace(/___(?!\s)([^_]+?)(?<!\s)___/g, (match, p1) => {
-        return `<em><strong>${p1}</strong></em>`;
+      // Parse italic with _: _italic_
+      //    Same logic, but with underscores.
+      html = html.replace(/(?<!_)_(?!\s)([^_]+?)(?<!\s)_(?!_)/g, (match, p1) => {
+        return `<em>${p1}</em>`;
       });
 
       return html;
@@ -565,8 +565,8 @@
             return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'I' || ie.tagName == 'EM') {
-            prefix = "*";
-            postfix = "*";
+            prefix = "_";
+            postfix = "_";
             return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'A') {
