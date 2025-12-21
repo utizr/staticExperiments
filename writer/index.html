@@ -513,6 +513,27 @@
       return text;
     }
 
+    function getLastTextNode(node) {
+      if (!node) return null;
+
+      // 1. If the node itself is a non-empty text node, return it
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node;
+      }
+
+      // 2. If it's an element, loop through children backwards
+      if (node.childNodes) {
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+          const textNode = getLastTextNode(node.childNodes[i]);
+          if (textNode) {
+            return textNode;
+          }
+        }
+      }
+
+      return null;
+    }
+
     function convertListItemToText(li, level) {
       const textParts = [];
       const nestedLists = [];
@@ -521,7 +542,7 @@
       Array.from(li.childNodes).forEach(child => {
         if (child.nodeType === textNodeType) {
           // Text node - add the text content
-          const text = child.textContent.trim();
+          const text = child.textContent;
           if (text) {
             textParts.push(text);
           }
@@ -531,6 +552,12 @@
           const nestedList = convertToText([child], true, level + 1);
           if (nestedList) {
             nestedLists.push(nestedList);
+          }
+        } else if (child.tagName === 'P') {
+          // The LI only contains a P element
+          const inlineText = convertInlineToText(child.childNodes);
+          if (inlineText) {
+            textParts.push(inlineText);
           }
         } else {
           // Other inline elements (bold, italic, etc.)
@@ -542,7 +569,7 @@
       });
 
       // Combine text content
-      let result = textParts.join(' ');
+      let result = textParts.join('');
 
       // Add nested lists with proper line breaks and indentation
       if (nestedLists.length > 0) {
@@ -575,6 +602,7 @@
           return ie.textContent.replace(/\n/g, '');
         })
         .join("");
+
       return text;
     }
 
@@ -815,7 +843,7 @@ Third paragraph, **bold** and is even more awesome.
             editor.append(htmlPasted.firstChild);
           }
 
-          const lastTextNode = editor.lastElementChild.lastChild;
+          const lastTextNode = getLastTextNode(editor);
           const lastText = lastTextNode.textContent;
 
           let rangeOnLastElement = new Range();
