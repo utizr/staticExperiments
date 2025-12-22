@@ -47,11 +47,11 @@ blockquote {
 
 .menu-button {
   display: inline-block;
-  padding: 5px 12px;
+  padding: 5px 6px 2px 6px;
 }
 .menu-separator {
   display: inline-block;
-  padding: 9px 1px;
+  padding: 13px 1px;
   border-left: 2px solid;
 }
 

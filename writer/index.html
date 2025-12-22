@@ -9,7 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Writer</title>
 
-  <link rel="stylesheet" href="./css/icons/style.css" />
+  <!-- <link rel="stylesheet" href="./css/icons/style.css" /> -->
+  <link rel="stylesheet" href="./css/material/style.css" />
   <link rel="stylesheet" href="./css/page.css" />
   <link rel="stylesheet" href="./css/colors-light.css" />
 
@@ -22,25 +23,43 @@
 <body>
   <div id="main-menu">
     <a id="hamburger" class="menu-button">
-      <div class="lsf symbol">menu</div>
+      <!-- <div class="lsf symbol">menu</div> -->
+      <span class="material-symbols-outlined size-28">menu</span>
     </a>
     <div class="menu-separator"></div>
 
+    <a id="h1-button" class="menu-button">
+      <!-- <div class="lsf symbol">bold</div> -->
+      <span class="material-symbols-outlined size-28">format_h1</span>
+    </a>
+    <a id="h2-button" class="menu-button">
+      <!-- <div class="lsf symbol">bold</div> -->
+      <span class="material-symbols-outlined size-28">format_h2</span>
+    </a>
     <a id="bold-button" class="menu-button">
-      <div class="lsf symbol">bold</div>
+      <!-- <div class="lsf symbol">bold</div> -->
+      <span class="material-symbols-outlined size-28">format_bold</span>
     </a>
     <a id="italic-button" class="menu-button">
-      <div class="lsf symbol">italic</div>
+      <!-- <div class="lsf symbol">italic</div> -->
+      <span class="material-symbols-outlined size-28">format_italic</span>
     </a>
     <!-- NEW: List buttons -->
     <a id="ul-button" class="menu-button">
-      <div class="lsf symbol">list</div>
+      <!-- <i class="far fa-list-ul">list</i> -->
+      <span class="material-symbols-outlined size-28">format_list_bulleted</span>
     </a>
     <a id="ol-button" class="menu-button">
-      <div class="lsf symbol">list</div>
+      <!-- <div class="lsf symbol">list</div> -->
+      <span class="material-symbols-outlined size-28">format_list_numbered</span>
+    </a>
+    <a id="code-button" class="menu-button">
+      <!-- <div class="lsf symbol">list</div> -->
+      <span class="material-symbols-outlined size-28">data_object</span>
     </a>
     <a id="unsaved-button" class="menu-button">
-      <div class="lsf symbol">etc</div>
+      <!-- <div class="lsf symbol">etc</div> -->
+      <span class="material-symbols-outlined size-28">cloud_sync</span>
     </a>
   </div>
 
@@ -74,6 +93,7 @@
   </div>
 
   <div id="page">
+
     <div id="container" contenteditable="true">
       <h1>Main title.</h1>
       <p>First paragraph which is awesome.</p>
@@ -88,6 +108,9 @@
       <p>Third paragraph, <strong>bold</strong> and is even more awesome.</p>
       <p>4th paragraph, <em>italic</em> that is even more awesome.</p>
     </div>
+
+    <i class="far fa-search"></i>
+
   </div>
 
   <script>

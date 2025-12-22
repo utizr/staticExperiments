@@ -23,3 +23,8 @@ TODO:
 - convert <strong> into <b> (or the other way around?) example: <https://alpinejs.dev/>
 - after pasting is done, merge neighbour inline elements
 - retain selection and reselect at button click: <https://stackoverflow.com/questions/985272/selecting-text-in-an-element-akin-to-highlighting-with-your-mouse>
+
+RESOURCES:
+
+material fonts
+<https://fonts.google.com/icons?icon.category=Text&selected=Material+Symbols+Outlined:data_object:FILL@0;wght@400;GRAD@0;opsz@24&icon.size=24&icon.color=%231f1f1f&icon.query=code&icon.style=Outlined>
