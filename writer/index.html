@@ -233,6 +233,11 @@
       return true;
     }
 
+    function loadFromText(text, container) {
+      container.innerHTML = convertTextToHTML(text);
+    }
+
+
     function convertTextToHTML(text, insideList = false) {
       // first if the pasted text is a url, we return it as a link
       if (isValidHttpUrl(text)) {
@@ -401,10 +406,6 @@
       return result.join('\n');
     }
 
-    function loadFromText(text, container) {
-      container.innerHTML = convertTextToHTML(text);
-    }
-
     function parseInlineMarkdown(text) {
       let html = text;
 
@@ -504,7 +505,19 @@
                 return `${indent}${index + 1}. ${itemText}`;
               })
               .join("\n");
-          } else {
+          }
+          else if (block.tagName?.startsWith("H")) {
+            const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
+            return prefix + convertInlineToText(Array.from(block.childNodes));
+          }
+          else if (block.tagName == "PRE") {
+            if (block.childNodes[0].tagName == 'CODE') {
+              const prefix = "```\n";
+              const postfix = "\n```";
+              return prefix + convertInlineToText(Array.from(block.childNodes[0].childNodes)) + postfix;
+            }
+          }
+          else {
             if (block.tagName?.startsWith("H")) {
               const prefix = "#".repeat(parseInt(block.tagName[1])) + " ";
               return prefix + convertInlineToText(Array.from(block.childNodes));
@@ -613,6 +626,11 @@
           if (ie.tagName == 'I' || ie.tagName == 'EM') {
             prefix = "_";
             postfix = "_";
+            return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
+          }
+          if (ie.tagName == 'CODE') {
+            prefix = "`";
+            postfix = "`";
             return prefix + convertInlineToText(Array.from(ie.childNodes)) + postfix;
           }
           if (ie.tagName == 'A') {
