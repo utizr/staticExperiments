@@ -558,7 +558,7 @@
           // NEW: Handle UL lists
           // if statement when the block is an textnode
           if (block.nodeType === textNodeType && !insideList) {
-            const textContent = block.textContent.trim();
+            const textContent = block.textContent.replace(/\n/g, '');
             return textContent;
           }
           if (block.tagName === "UL") {
@@ -649,7 +649,7 @@
       Array.from(li.childNodes).forEach(child => {
         if (child.nodeType === textNodeType) {
           // Text node - add the text content
-          const text = child.textContent.trim();
+          const text = child.textContent.replace(/\n/g, '');
           if (text) {
             textParts.push(text);
           }
