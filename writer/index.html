@@ -236,14 +236,62 @@
     function loadFromText(text, container) {
       container.innerHTML = convertTextToHTML(text);
     }
-
-
+    /**
+     * Main conversion function
+     */
     function convertTextToHTML(text, insideList = false) {
-      // first if the pasted text is a url, we return it as a link
+      // 1. Check for single URL
       if (isValidHttpUrl(text)) {
         return `<a href="${text}" target="_blank">${text}</a>`;
       }
+
+      // 2. Define Regex for Code Blocks (Fence)
+      // Logic:
+      // (?:^|\n)      -> Match Start of String OR a Newline (non-capturing)
+      // ```           -> Match opening fence
+      // [\w-]* -> Match optional language (e.g. js, css)
+      // \r?\n         -> Match newline immediately after fence (Required)
+      // [\s\S]*?      -> Match any content (lazy)
+      // \r?\n```      -> Match closing fence (must be on a new line)
+      const codeBlockRegex = /((?:^|\n)```[\w-]*\r?\n[\s\S]*?\r?\n```)/g;
+
+      // 3. Split text into segments
+      // Because we wrapped the entire pattern in (), split will include the code blocks in the array
+      const segments = text.split(codeBlockRegex);
+
+      // 4. Process each segment
+      const processedSegments = segments.map((segment) => {
+        // Check if this segment looks like a code block
+        // It might start with a newline if it was in the middle of the text
+        const codeMatch = segment.match(/^(?:\r?\n)?```([\w-]*)\r?\n([\s\S]*?)\r?\n```$/);
+
+        if (codeMatch) {
+          const language = codeMatch[1];
+          const codeContent = codeMatch[2];
+
+          // Encode HTML entities to prevent rendering inside the code block
+          const encodedCode = helper.encodeHTMLEntities(codeContent);
+
+          const langClass = language ? ` class="language-${language}"` : "";
+          return `<pre><code${langClass}>${encodedCode}</code></pre>`;
+        }
+
+        // Fallback: Treat as Standard Markdown
+        if (segment.trim() === "") return "";
+
+        return parseStandardBlock(segment, insideList);
+      });
+
+      return processedSegments.join("\n");
+    }
+
+    /**
+     * Extracted the original block parsing logic into a separate helper
+     * to allow it to be called for segments between code blocks.
+     */
+    function parseStandardBlock(text, insideList) {
       const blocks = text.split("\n\n");
+
       const blockType = {
         "#": "H1",
         "##": "H2",
@@ -252,30 +300,36 @@
         "#####": "H5",
         "######": "H6",
       };
+
       const blockElements = blocks.map((block) => {
+        // Handle empty blocks that might occur from splitting
+        if (!block.trim()) return "";
+
         const lines = block.split("\n");
-        // Check if this block is a list block (e.g. lines starting with "- " or "1. ")
-        // Supports nested lists with indentation (2 spaces or tabs per level)
+
+        // Check if this block is a list block
         if (/^(\-|\*|\+|\d+\.)\s+/.test(lines[0]) && !insideList) {
           return parseListBlock(lines);
         } else {
           let blockTypeKey = lines[0].match(/^#+/);
-          let blockTypeValue = blockType[blockTypeKey];
-          if (!blockTypeValue) {
-            blockTypeValue = "P";
-          } else {
+          let blockTypeValue = blockType[blockTypeKey] || "P";
+
+          if (blockType[blockTypeKey]) {
             lines[0] = lines[0].replace(/^#+/, "").trim();
           }
-          if (blockTypeValue === "P" && lines[0] === brMarkerInText && lines.length === 1) {
+
+          // Handle specific BR marker if defined in your context
+          if (typeof brMarkerInText !== 'undefined' && blockTypeValue === "P" && lines[0] === brMarkerInText && lines.length === 1) {
             return "<p><br/></p>";
           }
+
           const htmlLines = lines.map((line) => {
             return parseInlineMarkdown(line);
           });
           const blockContent = htmlLines.join("<br>");
 
           if (insideList && blockTypeValue === "P") {
-            return blockContent; // If inside a list, return just the content without wrapping in a <p>
+            return blockContent;
           }
           return `<${blockTypeValue}>${blockContent}</${blockTypeValue}>`;
         }
@@ -283,6 +337,9 @@
 
       return blockElements.join("\n");
     }
+
+    // --- The rest of your existing functions (parseListBlock, buildNestedList, parseInlineMarkdown) ---
+    // --- Keep them exactly as they were in your question, ensuring 'helper' is defined ---
 
     function parseListBlock(lines) {
       // Parse nested lists by analyzing indentation levels
@@ -294,10 +351,8 @@
 
         if (listMatch) {
           const [, indentation, marker, content] = listMatch;
-          // Convert tabs to spaces and calculate level
-          // Standard markdown uses 2 spaces per level, but we'll be flexible
-          const normalizedIndent = indentation.replace(/\t/g, '  '); // Convert tabs to 2 spaces
-          const level = Math.floor(normalizedIndent.length / 2); // Assuming 2 spaces per level
+          const normalizedIndent = indentation.replace(/\t/g, '  ');
+          const level = Math.floor(normalizedIndent.length / 2);
           const isOrdered = /^\d+\./.test(marker);
 
           if (level > 1 && !listItems.length) {
@@ -313,10 +368,8 @@
             originalLine: line
           });
         } else if (line.trim() === '') {
-          // Empty line - continue to next line
           continue;
         } else {
-          // Non-list line - treat as continuation of previous list item
           if (listItems.length > 0) {
             const lastItem = listItems[listItems.length - 1];
             lastItem.content += '\n' + line;
@@ -337,7 +390,6 @@
         const currentItem = items[i];
 
         if (currentItem.level === startLevel) {
-          // Group consecutive items of the same type at this level
           const levelGroups = [];
           let currentGroup = {
             isOrdered: currentItem.isOrdered,
@@ -347,7 +399,6 @@
           let j = i;
           while (j < items.length && items[j].level >= startLevel) {
             if (items[j].level === startLevel) {
-              // If we encounter a different list type, start a new group
               if (items[j].isOrdered !== currentGroup.isOrdered && currentGroup.items.length > 0) {
                 levelGroups.push(currentGroup);
                 currentGroup = {
@@ -356,7 +407,6 @@
                 };
               }
 
-              // Find all nested items for this list item
               const nestedItems = [];
               let k = j + 1;
               while (k < items.length && items[k].level > startLevel) {
@@ -364,7 +414,6 @@
                 k++;
               }
 
-              // Build the nested list for this item
               const nestedList = buildNestedList(nestedItems, startLevel + 1);
               const itemContent = convertTextToHTML(items[j].content, true);
 
@@ -373,17 +422,15 @@
                 nestedList: nestedList
               });
 
-              j = k - 1; // Skip the nested items we just processed
+              j = k - 1;
             }
             j++;
           }
 
-          // Add the last group
           if (currentGroup.items.length > 0) {
             levelGroups.push(currentGroup);
           }
 
-          // Build HTML for each group
           levelGroups.forEach(group => {
             const listTag = group.isOrdered ? "OL" : "UL";
             const groupItems = group.items.map(item => {
@@ -398,7 +445,6 @@
 
           i = j;
         } else {
-          // This item is at a deeper level, skip it (it will be handled by recursion)
           i++;
         }
       }
@@ -408,70 +454,66 @@
 
     function parseInlineMarkdown(text) {
       let html = text;
+      // Parse inline code blocks: 
+      // 1. (`+)       -> Capture delimiter (one or more backticks)
+      // 2. ([\s\S]*?) -> Capture content (non-greedy)
+      // 3. (?<!`)     -> Negative Lookbehind: Ensure the closer is NOT preceded by a backtick
+      // 4. \1         -> Match the exact same delimiter captured in group 1
+      // 5. (?!`)      -> Negative Lookahead: Ensure the closer is NOT followed by a backtick
+      html = html.replace(/(`+)([\s\S]*?)(?<!`)\1(?!`)/g, (match, delimiter, content) => {
+        let code = content;
 
-      // Parse inline code blocks: `code`
-      html = html.replace(/`([^`]+)`/g, (match, p1) => {
-        return `<code>${helper.encodeHTMLEntities(p1)}</code>`;
+        // Optional: CommonMark spec says to strip outer space if present on both sides
+        // e.g. `` ` `` renders as ` (a single backtick)
+        if (code.startsWith(" ") && code.endsWith(" ") && code.trim().length > 0) {
+          code = code.substring(1, code.length - 1);
+        }
+
+        return `<code>${helper.encodeHTMLEntities(code)}</code>`;
       });
 
-      // Parse images: ![alt text](imageURL)
-      //    The alt text can be optional (we'll match even an empty alt: ![](imageURL)).
-      //    For example: ![A cat](https://example.com/cat.jpg)
+      // Parse images
       html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, altText, src) => {
         return `<img src="${src}" alt="${altText}" />`;
       });
 
-      // Parse links: [link text](http://example.com)
+      // Parse links
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, textContent, href) => {
         return `<a href="${href}" target="_blank">${helper.encodeHTMLEntities(textContent)}</a>`;
       });
 
-      // see explanation below
+      // Bold Italic ***
       html = html.replace(/\*\*\*(?!\s)([^*]+?)(?<!\s)\*\*\*/g, (match, p1) => {
         return `<em><strong>${p1}</strong></em>`;
       });
 
-      // Parse bold text: **bold**
-      // Only match if there's no space after the opening `**` and no space before the closing `**`.
-      //
-      // Explanation of the RegExp:
-      //   \*\*(?!\s)      => Match `**` that is NOT followed by a space
-      //   ([^*]+?)        => Capture one or more non-asterisk characters (lazy)
-      //   (?<!\s)\*\*     => Match `**` that is NOT preceded by a space (using a negative lookbehind if supported)
-      //
-      // For broad compatibility, we can do a slightly simpler pattern without the negative lookbehind,
-      // but the pattern shown here demonstrates the intent. If negative lookbehind isn't supported in your environment,
-      // consider alternative approaches or check browser compatibility.
+      // Bold **
       html = html.replace(/(?<!\*)\*\*(?!\s)([^*]+?)(?<!\s)\*\*(?!\*)/g, (match, p1) => {
         return `<strong>${p1}</strong>`;
       });
 
-      // Parse italic text: *italic*
-      // Only match if there's no space after the opening `*` and no space before the closing `*`.
+      // Italic *
       html = html.replace(/(?<!\*)\*(?!\s)([^*]+?)(?<!\s)\*(?!\*)/g, (match, p1) => {
         return `<em>${p1}</em>`;
       });
 
-      // see explanation below
+      // Bold Italic ___
       html = html.replace(/___(?!\s)([^_]+?)(?<!\s)___/g, (match, p1) => {
         return `<em><strong>${p1}</strong></em>`;
       });
 
-      // Parse bold with __: __bold__
-      //    Same logic, but with underscores.
+      // Bold __
       html = html.replace(/(?<!_)__(?!\s)([^_]+?)(?<!\s)__(?!_)/g, (match, p1) => {
         return `<strong>${p1}</strong>`;
       });
 
-      // Parse italic with _: _italic_
-      //    Same logic, but with underscores.
+      // Italic _
       html = html.replace(/(?<!_)_(?!\s)([^_]+?)(?<!\s)_(?!_)/g, (match, p1) => {
         return `<em>${p1}</em>`;
       });
 
       return html;
     }
-
     // PASTE handler
     function convertToText(nodes, insideList = false, level = 0) {
 
