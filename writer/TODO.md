@@ -4,6 +4,7 @@ BUGS:
 - bold and italic together is not ok. Eg paste this: <https://magazin.libri.hu/fikcio/szeretnem-hinni-hogy-a-regenyem-melto-kovetoje-a-hunyadi-sorozat-hagyomanyanak/>
   A new pasing method should be created without regexp.
 - wrap root inline elements into p
+- list element with multiple paragraphs, so if more lines are in a list then they are probably ignored. See "Example 1" below
 - we should escape text at converting to html
 - pasting a single line into an empty list item does not work. It should convert the pasted element into a list.
   - select a list item, paste it into an empty list item (enter on another list item) will not wrap the ul into a li
@@ -28,3 +29,15 @@ RESOURCES:
 
 material fonts
 <https://fonts.google.com/icons?selected=Material+Symbols+Outlined:close:FILL@0;wght@400;GRAD@0;opsz@24&icon.size=24&icon.color=%231f1f1f&icon.style=Outlined>
+
+```Example 1
+## 9. Alternative word orders (also correct)
+
+Spanish lets you move the pronoun around a bit:
+
+* **Tendría que haberme puesto a preparar algunas clases.** ✅
+* **Me tendría que haber puesto a preparar algunas clases.** ✅
+* **Tendría que ponerme a preparar algunas clases.**
+  → 1 changes meaning slightly:
+  → 2 changes meaning slightly:
+```

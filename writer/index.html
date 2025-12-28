@@ -199,6 +199,38 @@
 
     helper.ini();
 
+    function tagReplacer(tagName) {
+      if (tagName === "b" || tagName === "strong") {
+        return "strong";
+      }
+      if (tagName === "i" || tagName === "em") {
+        return "em";
+      }
+      if (tagName === "span") {
+        return "p";
+      }
+      else return tagName;
+    }
+
+    function escapeHtml(text) {
+      if (!text) return text;
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+    function unescapeHtml(text) {
+      if (!text) return text;
+      return text
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#039;/g, "'")
+        .replace(/&amp;/g, "&"); // Always replace ampersand last to avoid double-decoding
+    }
+
     // VIEW METHODS <<<<<<<<<<<<<<<<<<<<<
     function toggleDialog() {
       dialog.classList.toggle("active");
@@ -556,7 +588,8 @@
             if (block.childNodes[0].tagName == 'CODE') {
               const prefix = "```\n";
               const postfix = "\n```";
-              return prefix + convertInlineToText(Array.from(block.childNodes[0].childNodes)) + postfix;
+              // return prefix + convertInlineToText(Array.from(block.childNodes[0].childNodes)) + postfix;
+              return prefix + unescapeHtml(block.childNodes[0].innerHTML) + postfix;
             }
           }
           else {
@@ -616,7 +649,7 @@
       Array.from(li.childNodes).forEach(child => {
         if (child.nodeType === textNodeType) {
           // Text node - add the text content
-          const text = child.textContent;
+          const text = child.textContent.trim();
           if (text) {
             textParts.push(text);
           }
@@ -629,7 +662,7 @@
           }
         } else if (child.tagName === 'P') {
           // The LI only contains a P element
-          const inlineText = convertInlineToText(child.childNodes);
+          const inlineText = convertInlineToText(Array.from(child.childNodes));
           if (inlineText) {
             textParts.push(inlineText);
           }
@@ -1194,27 +1227,17 @@ Third paragraph, **bold** and is even more awesome.
       if (!result.blockElementCount) {
         result.html = `<p>${result.html}</p>`;
       }
-      // second run of htmlWalker:
-      // this is needed to replace <br> with </p><p>
-      // because we only know if the root element will be a p after the first run
-      const tempDiv2 = document.createElement('div');
-      tempDiv2.innerHTML = result.html;
-      const result2 = htmlWalker(tempDiv2.childNodes);
-      return result2;
+      return result;
+      // // second run of htmlWalker:
+      // // this is needed to replace <br> with </p><p>
+      // // because we only know if the root element will be a p after the first run
+      // const tempDiv2 = document.createElement('div');
+      // tempDiv2.innerHTML = result.html;
+      // const result2 = htmlWalker(tempDiv2.childNodes);
+      // return result2;
     }
 
-    function tagReplacer(tagName) {
-      if (tagName === "b" || tagName === "strong") {
-        return "strong";
-      }
-      if (tagName === "i" || tagName === "em") {
-        return "em";
-      }
-      if (tagName === "span") {
-        return "p";
-      }
-      else return tagName;
-    }
+
     // todo, have an insideList parameter, so that P elements are not created
     function htmlWalker(children, blockElementCount = 0, insideList = false, parentTagName = null) {
       let resultHtml = '';
@@ -1248,9 +1271,17 @@ Third paragraph, **bold** and is even more awesome.
           }
           let tag = node.tagName.toLowerCase();
           tag = tagReplacer(tag);
+          const isCode = tag === 'code';
+          if (isCode) {
+            // 1. Get the cleaned HTML string (spans removed, other tags kept)
+            const rawHtml = codeWalker(node.childNodes);
 
-          if (blockElement || inlineElement) {
-            let tag = node.tagName.toLowerCase();
+            // 2. Escape it so it displays literally
+            const safeString = escapeHtml(rawHtml);
+            // If it is the actual container, keep the tag
+            resultHtml += `<${tag}>${safeString}</${tag}>`;
+            blockElementCount++;
+          } else if (blockElement || inlineElement) {
             const result = htmlWalker(node.childNodes, 0, isList || insideList, tag);
             blockElementCount += result.blockElementCount;
             let attributes = '';
@@ -1286,6 +1317,59 @@ Third paragraph, **bold** and is even more awesome.
       }
 
       return { html: resultHtml, blockElementCount };
+    }
+
+    /**
+   * Walks through DOM nodes, stripping <span> tags but preserving their content,
+   * while keeping all other elements (br, div, etc.) and text intact.
+   */
+    function codeWalker(children) {
+      let resultHtml = '';
+
+      if (!children?.length) {
+        return resultHtml;
+      }
+
+      for (let i = 0; i < children.length; i++) {
+        const node = children[i];
+
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tag = node.tagName.toLowerCase();
+
+          // CASE 1: SPAN
+          // We want to remove the span tag but keep its content.
+          // We recursively walk its children and add them to the result.
+          if (tag === 'span') {
+            resultHtml += codeWalker(node.childNodes);
+          }
+          // CASE 2: All other elements (br, div, b, etc.)
+          // We want to keep these intact, including attributes.
+          else {
+            let attributes = '';
+            if (node.hasAttributes()) {
+              for (const attr of node.attributes) {
+                attributes += ` ${attr.name}="${attr.value}"`;
+              }
+            }
+
+            // Handle self-closing tags (void elements) like <br> or <hr>
+            const voidElements = ['br', 'hr', 'img', 'input'];
+            if (voidElements.includes(tag)) {
+              resultHtml += `<${tag}${attributes}>`;
+            } else {
+              // Standard elements: Opening Tag + Children + Closing Tag
+              resultHtml += `<${tag}${attributes}>${codeWalker(node.childNodes)}</${tag}>`;
+            }
+          }
+        }
+        // CASE 3: Text Nodes
+        else if (node.nodeType === Node.TEXT_NODE) {
+          console.log('code text:', node.nodeValue)
+          resultHtml += node.nodeValue;
+        }
+      }
+
+      return resultHtml;
     }
 
     function getAllTextNodesInSelection(selectionContainer, range, collectedTextNodes) {
