@@ -389,7 +389,7 @@
 
           if (level > 1 && !listItems.length) {
             const lastItem = listItems[listItems.length - 1];
-            lastItem.content += '\n' + line;
+            lastItem.content += '\n' + line.trim();
             continue;
           }
           listItems.push({
@@ -404,7 +404,7 @@
         } else {
           if (listItems.length > 0) {
             const lastItem = listItems[listItems.length - 1];
-            lastItem.content += '\n' + line;
+            lastItem.content += '\n' + line.trim();
           }
         }
       }
@@ -564,9 +564,8 @@
           if (block.tagName === "UL") {
             return Array.from(block.children)
               .map(li => {
-                const indent = "  ".repeat(level);
-                const itemText = convertListItemToText(li, level);
-                return `${indent}- ${itemText}`;
+                const itemText = convertListItemToText(li, level, '-');
+                return itemText;
               })
               .join("\n");
           }
@@ -574,9 +573,9 @@
           else if (block.tagName === "OL") {
             return Array.from(block.children)
               .map((li, index) => {
-                const indent = "  ".repeat(level);
-                const itemText = convertListItemToText(li, level);
-                return `${indent}${index + 1}. ${itemText}`;
+                const listMarker = `${index + 1}.`
+                const itemText = convertListItemToText(li, level, listMarker);
+                return itemText;
               })
               .join("\n");
           }
@@ -641,9 +640,14 @@
       return null;
     }
 
-    function convertListItemToText(li, level) {
+    function convertListItemToText(li, level, listMarker) {
       const textParts = [];
       const nestedLists = [];
+
+      const firstListIndent = "  ".repeat(level);
+      const indent = "  ".repeat(level + 1);
+
+      let output = `${firstListIndent}${listMarker} `;
 
       // Process each child node of the list item
       Array.from(li.childNodes).forEach(child => {
@@ -653,6 +657,7 @@
           if (text) {
             textParts.push(text);
           }
+          output += text;
         } else if (child.tagName === 'UL' || child.tagName === 'OL') {
           // Nested list - convert it with proper indentation
           // This should be treated as a block element, not inline content
@@ -661,17 +666,22 @@
             nestedLists.push(nestedList);
           }
         } else if (child.tagName === 'P') {
+          output += `\n${indent}`;
           // The LI only contains a P element
           const inlineText = convertInlineToText(Array.from(child.childNodes));
           if (inlineText) {
             textParts.push(inlineText);
           }
+          output += inlineText;
+        } else if (child.tagName == 'BR') {
+          output += `\n${indent}`;
         } else {
           // Other inline elements (bold, italic, etc.)
           const inlineText = convertInlineToText([child]);
           if (inlineText) {
             textParts.push(inlineText);
           }
+          output += inlineText;
         }
       });
 
@@ -683,9 +693,10 @@
         // Add a line break before the nested list
         // The nested list already has the correct indentation from convertToText
         result += '\n' + nestedLists.join('\n');
+        output += '\n' + nestedLists.join('\n');
       }
 
-      return result;
+      return output;
     }
 
     function convertInlineToText(inlineElements) {
