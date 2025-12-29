@@ -1,5 +1,6 @@
 BUGS:
 
+- underscore within inline code will trigger italic. See example 2 below.
 - remove these links `<a href="javascript:void(0)"`
 - bold and italic together is not ok. Eg paste this: <https://magazin.libri.hu/fikcio/szeretnem-hinni-hogy-a-regenyem-melto-kovetoje-a-hunyadi-sorozat-hagyomanyanak/>
   A new pasing method should be created without regexp.
@@ -40,4 +41,8 @@ Spanish lets you move the pronoun around a bit:
 * **Tendría que ponerme a preparar algunas clases.**
   → 1 changes meaning slightly:
   → 2 changes meaning slightly:
+```
+
+```Example 2
+`color_cell` from the first undescore to the second underscore it will be italic `color_cell`
 ```
