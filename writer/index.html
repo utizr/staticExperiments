@@ -486,6 +486,7 @@
 
     function parseInlineMarkdown(text) {
       let html = text;
+      const codeBlocks = [];
       // Parse inline code blocks: 
       // 1. (`+)       -> Capture delimiter (one or more backticks)
       // 2. ([\s\S]*?) -> Capture content (non-greedy)
@@ -501,7 +502,15 @@
           code = code.substring(1, code.length - 1);
         }
 
-        return `<code>${helper.encodeHTMLEntities(code)}</code>`;
+        // we are first replacing the code blocks with a placeholder, so that code inside it doesn ot disturb other elements.
+        // for example if it has underscore in it, it might be interpreted as italic formating.
+        const index = codeBlocks.length + 1;
+        const placeHolder = `<code::${index}/>`;
+        codeBlocks.push({
+          placeHolder,
+          code: `<code>${helper.encodeHTMLEntities(code)}</code>`,
+        });
+        return placeHolder;
       });
 
       // Parse images
@@ -544,6 +553,9 @@
         return `<em>${p1}</em>`;
       });
 
+      codeBlocks.forEach((codeBlock) => {
+        html = html.replace(codeBlock.placeHolder, codeBlock.code);
+      });
       return html;
     }
     // PASTE handler
