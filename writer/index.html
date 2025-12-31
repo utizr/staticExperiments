@@ -126,6 +126,7 @@
     // NEW: List buttons
     const ulButton = $("#ul-button");
     const olButton = $("#ol-button");
+    const titleButton = $("#title-button");
     const editor = $("#container");
     const page = $("#page");
     const unsaved = $("#unsaved-button");
@@ -947,7 +948,41 @@ Third paragraph, **bold** and is even more awesome.
           listElem.appendChild(li);
           block.remove();
         });
-        carretToNodeEnd(listElem)
+        carretToNodeEnd(listElem);
+      }
+    }
+
+    // NEW: Wrap the selected block elements in a list element.
+    function wrapSelectionWithHeader() {
+      if (editor.lastSelection) {
+        const range = editor.lastSelection;
+        const blocks = getAllBlockElementsInSelection(editor, range, []);
+        if (blocks.length !== 1) {
+          return;
+        }
+        const block = blocks[0];
+        let headerTag = 'h1';
+
+        // toggling the title
+        switch (block.tagName) {
+          case 'H1':
+            headerTag = 'h2';
+            break;
+          case 'H2':
+            headerTag = 'h3';
+            break;
+          case 'H3':
+            headerTag = 'p';
+            break;
+          default:
+            break;
+        }
+        const headerElem = document.createElement(headerTag);
+        // Insert the new list element before the first selected block.
+        block.parentNode.insertBefore(headerElem, blocks[0]);
+        headerElem.innerHTML = block.innerHTML;
+        block.remove();
+        carretToNodeEnd(headerElem);
       }
     }
 
@@ -1569,6 +1604,12 @@ Third paragraph, **bold** and is even more awesome.
       helper.saveDebounce();
     });
 
+    titleButton.addEventListener("click", function (e) {
+      e.preventDefault();
+      wrapSelectionWithHeader();
+      helper.saveDebounce();
+    });
+
     // const bookButton = $("#book-button");
     // bookButton.addEventListener("click", function () {
     //   page.classList.toggle("book");
@@ -1821,6 +1862,10 @@ Third paragraph, **bold** and is even more awesome.
 
     document.addEventListener('click', e => {
       const clicks = e.detail;
+      const selection = document.getSelection();
+      if (selection.rangeCount === 0) {
+        return;
+      }
       const range = document.getSelection().getRangeAt(0);
 
       if (clicks === 3) {
