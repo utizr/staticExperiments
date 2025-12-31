@@ -1295,14 +1295,23 @@ Third paragraph, **bold** and is even more awesome.
           let tag = node.tagName.toLowerCase();
           tag = tagReplacer(tag);
           const isCode = tag === 'code';
-          if (isCode) {
+          const isPre = tag === 'pre';
+          if (isPre) {
+          }
+          if (isPre || isCode) {
+            const codeElement = node.querySelector('code');
+            const childNodes = codeElement ? codeElement.childNodes : node.childNodes;
             // 1. Get the cleaned HTML string (spans removed, other tags kept)
-            const rawHtml = codeWalker(node.childNodes);
-
+            const rawHtml = codeWalker(childNodes);
             // 2. Escape it so it displays literally
             const safeString = escapeHtml(rawHtml);
             // If it is the actual container, keep the tag
-            resultHtml += `<${tag}>${safeString}</${tag}>`;
+            console.log("parentTagName", parentTagName, new Error("HERE").stack)
+            if (isPre) {
+              resultHtml += `<pre><code>${safeString}</code></pre>`;
+            } else {
+              resultHtml += `<code>${safeString}</code>`;
+            }
             blockElementCount++;
           } else if (blockElement || inlineElement) {
             const result = htmlWalker(node.childNodes, 0, isList || insideList, tag);
@@ -1387,7 +1396,6 @@ Third paragraph, **bold** and is even more awesome.
         }
         // CASE 3: Text Nodes
         else if (node.nodeType === Node.TEXT_NODE) {
-          console.log('code text:', node.nodeValue)
           resultHtml += node.nodeValue;
         }
       }

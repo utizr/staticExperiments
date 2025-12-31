@@ -1,5 +1,6 @@
 BUGS:
 
+- when the last element is a code block, selecting all and copy pasting will create an empty code block at the end of the text.
 - remove these links `<a href="javascript:void(0)"`
 - wrap root inline elements into p
 - we should escape text at converting to html
@@ -7,6 +8,7 @@ BUGS:
   - select a list item, paste it into an empty list item (enter on another list item) will not wrap the ul into a li
 - when coming from a paragraph that is completely bold, and hitting enter to create a new paragraph, pasting will not work.
 - pasting at the very beginning of the editor does not work if text is below it.
+- When last element is a code-block, when pressing enter, we create a new empty code-block.
 
 INCOMPLETE:
 
