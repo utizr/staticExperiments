@@ -143,9 +143,34 @@
 
     // HELPERS >>>>>>>>>>>>>>>>>>
     const helper = {
+      marker: null,
       ini() {
         this.saveDebounce = this.saveDebounce();
         this.elementsCleanupDebounce = this.elementsCleanupDebounce();
+      },
+      saveCursorWithMarker() {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return null;
+
+        const range = selection.getRangeAt(0);
+        this.marker = document.createElement("span");
+        this.marker.id = "cursor-marker";
+        this.marker.style.display = "none";
+
+        range.insertNode(this.marker);
+      },
+      restoreCursorFromMarker() {
+        if (!this.marker) return;
+        const range = document.createRange();
+        range.setStartAfter(this.marker);
+        range.collapse(true);
+
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        this.marker.remove();
+        this.marker = null;
       },
       debounce: function (fn, delay) {
         var timer = null;
@@ -160,6 +185,13 @@
       },
       saveDebounce: function () {
         return this.debounce(() => {
+          if (editor.lastChild.tagName !== 'P') {
+            this.saveCursorWithMarker();
+            const emptyParagraph = document.createElement('p');
+            emptyParagraph.innerHTML = '<br>';
+            editor.append(emptyParagraph);
+            this.restoreCursorFromMarker();
+          }
           localStorage.setItem("book", convertToText(Array.from(editor.children)));
           unsaved.style.display = "none";
         }, 1000)
@@ -1480,10 +1512,15 @@ Third paragraph, **bold** and is even more awesome.
       return collectedBlockNodes;
     }
 
-    function isEmptyBlockElement(element) {
+    function isEmptyBlockElement(element, options = {}) {
       // Check each child node recursively
       for (let i = 0; i < element.childNodes.length; i++) {
         const node = element.childNodes[i];
+
+        // Skip BR elements
+        if (node.tagName === "BR" && options.brOK) {
+          return false;
+        }
 
         // Skip BR elements
         if (node.tagName === "BR") {
@@ -1641,7 +1678,7 @@ Third paragraph, **bold** and is even more awesome.
               insertedElement.replaceWith(text);
             }
             if (insertedElement.tagName === "P") {
-              if (isEmptyBlockElement(insertedElement)) {
+              if (isEmptyBlockElement(insertedElement, { brOK: true })) {
                 // this fixes the issue when we are creating a title with just a bold text
                 // then press enter at the end, and the next line would have an empty <p> with a <strong> in it
                 insertedElement.innerHTML = '<br>';
