@@ -43,18 +43,16 @@
     /* Tooltip styling */
     .tooltip {
       position: absolute;
+      width: 2000px;
       text-align: center;
       padding: 8px 12px;
-      font-size: 14px;
+      font-size: 18px;
       font-weight: bold;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(3, 168, 30, 0.8);
       color: #fff;
       border-radius: 4px;
       pointer-events: none;
       opacity: 0;
-      /* Hidden by default */
-      transform: translate(-50%, -100%);
-      margin-top: -10px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
       z-index: 10;
     }
@@ -69,8 +67,8 @@
 
   <script>
     // Set dimensions for the SVG container
-    const width = 900;
-    const height = 600;
+    const width = 2000;
+    const height = 1500;
 
     // Create the SVG element
     const svg = d3.select("#map-container")
@@ -83,7 +81,7 @@
 
     // Define the map projection (Natural Earth is visually pleasing for world maps)
     const projection = d3.geoNaturalEarth1()
-      .scale(160)
+      .scale(460)
       .translate([width / 2, height / 2]);
 
     // Define the path generator
@@ -128,13 +126,11 @@
 
           // Show and position the tooltip
           tooltip.style("opacity", 1)
-            .html(countryName)
-            .style("left", event.pageX + "px")
-            .style("top", event.pageY + "px");
+            .html(countryName);
         })
         // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
         .on("mouseleave", function () {
-          // tooltip.style("opacity", 0); 
+          tooltip.style("opacity", 0);
         });
     }).catch(error => {
       console.error("Error loading the map data: ", error);
