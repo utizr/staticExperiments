@@ -1,6 +1,5 @@
 BUGS:
 
-- when the last element is a code block, selecting all and copy pasting will create an empty code block at the end of the text.
 - remove these links `<a href="javascript:void(0)"`
 - wrap root inline elements into p
 - we should escape text at converting to html
