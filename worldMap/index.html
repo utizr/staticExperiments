@@ -26,10 +26,16 @@
       position: relative;
     }
 
+    .ocean {
+      fill: #0772ca;
+      stroke: #044691;
+      stroke-width: 1.5px;
+    }
+
     .country {
       fill: #7cb342;
       /* Land color */
-      stroke: #ffffff;
+      stroke: #568029;
       stroke-width: 0.5px;
       transition: fill 0.2s;
       cursor: pointer;
@@ -38,6 +44,11 @@
     .country:hover {
       fill: #558b2f;
       /* Highlight on hover */
+    }
+
+    .country.selected {
+      fill: #ff9800;
+      stroke-width: 1px;
     }
 
     /* Tooltip styling */
@@ -99,6 +110,7 @@
 
     // Apply the zoom behavior to the SVG
     svg.call(zoom);
+    // Add a white sphere with a black border.
 
     // Optional: Hide tooltip when clicking on the background (ocean)
     svg.on("click", (event) => {
@@ -107,12 +119,18 @@
       }
     });
 
+    // Draw the background sphere (ocean and outline)
+    g.append("path")
+      .datum({ type: "Sphere" })
+      .attr("class", "ocean")
+      .attr("d", path);
     // Fetch the GeoJSON data for the world
-    const geojsonUrl = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
+    // src: https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson
+    const geojsonUrl = "./world.geojson";
 
     d3.json(geojsonUrl).then(data => {
       // Draw the countries
-      g.selectAll("path")
+      g.selectAll(".country")
         .data(data.features)
         .join("path")
         .attr("d", path)
@@ -122,6 +140,7 @@
           // Prevent the SVG background click from triggering
           event.stopPropagation();
 
+          d3.select(this).classed("selected", true);
           const countryName = d.properties.name;
 
           // Show and position the tooltip
@@ -130,7 +149,7 @@
         })
         // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
         .on("mouseleave", function () {
-          tooltip.style("opacity", 0);
+          // tooltip.style("opacity", 0);
         });
     }).catch(error => {
       console.error("Error loading the map data: ", error);
