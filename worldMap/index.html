@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zoomable Interactive World Map</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #f4f4f9;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    #map-container {
+      background-color: #e0f7fa;
+      /* Ocean color */
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .country {
+      fill: #7cb342;
+      /* Land color */
+      stroke: #ffffff;
+      stroke-width: 0.5px;
+      transition: fill 0.2s;
+      cursor: pointer;
+    }
+
+    .country:hover {
+      fill: #558b2f;
+      /* Highlight on hover */
+    }
+
+    /* Tooltip styling */
+    .tooltip {
+      position: absolute;
+      text-align: center;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      /* Hidden by default */
+      transform: translate(-50%, -100%);
+      margin-top: -10px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="map-container">
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <script>
+    // Set dimensions for the SVG container
+    const width = 900;
+    const height = 600;
+
+    // Create the SVG element
+    const svg = d3.select("#map-container")
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+    // Create a group for the map (required for semantic zooming)
+    const g = svg.append("g");
+
+    // Define the map projection (Natural Earth is visually pleasing for world maps)
+    const projection = d3.geoNaturalEarth1()
+      .scale(160)
+      .translate([width / 2, height / 2]);
+
+    // Define the path generator
+    const path = d3.geoPath().projection(projection);
+
+    // Select the tooltip
+    const tooltip = d3.select("#tooltip");
+
+    // Set up the Zoom behavior
+    const zoom = d3.zoom()
+      .scaleExtent([1, 8]) // Zoom limits: 1x to 8x
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+
+    // Apply the zoom behavior to the SVG
+    svg.call(zoom);
+
+    // Optional: Hide tooltip when clicking on the background (ocean)
+    svg.on("click", (event) => {
+      if (event.target.tagName !== "path") {
+        tooltip.style("opacity", 0);
+      }
+    });
+
+    // Fetch the GeoJSON data for the world
+    const geojsonUrl = "https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson";
+
+    d3.json(geojsonUrl).then(data => {
+      // Draw the countries
+      g.selectAll("path")
+        .data(data.features)
+        .join("path")
+        .attr("d", path)
+        .attr("class", "country")
+        // Handle the click event to show the popup
+        .on("click", function (event, d) {
+          // Prevent the SVG background click from triggering
+          event.stopPropagation();
+
+          const countryName = d.properties.name;
+
+          // Show and position the tooltip
+          tooltip.style("opacity", 1)
+            .html(countryName)
+            .style("left", event.pageX + "px")
+            .style("top", event.pageY + "px");
+        })
+        // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
+        .on("mouseleave", function () {
+          // tooltip.style("opacity", 0); 
+        });
+    }).catch(error => {
+      console.error("Error loading the map data: ", error);
+    });
+  </script>
+</body>
+
+</html>
