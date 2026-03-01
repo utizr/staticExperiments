@@ -11,25 +11,27 @@
       font-family: sans-serif;
       background-color: #f4f4f9;
       margin: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      padding: 0;
+      /* Force body to take exactly the window size */
+      width: 100vw;
       height: 100vh;
+      overflow: hidden;
+      /* Prevents scrollbars */
     }
 
     #map-container {
-      background-color: #e0f7fa;
-      /* Ocean color */
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      overflow: hidden;
+      background-color: #ffffff;
+      /* Make container fill the entire body */
+      width: 100%;
+      height: 100%;
       position: relative;
     }
 
     .ocean {
       fill: #0772ca;
       stroke: #044691;
-      stroke-width: 1.5px;
+      stroke-width: 3px;
+      vector-effect: non-scaling-stroke;
     }
 
     .country {
@@ -67,6 +69,20 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
       z-index: 10;
     }
+
+    /* Styling for the flight path */
+    .flight-path {
+      fill: none;
+      stroke: #ff3d00;
+      /* Bright orange/red */
+      stroke-width: 2px;
+      stroke-dasharray: 4 4;
+      /* Makes the line dashed */
+      vector-effect: non-scaling-stroke;
+      /* Keeps the line crisp when zooming */
+      pointer-events: none;
+      /* So it doesn't interfere with country clicks */
+    }
   </style>
 </head>
 
@@ -78,14 +94,17 @@
 
   <script>
     // Set dimensions for the SVG container
-    const width = 2000;
-    const height = 1500;
+    const width = 1200;
+    const height = 800;
 
     // Create the SVG element
     const svg = d3.select("#map-container")
       .append("svg")
-      .attr("width", width)
-      .attr("height", height);
+      // NEW: viewBox defines the internal coordinate system
+      .attr("viewBox", `0 0 ${width} ${height}`)
+      // NEW: Tell the SVG to stretch visually to fit the container
+      .style("width", "100%")
+      .style("height", "100%");
 
     // Create a group for the map (required for semantic zooming)
     const g = svg.append("g");
@@ -103,7 +122,7 @@
 
     // Set up the Zoom behavior
     const zoom = d3.zoom()
-      .scaleExtent([1, 148]) // Zoom limits: 1x to 8x
+      .scaleExtent([0.1, 148]) // Zoom limits: 1x to 8x
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
       });
@@ -119,6 +138,8 @@
       }
     });
 
+    // Track the first clicked point
+    let firstPoint = null;
     // Draw the background sphere (ocean and outline)
     g.append("path")
       .datum({ type: "Sphere" })
@@ -128,7 +149,7 @@
     // src: https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson
     // const geojsonUrl = "./world.geojson";
     // const geojsonUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson";
-    const geojsonUrl = "./worldDetailed.geojson";
+    const geojsonUrl = "./worldProcessed.geojson";
 
     d3.json(geojsonUrl).then(data => {
       // Draw the countries
@@ -139,15 +160,49 @@
         .attr("class", "country")
         // Handle the click event to show the popup
         .on("click", function (event, d) {
-          // Prevent the SVG background click from triggering
           event.stopPropagation();
 
-          d3.select(this).classed("selected", true);
-          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;;
+          // Get the geographic center [longitude, latitude] of the clicked country
+          const centroid = d3.geoCentroid(d);
 
-          // Show and position the tooltip
+          // Logic for connecting two countries
+          if (!firstPoint) {
+            // --- FIRST CLICK ---
+            firstPoint = centroid;
+
+            // Clear old lines and selections
+            g.selectAll(".flight-path").remove();
+            d3.selectAll(".country").classed("selected", false);
+
+            // Highlight just this country
+            d3.select(this).classed("selected", true);
+
+          } else {
+            // --- SECOND CLICK ---
+            // Highlight the second country too
+            d3.select(this).classed("selected", true);
+
+            // Create a GeoJSON line from point A to point B
+            const route = {
+              type: "LineString",
+              coordinates: [firstPoint, centroid]
+            };
+
+            // Draw the line on the map
+            g.append("path")
+              .datum(route)
+              .attr("class", "flight-path")
+              .attr("d", path);
+
+            // Reset memory so the next click starts a brand new line
+            firstPoint = null;
+          }
+
+          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
+
           tooltip.style("opacity", 1)
             .html(countryName);
+
         })
         // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
         .on("mouseleave", function () {
