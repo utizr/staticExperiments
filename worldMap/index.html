@@ -52,6 +52,22 @@
       fill: #ff9800;
     }
 
+    /* Styling for our capital city dots */
+    .capital {
+      fill: #c5b525;
+      /* Bright yellow */
+      stroke: #333333;
+      /* Dark border to make them pop */
+      stroke-width: 0.5px;
+      vector-effect: non-scaling-stroke;
+      cursor: pointer;
+      transition: fill 0.2s;
+    }
+
+    .capital:hover {
+      fill: #ffffff;
+    }
+
     /* Tooltip styling */
     .tooltip {
       position: absolute;
@@ -149,11 +165,19 @@
     // const geojsonUrl = "./world.geojson";
     // const geojsonUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson";
     const geojsonUrl = "./worldProcessed.geojson";
+    // const capitalsUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson";
+    const capitalsUrl = "./50m_populated_places_simple.geojson";
+    const citiesUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson";
+    // const capitalsUrl = "./10m_populated_places_simple.geojson";
 
-    d3.json(geojsonUrl).then(data => {
+
+    Promise.all([
+      d3.json(geojsonUrl),
+      d3.json(capitalsUrl)
+    ]).then(([countryData, capitalData]) => {
       // Draw the countries
       g.selectAll(".country")
-        .data(data.features)
+        .data(countryData.features)
         .join("path")
         .attr("d", path)
         .attr("class", "country")
@@ -207,6 +231,28 @@
         .on("mouseleave", function () {
           // tooltip.style("opacity", 0);
         });
+
+      // 2. Draw the capital cities on top
+      g.selectAll(".capital")
+        .data(capitalData.features)
+        .join("circle")
+        .attr("class", "capital")
+        // Use projection to find exact x and y pixels
+        .attr("cx", d => projection(d.geometry.coordinates)[0])
+        .attr("cy", d => projection(d.geometry.coordinates)[1])
+        .attr("r", 1) // Initial size of the dot
+        .on("click", function (event, d) {
+          event.stopPropagation(); // Stop the country underneath from registering a click
+
+          // The dataset properties hold the names
+          const cityName = d.properties.name || "Unknown Capital";
+          const countryName = d.properties.sov0name || "Unknown Country";
+
+          // Show a formatted tooltip with City and Country
+          tooltip.style("opacity", 1)
+            .html(`<span style="font-size:18px; font-weight:bold;">${cityName}</span><br><span style="font-size:14px; font-weight:normal;">${countryName}</span>`)
+        })
+        .on("mouseleave", () => tooltip.style("opacity", 0));
     }).catch(error => {
       console.error("Error loading the map data: ", error);
     });
