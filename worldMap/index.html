@@ -52,8 +52,8 @@
       fill: #ff9800;
     }
 
-    /* Styling for our capital city dots */
-    .capital {
+    /* Styling for our city city dots */
+    .city {
       fill: #46675f;
       /* Bright yellow */
       stroke: #333333;
@@ -64,8 +64,12 @@
       transition: fill 0.2s;
     }
 
-    .capital:hover {
+    .city:hover {
       fill: #ffffff;
+    }
+
+    .city.selected {
+      fill: #ff9800;
     }
 
     /* Tooltip styling */
@@ -146,10 +150,10 @@
       .scaleExtent([0.1, 148]) // Zoom limits: 1x to 8x
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
-        // NEW: Dynamically shrink the capital dots based on zoom level
+        // NEW: Dynamically shrink the city dots based on zoom level
         // The number '2' is the base size. Divide it by the zoom scale (k)
 
-        g.selectAll(".capital")
+        g.selectAll(".city")
           .attr("r", getCityCircleSize(event.transform.k));
       });
 
@@ -176,16 +180,16 @@
     // const geojsonUrl = "./world.geojson";
     // const geojsonUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson";
     const geojsonUrl = "./worldProcessed.geojson";
-    // const capitalsUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson";
-    const capitalsUrl = "./50m_populated_places_simple.geojson";
-    const citiesUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson";
-    // const capitalsUrl = "./10m_populated_places_simple.geojson";
+    // const citiesUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson";
+    const citiesUrl = "./50m_populated_places_simple.geojson";
+    // const citiesUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson";
+    // const citiesUrl = "./10m_populated_places_simple.geojson";
 
 
     Promise.all([
       d3.json(geojsonUrl),
-      d3.json(capitalsUrl)
-    ]).then(([countryData, capitalData]) => {
+      d3.json(citiesUrl)
+    ]).then(([countryData, cityData]) => {
       // Draw the countries
       g.selectAll(".country")
         .data(countryData.features)
@@ -195,18 +199,45 @@
         // Handle the click event to show the popup
         .on("click", function (event, d) {
           event.stopPropagation();
+          d3.selectAll(".country").classed("selected", false);
+          d3.select(this).classed("selected", true);
 
-          // Get the geographic center [longitude, latitude] of the clicked country
-          const centroid = d3.geoCentroid(d);
+          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
+
+          tooltip.style("opacity", 1)
+            .html(countryName);
+        })
+        // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
+        .on("mouseleave", function () {
+          // tooltip.style("opacity", 0);
+        });
+
+      // Draw the city cities on top
+      // Grab the current zoom level of the map
+      const currentZoom = d3.zoomTransform(svg.node()).k;
+      // 2. Draw the city cities on top
+      g.selectAll(".city")
+        .data(cityData.features)
+        .join("circle")
+        .attr("class", "city")
+        // Use projection to find exact x and y pixels
+        .attr("cx", d => projection(d.geometry.coordinates)[0])
+        .attr("cy", d => projection(d.geometry.coordinates)[1])
+        .attr("r", getCityCircleSize(currentZoom))
+        .on("click", function (event, d) {
+          event.stopPropagation();
+
+          const cityName = d.properties.city || d.properties.city || "Unknown city";
+          const countryName = d.properties.country || "";
 
           // Logic for connecting two countries
           if (!firstPoint) {
             // --- FIRST CLICK ---
-            firstPoint = centroid;
+            firstPoint = d.geometry.coordinates;
 
             // Clear old lines and selections
             g.selectAll(".flight-path").remove();
-            d3.selectAll(".country").classed("selected", false);
+            d3.selectAll(".city").classed("selected", false);
 
             // Highlight just this country
             d3.select(this).classed("selected", true);
@@ -219,7 +250,7 @@
             // Create a GeoJSON line from point A to point B
             const route = {
               type: "LineString",
-              coordinates: [firstPoint, centroid]
+              coordinates: [firstPoint, d.geometry.coordinates]
             };
 
             // Draw the line on the map
@@ -231,36 +262,13 @@
             // Reset memory so the next click starts a brand new line
             firstPoint = null;
           }
-
-          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
-
-          tooltip.style("opacity", 1)
-            .html(countryName);
-
         })
-        // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
-        .on("mouseleave", function () {
-          // tooltip.style("opacity", 0);
-        });
-
-      // Draw the capital cities on top
-      // Grab the current zoom level of the map
-      const currentZoom = d3.zoomTransform(svg.node()).k;
-      // 2. Draw the capital cities on top
-      g.selectAll(".capital")
-        .data(capitalData.features)
-        .join("circle")
-        .attr("class", "capital")
-        // Use projection to find exact x and y pixels
-        .attr("cx", d => projection(d.geometry.coordinates)[0])
-        .attr("cy", d => projection(d.geometry.coordinates)[1])
-        .attr("r", getCityCircleSize(currentZoom))
         // .attr("r", 1) // Initial size of the dot
         .on("mouseover", function (event, d) {
           event.stopPropagation(); // Stop the country underneath from registering a click
 
           // The dataset properties hold the names
-          const cityName = d.properties.name || "Unknown Capital";
+          const cityName = d.properties.name || "Unknown city";
           const countryName = d.properties.sov0name || "Unknown Country";
 
           // Show a formatted tooltip with City and Country
