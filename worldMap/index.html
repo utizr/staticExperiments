@@ -80,8 +80,8 @@
       padding: 8px 12px;
       font-size: 18px;
       font-weight: bold;
-      background: rgba(3, 168, 30, 0.8);
-      color: #fff;
+      background: #1d2434;
+      color: #d9dbe1;
       border-radius: 4px;
       pointer-events: none;
       opacity: 0;
@@ -292,8 +292,8 @@
           // Show a formatted tooltip with City and Country
           tooltip.style("opacity", 1)
             .html(`<span style="font-size:18px; font-weight:bold;">${cityName}</span><br><span style="font-size:14px; font-weight:normal;">${countryName}</span>`)
-        })
-        .on("mouseleave", () => tooltip.style("opacity", 0));
+        });
+      // .on("mouseleave", () => tooltip.style("opacity", 0));
     }).catch(error => {
       console.error("Error loading the map data: ", error);
     });
