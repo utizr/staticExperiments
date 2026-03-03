@@ -199,13 +199,31 @@
         // Handle the click event to show the popup
         .on("click", function (event, d) {
           event.stopPropagation();
+
+          // 1. Check if the clicked country currently has the "selected" class
+          const isAlreadySelected = d3.select(this).classed("selected");
+
+          // 2. Clear the "selected" class from ALL countries
           d3.selectAll(".country").classed("selected", false);
-          d3.select(this).classed("selected", true);
 
-          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
+          // 3. Reset your flight paths and cities
+          g.selectAll(".flight-path").remove();
+          d3.selectAll(".city").classed("selected", false);
+          firstPoint = null;
 
-          tooltip.style("opacity", 1)
-            .html(countryName);
+          // 4. If it was NOT already selected, select it and show the tooltip
+          if (!isAlreadySelected) {
+            // Add the class back to just this country
+            d3.select(this).classed("selected", true);
+
+            const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
+
+            tooltip.style("opacity", 1)
+              .html(countryName);
+          } else {
+            // If it WAS already selected, we leave it unselected and hide the tooltip
+            tooltip.style("opacity", 0);
+          }
         })
         // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
         .on("mouseleave", function () {
@@ -260,7 +278,7 @@
               .attr("d", path);
 
             // Reset memory so the next click starts a brand new line
-            firstPoint = null;
+            firstPoint = d.geometry.coordinates;
           }
         })
         // .attr("r", 1) // Initial size of the dot
