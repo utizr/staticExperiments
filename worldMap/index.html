@@ -271,11 +271,57 @@
               coordinates: [firstPoint, d.geometry.coordinates]
             };
 
-            // Draw the line on the map
-            g.append("path")
+            // 1. Draw the line and save it to a variable
+            const flightPath = g.append("path")
               .datum(route)
               .attr("class", "flight-path")
               .attr("d", path);
+
+
+            // --- Calculate the distance ---
+            const earthRadiusKm = 6371; // Average radius of Earth in km
+            const distanceInRadians = d3.geoDistance(firstPoint, d.geometry.coordinates);
+            const distanceInKm = Math.round(distanceInRadians * earthRadiusKm);
+
+            // Display the distance in the tooltip
+            tooltip.style("opacity", 1)
+              .html(`Distance:<br><span style="font-size:18px; font-weight:bold;">${distanceInKm} km</span>`);
+
+            // --- Emoji Animation Logic ---
+
+            // 2. Get the raw SVG node of the path so we can measure it
+            const pathNode = flightPath.node();
+            const pathLength = pathNode.getTotalLength();
+
+            // 3. Add our emoji to the map group
+            const plane = g.append("text")
+              .text("✈️")
+              // Adjust size based on your current zoom level so it's not massive
+              .attr("font-size", `${15 / currentZoom}px`)
+              .attr("text-anchor", "middle")
+              .attr("dominant-baseline", "central")
+              // Start it hidden at 0,0 to prevent a flash before the animation starts
+              .attr("transform", "translate(0,0)")
+              .style("pointer-events", "none"); // Don't block clicks
+
+
+            const animationTime = (distanceInKm / 200) * 1000;
+            // 4. Animate it along the path!
+            plane.transition()
+              .duration(animationTime) // 3 seconds to complete the flight
+              .ease(d3.easeLinear) // Smooth takeoff and landing
+              .attrTween("transform", function () {
+                return function (t) {
+                  // t goes from 0.0 to 1.0 over the 3 seconds.
+                  // We multiply t by the total length to find the exact pixel spot
+                  const point = pathNode.getPointAtLength(t * pathLength);
+                  return `translate(${point.x}, ${point.y})`;
+                };
+              })
+              .on("end", function () {
+                // Remove the emoji from the DOM once it reaches the destination
+                d3.select(this).remove();
+              });
 
             // Reset memory so the next click starts a brand new line
             firstPoint = d.geometry.coordinates;
