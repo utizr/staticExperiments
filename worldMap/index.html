@@ -312,10 +312,31 @@
               .ease(d3.easeLinear) // Smooth takeoff and landing
               .attrTween("transform", function () {
                 return function (t) {
-                  // t goes from 0.0 to 1.0 over the 3 seconds.
-                  // We multiply t by the total length to find the exact pixel spot
-                  const point = pathNode.getPointAtLength(t * pathLength);
-                  return `translate(${point.x}, ${point.y})`;
+                  // If we are at the very end of the path, don't look ahead 
+                  // or we will get an error. Just stay at 1.
+                  const nextT = t < 1 ? t + 0.01 : 1;
+
+                  // Get current position (P1) and future position (P2)
+                  const p1 = pathNode.getPointAtLength(t * pathLength);
+                  const p2 = pathNode.getPointAtLength(nextT * pathLength);
+
+                  // Calculate the differences
+                  const dx = p2.x - p1.x;
+                  const dy = p2.y - p1.y;
+
+                  // Calculate the angle in radians, then convert to degrees
+                  // JS Math.atan2 handles the quadrant math for us automatically
+                  let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+                  // EMOJI QUIRK: Depending on your OS, the ✈️ emoji usually 
+                  // points up-and-right by default (around 45 degrees). 
+                  // We add an offset to correct its nose so it points straight.
+                  // (You may need to change this to 90 depending on your font!)
+                  const emojiOffset = 45;
+                  angle += emojiOffset;
+
+                  // Apply both the translation and the rotation
+                  return `translate(${p1.x}, ${p1.y}) rotate(${angle})`;
                 };
               })
               .on("end", function () {
