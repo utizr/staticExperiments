@@ -302,47 +302,79 @@
               .attr("dominant-baseline", "central")
               // Start it hidden at 0,0 to prevent a flash before the animation starts
               .attr("transform", "translate(0,0)")
-              .style("pointer-events", "none"); // Don't block clicks
+              .style("cursor", "pointer")     // Changed from pointer-events: none so we can click it!
+              .style("user-select", "none");  // Prevents text highlighting if clicked rapidly
 
 
             const animationTime = (distanceInKm / 200) * 1000;
-            // 4. Animate it along the path!
-            plane.transition()
-              .duration(animationTime) // 3 seconds to complete the flight
-              .ease(d3.easeLinear) // Smooth takeoff and landing
-              .attrTween("transform", function () {
-                return function (t) {
-                  // If we are at the very end of the path, don't look ahead 
-                  // or we will get an error. Just stay at 1.
-                  const nextT = t < 1 ? t + 0.01 : 1;
 
-                  // Get current position (P1) and future position (P2)
-                  const p1 = pathNode.getPointAtLength(t * pathLength);
-                  const p2 = pathNode.getPointAtLength(nextT * pathLength);
+            // --- NEW: Pause and Play Logic ---
+            let isPaused = false;
+            let currentT = 0; // Track the global flight progress (0.0 to 1.0)
 
-                  // Calculate the differences
-                  const dx = p2.x - p1.x;
-                  const dy = p2.y - p1.y;
+            // Wrap the animation in a function so we can restart it easily
+            function animatePlane(startProgress) {
+              // Calculate how much time is remaining based on where we paused
+              const remainingTime = animationTime * (1 - startProgress);
 
-                  // Calculate the angle in radians, then convert to degrees
-                  // JS Math.atan2 handles the quadrant math for us automatically
-                  let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+              // 4. Animate it along the path!
+              plane.transition()
+                .duration(remainingTime)
+                .ease(d3.easeLinear)
+                .attrTween("transform", function () {
+                  return function (t) {
+                    // 't' is the progress of this specific transition (0 to 1).
+                    // We map it to the global flight progress 'currentT'
+                    currentT = startProgress + t * (1 - startProgress);
 
-                  // EMOJI QUIRK: Depending on your OS, the ✈️ emoji usually 
-                  // points up-and-right by default (around 45 degrees). 
-                  // We add an offset to correct its nose so it points straight.
-                  // (You may need to change this to 90 depending on your font!)
-                  const emojiOffset = 45;
-                  angle += emojiOffset;
+                    // If we are at the very end of the path, don't look ahead 
+                    const nextT = currentT < 1 ? currentT + 0.01 : 1;
 
-                  // Apply both the translation and the rotation
-                  return `translate(${p1.x}, ${p1.y}) rotate(${angle})`;
-                };
-              })
-              .on("end", function () {
-                // Remove the emoji from the DOM once it reaches the destination
-                d3.select(this).remove();
-              });
+                    // Get current position (P1) and future position (P2)
+                    const p1 = pathNode.getPointAtLength(currentT * pathLength);
+                    const p2 = pathNode.getPointAtLength(nextT * pathLength);
+
+                    // Calculate the differences
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+
+                    // Calculate the angle in radians, then convert to degrees
+                    let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+                    const emojiOffset = 45;
+                    angle += emojiOffset;
+
+                    // Apply both the translation and the rotation
+                    return `translate(${p1.x}, ${p1.y}) rotate(${angle})`;
+                  };
+                })
+                .on("end", function () {
+                  // Only remove the plane if it actually finished the journey (t > 0.99)
+                  // We don't want to remove it if the transition ended just because it was interrupted/paused.
+                  if (currentT >= 0.99) {
+                    d3.select(this).remove();
+                  }
+                });
+            }
+
+            // Start the flight from 0!
+            animatePlane(0);
+
+            // 5. Add the click listener to toggle pause/play
+            plane.on("click", function (event) {
+              event.stopPropagation(); // Don't trigger the city/country clicks underneath
+
+              if (isPaused) {
+                // Plane was paused, let's fly! Resume from where we left off.
+                isPaused = false;
+                animatePlane(currentT);
+              } else {
+                // Plane was flying, let's pause!
+                isPaused = true;
+                // .interrupt() completely stops the current active d3.transition.
+                d3.select(this).interrupt();
+              }
+            });
 
             // Reset memory so the next click starts a brand new line
             firstPoint = d.geometry.coordinates;
