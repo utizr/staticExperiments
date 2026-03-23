@@ -26,6 +26,38 @@
       position: relative;
     }
 
+    /* Styling for our new UI Controls */
+    #ui-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 20;
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      background-color: #ff9800;
+      color: #08070f;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #ffc107;
+    }
+
+    button:disabled {
+      background-color: #3a4255;
+      color: #888;
+      cursor: not-allowed;
+    }
+
     .ocean {
       fill: #08070f;
       stroke: #110f1f;
@@ -52,10 +84,9 @@
       fill: #ff9800;
     }
 
-    /* Styling for our city city dots */
+    /* Styling for our city dots */
     .city {
       fill: #3a4255;
-      /* Bright yellow */
       stroke: #000;
       /* Dark border to make them pop */
       stroke-width: 0.5px;
@@ -108,6 +139,10 @@
 <body>
 
   <div id="map-container">
+    <div id="ui-panel">
+      <button id="btn-start" disabled>Start Flight</button>
+      <button id="btn-clear">Clear Route</button>
+    </div>
     <div class="tooltip" id="tooltip"></div>
   </div>
 
@@ -145,21 +180,19 @@
       r = Math.max(r, 1.8);
       return r;
     }
+
     // Set up the Zoom behavior
     const zoom = d3.zoom()
-      .scaleExtent([0.1, 148]) // Zoom limits: 1x to 8x
+      .scaleExtent([0.1, 148]) // Zoom limits: 0.1x to 148x
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
-        // NEW: Dynamically shrink the city dots based on zoom level
-        // The number '2' is the base size. Divide it by the zoom scale (k)
-
+        // Dynamically shrink the city dots based on zoom level so they don't block the screen
         g.selectAll(".city")
           .attr("r", getCityCircleSize(event.transform.k));
       });
 
     // Apply the zoom behavior to the SVG
     svg.call(zoom);
-    // Add a white sphere with a black border.
 
     // Optional: Hide tooltip when clicking on the background (ocean)
     svg.on("click", (event) => {
@@ -168,13 +201,20 @@
       }
     });
 
-    // Track the first clicked point
-    let firstPoint = null;
     // Draw the background sphere (ocean and outline)
     g.append("path")
       .datum({ type: "Sphere" })
       .attr("class", "ocean")
       .attr("d", path);
+
+    // --- GAME STATE VARIABLES ---
+    // Instead of just 'firstPoint', we now store an array of all clicked cities
+    let routePoints = [];
+    // Track the total physical distance of the multi-stop journey
+    let totalDistanceKm = 0;
+    // Prevent the user from adding new cities while the animation is actively running
+    let isFlying = false;
+
     // Fetch the GeoJSON data for the world
     // src: https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson
     // const geojsonUrl = "./world.geojson";
@@ -185,11 +225,11 @@
     // const citiesUrl = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_populated_places_simple.geojson";
     // const citiesUrl = "./10m_populated_places_simple.geojson";
 
-
     Promise.all([
       d3.json(geojsonUrl),
       d3.json(citiesUrl)
     ]).then(([countryData, cityData]) => {
+
       // Draw the countries
       g.selectAll(".country")
         .data(countryData.features)
@@ -199,41 +239,16 @@
         // Handle the click event to show the popup
         .on("click", function (event, d) {
           event.stopPropagation();
-
-          // 1. Check if the clicked country currently has the "selected" class
-          const isAlreadySelected = d3.select(this).classed("selected");
-
-          // 2. Clear the "selected" class from ALL countries
-          d3.selectAll(".country").classed("selected", false);
-
-          // 3. Reset your flight paths and cities
-          g.selectAll(".flight-path").remove();
-          d3.selectAll(".city").classed("selected", false);
-          firstPoint = null;
-
-          // 4. If it was NOT already selected, select it and show the tooltip
-          if (!isAlreadySelected) {
-            // Add the class back to just this country
-            d3.select(this).classed("selected", true);
-
-            const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
-
-            tooltip.style("opacity", 1)
-              .html(countryName);
-          } else {
-            // If it WAS already selected, we leave it unselected and hide the tooltip
-            tooltip.style("opacity", 0);
-          }
-        })
-        // Optional: Hide tooltip when the mouse leaves the country (if preferred over clicking elsewhere)
-        .on("mouseleave", function () {
-          // tooltip.style("opacity", 0);
+          // We no longer clear the flight path when clicking a country, 
+          // to prevent accidentally erasing a complex route
+          const countryName = d.properties.NAME || d.properties.ADMIN || d.properties.name;
+          tooltip.style("opacity", 1).html(countryName);
         });
 
-      // Draw the city cities on top
       // Grab the current zoom level of the map
       const currentZoom = d3.zoomTransform(svg.node()).k;
-      // 2. Draw the city cities on top
+
+      // Draw the city dots on top
       g.selectAll(".city")
         .data(cityData.features)
         .join("circle")
@@ -245,142 +260,47 @@
         .on("click", function (event, d) {
           event.stopPropagation();
 
-          const cityName = d.properties.city || d.properties.city || "Unknown city";
-          const countryName = d.properties.country || "";
+          // Lock city selection if the plane is currently in motion
+          if (isFlying) return;
 
-          // Logic for connecting two countries
-          if (!firstPoint) {
-            // --- FIRST CLICK ---
-            firstPoint = d.geometry.coordinates;
+          // 1. Save the new city's coordinates to our route array
+          const coords = d.geometry.coordinates;
+          routePoints.push(coords);
 
-            // Clear old lines and selections
-            g.selectAll(".flight-path").remove();
-            d3.selectAll(".city").classed("selected", false);
+          // 2. Visually highlight the clicked city
+          d3.select(this).classed("selected", true);
 
-            // Highlight just this country
-            d3.select(this).classed("selected", true);
+          // 3. Clear the old drawn path so we can draw the updated one
+          g.selectAll(".flight-path").remove();
 
-          } else {
-            // --- SECOND CLICK ---
-            // Highlight the second country too
-            d3.select(this).classed("selected", true);
+          // If we have at least two cities, we can draw a line and enable the start button
+          if (routePoints.length > 1) {
+            document.getElementById('btn-start').disabled = false;
 
-            // Create a GeoJSON line from point A to point B
+            // Create a multi-segment GeoJSON line string
             const route = {
               type: "LineString",
-              coordinates: [firstPoint, d.geometry.coordinates]
+              coordinates: routePoints
             };
 
-            // 1. Draw the line and save it to a variable
-            const flightPath = g.append("path")
+            // Draw the continuous dashed line between all points
+            g.append("path")
               .datum(route)
               .attr("class", "flight-path")
               .attr("d", path);
 
-
-            // --- Calculate the distance ---
+            // Calculate the total distance by summing up each individual segment
             const earthRadiusKm = 6371; // Average radius of Earth in km
-            const distanceInRadians = d3.geoDistance(firstPoint, d.geometry.coordinates);
-            const distanceInKm = Math.round(distanceInRadians * earthRadiusKm);
-
-            // Display the distance in the tooltip
-            tooltip.style("opacity", 1)
-              .html(`Distance:<br><span style="font-size:18px; font-weight:bold;">${distanceInKm} km</span>`);
-
-            // --- Emoji Animation Logic ---
-
-            // 2. Get the raw SVG node of the path so we can measure it
-            const pathNode = flightPath.node();
-            const pathLength = pathNode.getTotalLength();
-
-            // 3. Add our emoji to the map group
-            const plane = g.append("text")
-              .text("✈️")
-              // Adjust size based on your current zoom level so it's not massive
-              .attr("font-size", `${15 / currentZoom}px`)
-              .attr("text-anchor", "middle")
-              .attr("dominant-baseline", "central")
-              // Start it hidden at 0,0 to prevent a flash before the animation starts
-              .attr("transform", "translate(0,0)")
-              .style("cursor", "pointer")     // Changed from pointer-events: none so we can click it!
-              .style("user-select", "none");  // Prevents text highlighting if clicked rapidly
-
-
-            const animationTime = (distanceInKm / 200) * 1000;
-
-            // --- NEW: Pause and Play Logic ---
-            let isPaused = false;
-            let currentT = 0; // Track the global flight progress (0.0 to 1.0)
-
-            // Wrap the animation in a function so we can restart it easily
-            function animatePlane(startProgress) {
-              // Calculate how much time is remaining based on where we paused
-              const remainingTime = animationTime * (1 - startProgress);
-
-              // 4. Animate it along the path!
-              plane.transition()
-                .duration(remainingTime)
-                .ease(d3.easeLinear)
-                .attrTween("transform", function () {
-                  return function (t) {
-                    // 't' is the progress of this specific transition (0 to 1).
-                    // We map it to the global flight progress 'currentT'
-                    currentT = startProgress + t * (1 - startProgress);
-
-                    // If we are at the very end of the path, don't look ahead 
-                    const nextT = currentT < 1 ? currentT + 0.01 : 1;
-
-                    // Get current position (P1) and future position (P2)
-                    const p1 = pathNode.getPointAtLength(currentT * pathLength);
-                    const p2 = pathNode.getPointAtLength(nextT * pathLength);
-
-                    // Calculate the differences
-                    const dx = p2.x - p1.x;
-                    const dy = p2.y - p1.y;
-
-                    // Calculate the angle in radians, then convert to degrees
-                    let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-                    const emojiOffset = 45;
-                    angle += emojiOffset;
-
-                    // Apply both the translation and the rotation
-                    return `translate(${p1.x}, ${p1.y}) rotate(${angle})`;
-                  };
-                })
-                .on("end", function () {
-                  // Only remove the plane if it actually finished the journey (t > 0.99)
-                  // We don't want to remove it if the transition ended just because it was interrupted/paused.
-                  if (currentT >= 0.99) {
-                    d3.select(this).remove();
-                  }
-                });
+            totalDistanceKm = 0;
+            for (let i = 0; i < routePoints.length - 1; i++) {
+              totalDistanceKm += Math.round(d3.geoDistance(routePoints[i], routePoints[i + 1]) * earthRadiusKm);
             }
 
-            // Start the flight from 0!
-            animatePlane(0);
-
-            // 5. Add the click listener to toggle pause/play
-            plane.on("click", function (event) {
-              event.stopPropagation(); // Don't trigger the city/country clicks underneath
-
-              if (isPaused) {
-                // Plane was paused, let's fly! Resume from where we left off.
-                isPaused = false;
-                animatePlane(currentT);
-              } else {
-                // Plane was flying, let's pause!
-                isPaused = true;
-                // .interrupt() completely stops the current active d3.transition.
-                d3.select(this).interrupt();
-              }
-            });
-
-            // Reset memory so the next click starts a brand new line
-            firstPoint = d.geometry.coordinates;
+            // Display the updated total distance in the tooltip
+            tooltip.style("opacity", 1)
+              .html(`Total Distance:<br><span style="font-size:18px; font-weight:bold;">${totalDistanceKm} km</span>`);
           }
         })
-        // .attr("r", 1) // Initial size of the dot
         .on("mouseover", function (event, d) {
           event.stopPropagation(); // Stop the country underneath from registering a click
 
@@ -390,9 +310,118 @@
 
           // Show a formatted tooltip with City and Country
           tooltip.style("opacity", 1)
-            .html(`<span style="font-size:18px; font-weight:bold;">${cityName}</span><br><span style="font-size:14px; font-weight:normal;">${countryName}</span>`)
+            .html(`<span style="font-size:18px; font-weight:bold;">${cityName}</span><br><span style="font-size:14px; font-weight:normal;">${countryName}</span>`);
         });
-      // .on("mouseleave", () => tooltip.style("opacity", 0));
+
+      // --- BUTTON CONTROLS LOGIC ---
+
+      // Clear Button: Resets the entire map state
+      document.getElementById('btn-clear').addEventListener('click', () => {
+        routePoints = [];
+        totalDistanceKm = 0;
+        isFlying = false;
+        g.selectAll(".flight-path").remove();
+        g.selectAll(".plane-emoji").remove();
+        d3.selectAll(".city").classed("selected", false);
+        document.getElementById('btn-start').disabled = true;
+        tooltip.style("opacity", 0);
+      });
+
+      // Start Flight Button: Triggers the animation along the drawn path
+      document.getElementById('btn-start').addEventListener('click', () => {
+        // Double-check we have a valid route and aren't already flying
+        if (routePoints.length < 2 || isFlying) return;
+
+        isFlying = true;
+        document.getElementById('btn-start').disabled = true;
+
+        // Get the raw SVG node of the multi-segment path to measure its total pixel length
+        const flightPath = d3.select(".flight-path");
+        const pathNode = flightPath.node();
+        const pathLength = pathNode.getTotalLength();
+
+        // Check zoom level at the exact moment of launch to size the plane correctly
+        const launchZoom = d3.zoomTransform(svg.node()).k;
+
+        // Add the emoji plane to the map group
+        const plane = g.append("text")
+          .attr("class", "plane-emoji")
+          .text("✈️")
+          .attr("font-size", `${15 / launchZoom}px`)
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "central")
+          .attr("transform", "translate(0,0)") // Start at 0,0 temporarily
+          .style("cursor", "pointer")
+          .style("user-select", "none");
+
+        // Scale animation duration based on total route distance (so long flights don't drag on forever)
+        const animationTime = (totalDistanceKm / 200) * 1000;
+
+        // Variables for pause/play functionality
+        let isPaused = false;
+        let currentT = 0; // Tracks global progress from 0.0 (start) to 1.0 (end)
+
+        function animatePlane(startProgress) {
+          // Calculate remaining time if resuming from a pause
+          const remainingTime = animationTime * (1 - startProgress);
+
+          plane.transition()
+            .duration(remainingTime)
+            .ease(d3.easeLinear)
+            .attrTween("transform", function () {
+              return function (t) {
+                // 't' is the transition's local progress. Map it to the global progress
+                currentT = startProgress + t * (1 - startProgress);
+
+                // --- THE SHARP TURN FIX ---
+                // Instead of looking ahead 1% (which smooths corners), we look exactly 1 pixel ahead.
+                // This ensures the plane follows the line perfectly until the exact moment it hits the city.
+                const lookAhead = 1 / pathLength;
+                const nextT = currentT + lookAhead < 1 ? currentT + lookAhead : 1;
+
+                // Get exact pixel coordinates for current and future positions along the path
+                const p1 = pathNode.getPointAtLength(currentT * pathLength);
+                const p2 = pathNode.getPointAtLength(nextT * pathLength);
+
+                // Calculate the difference to find the angle
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+
+                // Convert to degrees and add 45 degrees to offset the default emoji angle
+                let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                angle += 45;
+
+                // Apply translation and rotation frame-by-frame
+                return `translate(${p1.x}, ${p1.y}) rotate(${angle})`;
+              };
+            })
+            .on("end", function () {
+              // Only remove the plane if it actually finished the whole journey
+              if (currentT >= 0.99) {
+                d3.select(this).remove();
+                isFlying = false;
+                // Re-enable the start button so they can fly the same route again if they want
+                document.getElementById('btn-start').disabled = false;
+              }
+            });
+        }
+
+        // Kick off the animation from 0% progress
+        animatePlane(0);
+
+        // Allow clicking the plane to pause/resume
+        plane.on("click", function (event) {
+          event.stopPropagation();
+          if (isPaused) {
+            isPaused = false;
+            animatePlane(currentT); // Resume from where we stopped
+          } else {
+            isPaused = true;
+            d3.select(this).interrupt(); // Completely stop the active D3 transition
+          }
+        });
+      });
+
     }).catch(error => {
       console.error("Error loading the map data: ", error);
     });
