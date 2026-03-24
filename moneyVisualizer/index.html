@@ -164,6 +164,7 @@
       const zoomLevel = zoomSlider.value;
       zoomDisplay.textContent = `${zoomLevel}x`;
       vizContainer.style.fontSize = `${zoomLevel}rem`;
+      vizContainer.style.letterSpacing = `${zoomLevel / 15}rem`;
     }
 
     // Event Listeners
