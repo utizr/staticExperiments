@@ -4,8 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HUF Buying Power Visualizer</title>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💸</text></svg>">
+  <title>Millió - Milliárd</title>
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -25,6 +26,7 @@
       border-radius: 12px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
       margin-bottom: 20px;
+      flex-shrink: 0;
     }
 
     h1 {
@@ -40,8 +42,9 @@
 
     .controls-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 40px;
+      /* Changed to 3 columns for the new slider */
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
     }
 
     .slider-group {
@@ -54,6 +57,7 @@
       justify-content: space-between;
       margin-bottom: 10px;
       font-weight: 600;
+      font-size: 0.95rem;
     }
 
     input[type="range"] {
@@ -66,29 +70,20 @@
       background-color: #ffffff;
       border-radius: 12px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-      overflow: hidden;
-      position: relative;
-    }
-
-    svg {
-      width: 100%;
-      height: 100%;
-      cursor: grab;
-    }
-
-    svg:active {
-      cursor: grabbing;
-    }
-
-    .house {
-      font-size: 32px;
-      user-select: none;
-      alignment-baseline: middle;
-      text-anchor: middle;
+      padding: 20px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* Default font size, overridden by JS */
+      font-size: 1.2rem;
+      line-height: 1.5;
+      letter-spacing: 2px;
+      word-wrap: break-word;
+      /* Smooth transition when zooming */
+      transition: font-size 0.1s ease-out;
     }
 
     /* Responsive design for smaller screens */
-    @media (max-width: 768px) {
+    @media (max-width: 900px) {
       .controls-grid {
         grid-template-columns: 1fr;
         gap: 20px;
@@ -100,130 +95,85 @@
 <body>
 
   <div id="control-panel">
-    <h1>You can buy <span id="house-count" class="highlight">20</span> houses 🏠</h1>
+    <h1>Vehetnél <span id="house-count" class="highlight">20</span> házat 🏠</h1>
 
     <div class="controls-grid">
       <div class="slider-group">
         <div class="slider-header">
-          <span>Total Budget:</span>
-          <span id="budget-display">1 Billion HUF</span>
+          <span>Milliárdok:</span>
+          <span id="budget-display">1 Milliárd HUF</span>
         </div>
         <input type="range" id="budget-slider" min="1" max="1000" step="1" value="1">
       </div>
 
       <div class="slider-group">
         <div class="slider-header">
-          <span>House Price:</span>
-          <span id="price-display">50 Million HUF</span>
+          <span>Ház ára:</span>
+          <span id="price-display">50 Millió HUF</span>
         </div>
-        <input type="range" id="price-slider" min="10" max="200" step="5" value="50">
+        <input type="range" id="price-slider" min="10" max="200" step="1" value="50">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span>Zoom:</span>
+          <span id="zoom-display">1.2x</span>
+        </div>
+        <input type="range" id="zoom-slider" min="0.5" max="5" step="0.1" value="1.2">
       </div>
     </div>
   </div>
 
-  <div id="viz-container">
-    <svg id="canvas"></svg>
-  </div>
+  <div id="viz-container"></div>
 
   <script>
-    // Formatter for numbers
     const formatter = new Intl.NumberFormat('hu-HU');
-
-    // Initial State (Simplified values)
-    let budgetInBillions = 1;
-    let priceInMillions = 50;
 
     // DOM Elements
     const budgetSlider = document.getElementById('budget-slider');
     const priceSlider = document.getElementById('price-slider');
+    const zoomSlider = document.getElementById('zoom-slider');
+
     const budgetDisplay = document.getElementById('budget-display');
     const priceDisplay = document.getElementById('price-display');
+    const zoomDisplay = document.getElementById('zoom-display');
     const countDisplay = document.getElementById('house-count');
 
-    // D3 Setup
-    const svg = d3.select("#canvas");
-    const g = svg.append("g");
+    const vizContainer = document.getElementById('viz-container');
 
-    // Add Zoom and Pan behavior
-    const zoom = d3.zoom()
-      .scaleExtent([0.1, 5]) // Expanded zoom out scale for huge numbers
-      .on("zoom", (event) => {
-        g.attr("transform", event.transform);
-      });
-
-    svg.call(zoom);
-
-    // Layout constants
-    const spacing = 45;
-
+    // Function to update the data and text content
     function updateVisualization() {
-      // Re-calculate the actual math behind the scenes
+      const budgetInBillions = parseInt(budgetSlider.value);
+      const priceInMillions = parseInt(priceSlider.value);
+
       const actualBudget = budgetInBillions * 1000000000;
       const actualHousePrice = priceInMillions * 1000000;
 
-      // Calculate number of houses
       const numHouses = Math.floor(actualBudget / actualHousePrice);
 
-      // Update Text Displays
-      budgetDisplay.textContent = `${formatter.format(budgetInBillions)} Billion HUF`;
-      priceDisplay.textContent = `${formatter.format(priceInMillions)} Million HUF`;
+      budgetDisplay.textContent = `${formatter.format(budgetInBillions)} Milliárd HUF`;
+      priceDisplay.textContent = `${formatter.format(priceInMillions)} Millió HUF`;
       countDisplay.textContent = formatter.format(numHouses);
 
-      // Generate an array of data for D3
-      const data = Array.from({ length: numHouses }, (_, i) => i);
-
-      // Calculate grid dimensions 
-      const cols = Math.max(5, Math.ceil(Math.sqrt(numHouses * 1.5)));
-      const rows = Math.ceil(numHouses / cols);
-
-      // Get current SVG dimensions to center the initial layout
-      const svgWidth = document.getElementById('viz-container').clientWidth;
-      const svgHeight = document.getElementById('viz-container').clientHeight;
-
-      const gridWidth = cols * spacing;
-      const gridHeight = rows * spacing;
-
-      const startX = (svgWidth - gridWidth) / 2 + (spacing / 2);
-      const startY = (svgHeight - gridHeight) / 2 + (spacing / 2);
-
-      // D3 Data Binding
-      const houses = g.selectAll(".house")
-        .data(data, d => d);
-
-      // EXIT phase
-      houses.exit()
-        .remove(); // Removed transition for performance with large numbers
-
-      // ENTER phase
-      const enterHouses = houses.enter()
-        .append("text")
-        .attr("class", "house")
-        .text("🏠")
-        .attr("x", d => startX + (d % cols) * spacing)
-        .attr("y", d => startY + Math.floor(d / cols) * spacing);
-
-      // UPDATE + ENTER phase (merge)
-      enterHouses.merge(houses)
-        .attr("x", d => startX + (d % cols) * spacing)
-        .attr("y", d => startY + Math.floor(d / cols) * spacing);
+      // Render emojis
+      vizContainer.textContent = '🏠'.repeat(numHouses);
     }
 
-    // Event Listeners for Sliders
-    budgetSlider.addEventListener('input', (e) => {
-      budgetInBillions = parseInt(e.target.value);
-      updateVisualization();
-    });
+    // Dedicated function to handle zooming independently for better performance
+    function updateZoom() {
+      const zoomLevel = zoomSlider.value;
+      zoomDisplay.textContent = `${zoomLevel}x`;
+      vizContainer.style.fontSize = `${zoomLevel}rem`;
+    }
 
-    priceSlider.addEventListener('input', (e) => {
-      priceInMillions = parseInt(e.target.value);
-      updateVisualization();
-    });
-
-    // Handle window resize to keep things centered
-    window.addEventListener('resize', updateVisualization);
+    // Event Listeners
+    budgetSlider.addEventListener('input', updateVisualization);
+    priceSlider.addEventListener('input', updateVisualization);
+    zoomSlider.addEventListener('input', updateZoom);
 
     // Initial render
     updateVisualization();
+    updateZoom();
   </script>
 </body>
 
