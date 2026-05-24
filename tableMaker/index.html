@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sortable Markdown Table Converter</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 1000px;
+      margin: 40px auto;
+      padding: 0 20px;
+      color: #333;
+    }
+
+    #input-container {
+      background: #f4f4f9;
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+    }
+
+    textarea {
+      width: 100%;
+      height: 200px;
+      margin-bottom: 15px;
+      padding: 10px;
+      font-family: monospace;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+
+    button {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f8f9fa;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+    }
+
+    th:hover {
+      background-color: #e9ecef;
+    }
+
+    /* Sort Indicators */
+    th.sort-asc::after {
+      content: " ▲";
+    }
+
+    th.sort-desc::after {
+      content: " ▼";
+    }
+
+    tr:nth-child(even) {
+      background-color: #fafafa;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    a {
+      color: #007bff;
+      text-decoration: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2>Sortable Table Converter</h2>
+
+  <div id="input-container">
+    <p>Paste Markdown table:</p>
+    <textarea id="markdown-input"
+      placeholder="| ID | Item |&#10;|---|---|&#10;| 2 | **Banana** |&#10;| 1 | [Apple](link) |"></textarea>
+    <br>
+    <button onclick="processAndLoad()">Load Table</button>
+  </div>
+
+  <div id="output-container" class="hidden">
+    <div id="table-wrapper"></div>
+    <button onclick="resetView()" style="background-color: #6c757d;">Load New Table</button>
+  </div>
+
+  <script>
+    let originalRows = []; // To keep track of the initial order
+    let currentRows = [];  // To store current data for sorting
+    let headers = [];
+    let sortState = { colIndex: -1, direction: 0 }; // 0: None, 1: Asc, 2: Desc
+
+    function formatCell(text) {
+      return text.trim()
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/__(.*?)__/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/_(.*?)_/g, '<em>$1</em>')
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank">$1</a>');
+    }
+
+    function processAndLoad() {
+      const input = document.getElementById('markdown-input').value.trim();
+      if (!input) return;
+
+      const lines = input.split('\n');
+      headers = [];
+      originalRows = [];
+
+      let headerFound = false;
+
+      lines.forEach((line) => {
+        const cells = line.trim().split('|').filter((cell, i, arr) => {
+          return !((i === 0 || i === arr.length - 1) && cell === "");
+        });
+
+        if (cells.length === 0) return;
+
+        // Detect separator line
+        if (line.includes('---') && !line.match(/[a-zA-Z0-9]/)) {
+          headerFound = true;
+          return;
+        }
+
+        if (!headerFound && headers.length === 0) {
+          headers = cells.map(c => c.trim());
+        } else {
+          originalRows.push(cells.map(c => c.trim()));
+        }
+      });
+
+      currentRows = [...originalRows];
+      sortState = { colIndex: -1, direction: 0 };
+      renderTable();
+
+      document.getElementById('input-container').classList.add('hidden');
+      document.getElementById('output-container').classList.remove('hidden');
+    }
+
+    function renderTable() {
+      let html = '<table><thead><tr>';
+      headers.forEach((h, i) => {
+        let className = "";
+        if (sortState.colIndex === i) {
+          if (sortState.direction === 1) className = "sort-asc";
+          if (sortState.direction === 2) className = "sort-desc";
+        }
+        html += `<th class="${className}" onclick="handleSort(${i})">${h}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      currentRows.forEach(row => {
+        html += '<tr>' + row.map(cell => `<td>${formatCell(cell)}</td>`).join('') + '</tr>';
+      });
+
+      html += '</tbody></table>';
+      document.getElementById('table-wrapper').innerHTML = html;
+    }
+
+    function handleSort(index) {
+      if (sortState.colIndex !== index) {
+        sortState.colIndex = index;
+        sortState.direction = 1; // Start with Asc
+      } else {
+        sortState.direction = (sortState.direction + 1) % 3;
+      }
+
+      if (sortState.direction === 1) {
+        // Ascending
+        currentRows.sort((a, b) => a[index].localeCompare(b[index], undefined, { numeric: true, sensitivity: 'base' }));
+      } else if (sortState.direction === 2) {
+        // Descending
+        currentRows.sort((a, b) => b[index].localeCompare(a[index], undefined, { numeric: true, sensitivity: 'base' }));
+      } else {
+        // Original
+        currentRows = [...originalRows];
+        sortState.colIndex = -1;
+      }
+
+      renderTable();
+    }
+
+    function resetView() {
+      document.getElementById('markdown-input').value = '';
+      document.getElementById('input-container').classList.remove('hidden');
+      document.getElementById('output-container').classList.add('hidden');
+    }
+  </script>
+</body>
+
+</html>
