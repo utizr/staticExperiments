@@ -4,7 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Extensible Inline Edit Blocks (Plain Text Paste)</title>
+  <title>Draggable Extensible Blocks - Smooth Animation</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -21,7 +24,7 @@
       padding: 40px;
       border-radius: 8px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      min-width: 400px;
+      min-width: 450px;
     }
 
     .text-block-container {
@@ -32,15 +35,40 @@
 
     .text-block {
       background-color: #f8f9fa;
-      padding: 16px;
+      padding: 16px 16px 16px 40px;
       border-radius: 6px;
       border: 1px solid transparent;
-      transition: all 0.2s ease;
+      position: relative;
+      /* CHANGED: Specifically target background instead of 'all' */
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
 
     .text-block:hover {
       background-color: #e9ecef;
-      cursor: pointer;
+    }
+
+    .block-handle {
+      position: absolute;
+      left: 8px;
+      top: 18px;
+      color: #adb5bd;
+      padding: 4px;
+      border-radius: 4px;
+      cursor: grab;
+      user-select: none;
+      transition: background-color 0.2s, color 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .block-handle:hover {
+      color: #495057;
+      background-color: #dee2e6;
+    }
+
+    .block-handle:active {
+      cursor: grabbing;
     }
 
     .text-block p,
@@ -53,7 +81,8 @@
       margin: 0;
       border: 1px dashed transparent;
       border-radius: 4px;
-      transition: all 0.2s ease;
+      /* CHANGED: Same here, avoid 'all' to prevent interference */
+      transition: background-color 0.2s ease, border-color 0.2s ease;
       min-width: 250px;
     }
 
@@ -103,6 +132,18 @@
       cursor: text;
     }
 
+    .sortable-ghost {
+      opacity: 0.4;
+      background-color: #e2e6ea;
+      border: 1px dashed #adb5bd;
+    }
+
+    /* Optional: Add a class for the item actively being dragged */
+    .sortable-drag {
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+      cursor: grabbing !important;
+    }
+
     .add-btn {
       background-color: #007bff;
       color: white;
@@ -144,6 +185,14 @@
           { element: "p", text: "Search Engine" },
           { element: "i", text: "Find anything on the web" },
           { element: "a", text: "Go to Google", href: "https://google.com" }
+        ]
+      },
+      {
+        type: "simple-list",
+        elements: [
+          { element: "p", text: "Developer Docs" },
+          { element: "i", text: "Read the web documentation" },
+          { element: "a", text: "Visit MDN", href: "https://developer.mozilla.org" }
         ]
       }
     ];
@@ -227,6 +276,8 @@
     textBlockContainer.className = 'text-block-container';
     appContainer.appendChild(textBlockContainer);
 
+    let isDraggingBlock = false;
+
     function selectAllText(element) {
       const selection = window.getSelection();
       const range = document.createRange();
@@ -235,8 +286,11 @@
       selection.addRange(range);
     }
 
-    function applyEditableLogic(textBlock, componentInstances) {
-      textBlock.addEventListener('dblclick', function () {
+    function applyEditableLogic(textBlock, componentInstances, handle) {
+
+      handle.addEventListener('click', function (e) {
+        if (isDraggingBlock) return;
+
         componentInstances.forEach(comp => comp.startEdit());
 
         const editableElements = Array.from(textBlock.querySelectorAll('[contenteditable="true"]'));
@@ -263,19 +317,10 @@
         }
       });
 
-      // NEW: Intercept paste events to force plain text
       textBlock.addEventListener('paste', function (e) {
-        console.log("PASTNG!!!!")
-        // Ensure we only mess with the paste if an element is actively being edited
         if (e.target.getAttribute('contenteditable') === 'true') {
-          e.preventDefault(); // Stop the rich text paste (HTML, images, etc.)
-
-          // Get the plain text from the clipboard
+          e.preventDefault();
           const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-
-          // Insert the plain text at the current cursor position
-          // Note: execCommand is formally deprecated but remains the universally 
-          // supported way to do this while preserving the browser's undo/redo stack.
           document.execCommand('insertText', false, text);
         }
       });
@@ -290,6 +335,12 @@
     function createBlockElement(elementsData) {
       const blockDiv = document.createElement('div');
       blockDiv.className = 'text-block';
+
+      const handle = document.createElement('div');
+      handle.className = 'block-handle';
+      handle.innerHTML = `<svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><path d="M4.5 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-5 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm-5 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm5 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>`;
+      handle.title = 'Click to edit, drag to move';
+      blockDiv.appendChild(handle);
 
       const componentInstances = [];
 
@@ -307,12 +358,29 @@
         }
       });
 
-      applyEditableLogic(blockDiv, componentInstances);
+      applyEditableLogic(blockDiv, componentInstances, handle);
       return blockDiv;
     }
 
     blocksData.forEach(blockInfo => {
       textBlockContainer.appendChild(createBlockElement(blockInfo.elements));
+    });
+
+    // Initialize Sortable.js with enhanced animation
+    new Sortable(textBlockContainer, {
+      handle: '.block-handle',
+      animation: 250, // CHANGED: Increased from 150 to 250 for smoother motion
+      easing: "cubic-bezier(0.25, 1, 0.5, 1)", // CHANGED: Added a custom deceleration curve
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag', // Added drag styling class
+      onStart: function () {
+        isDraggingBlock = true;
+      },
+      onEnd: function () {
+        setTimeout(() => {
+          isDraggingBlock = false;
+        }, 50);
+      }
     });
 
     const addBtn = document.createElement('button');
@@ -327,7 +395,7 @@
       const newBlock = createBlockElement(placeholderData);
       textBlockContainer.insertBefore(newBlock, addBtn);
 
-      newBlock.dispatchEvent(new Event('dblclick'));
+      newBlock.querySelector('.block-handle').click();
     });
 
   </script>
