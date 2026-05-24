@@ -47,7 +47,7 @@
     .text-block {
       background-color: #f8f9fa;
       /* Added left padding for the handle: 16px 16px 16px 40px -> 1rem 1rem 1rem 2.5rem */
-      padding: 1rem 1rem 1rem 2.5rem;
+      padding: 0.2rem 0.2rem 0.2rem 2.5rem;
       border-radius: 0.375rem;
       /* 6px */
       border: 1px solid transparent;
@@ -63,8 +63,11 @@
       position: absolute;
       left: 0.5rem;
       /* 8px */
-      top: 1.125rem;
-      /* 18px */
+
+      /* Vertical Centering Magic */
+      top: 50%;
+      transform: translateY(-50%);
+
       color: #adb5bd;
       padding: 0.25rem;
       /* 4px */
@@ -93,7 +96,7 @@
     .text-block .url-edit-field {
       display: block;
       color: #333;
-      padding: 0.375rem;
+      padding: 0.225rem;
       /* 6px */
       margin: 0;
       border: 1px dashed transparent;
@@ -110,7 +113,6 @@
       font-size: 1.125rem;
       /* 18px */
       font-weight: 500;
-      margin-bottom: 0.25rem;
       /* 4px */
     }
 
@@ -118,7 +120,6 @@
       font-size: 0.875rem;
       /* 14px */
       color: #666;
-      margin-bottom: 0.25rem;
     }
 
     .text-block a {
@@ -423,7 +424,7 @@
     textBlockContainer.appendChild(addBtn);
 
     addBtn.addEventListener('click', () => {
-      const template = ['p', 'i', 'a'];
+      const template = ['a'];
       const placeholderData = template.map(type => ElementRegistry[type].getPlaceholder());
 
       const newBlock = createBlockElement(placeholderData);
