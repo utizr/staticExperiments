@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Inline Edit Blocks with Links</title>
+  <title>Extensible Inline Edit Blocks (Plain Text Paste)</title>
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -43,7 +43,6 @@
       cursor: pointer;
     }
 
-    /* Generic styling for editable elements */
     .text-block p,
     .text-block i,
     .text-block a,
@@ -70,7 +69,6 @@
       margin-bottom: 4px;
     }
 
-    /* Anchor tag specific styling */
     .text-block a {
       color: #007bff;
       text-decoration: none;
@@ -83,13 +81,10 @@
 
     .text-block a[contenteditable="true"] {
       text-decoration: none;
-      /* Remove underline while editing */
     }
 
-    /* URL editor field styling */
     .text-block .url-edit-field {
       display: none;
-      /* Hidden by default */
       font-family: monospace;
       font-size: 13px;
       color: #d63384;
@@ -97,12 +92,10 @@
       margin-bottom: 4px;
     }
 
-    /* Show the URL field when edit mode is active */
     .text-block .url-edit-field.visible {
       display: block;
     }
 
-    /* Active editing state styling for all fields */
     .text-block [contenteditable="true"] {
       border-color: #007bff;
       background-color: #fff;
@@ -110,7 +103,6 @@
       cursor: text;
     }
 
-    /* Styling for the Add Button */
     .add-btn {
       background-color: #007bff;
       color: white;
@@ -145,7 +137,6 @@
   <div class="container" id="app-container"></div>
 
   <script>
-    // Data updated to include 'a' elements and 'href' values
     const blocksData = [
       {
         type: "simple-list",
@@ -154,19 +145,84 @@
           { element: "i", text: "Find anything on the web" },
           { element: "a", text: "Go to Google", href: "https://google.com" }
         ]
-      },
-      {
-        type: "simple-list",
-        elements: [
-          { element: "p", text: "Developer Docs" },
-          { element: "i", text: "Read the web documentation" },
-          { element: "a", text: "Visit MDN", href: "https://developer.mozilla.org" }
-        ]
       }
     ];
 
-    const appContainer = document.getElementById('app-container');
+    const ElementRegistry = {
+      'p': {
+        create: (data) => {
+          const el = document.createElement('p');
+          el.textContent = data.text;
+          el.dataset.placeholder = data.text;
+          return [el];
+        },
+        startEdit: (elements) => elements[0].setAttribute('contenteditable', 'true'),
+        endEdit: (elements) => {
+          const el = elements[0];
+          el.removeAttribute('contenteditable');
+          if (el.textContent.trim() === '') el.textContent = el.dataset.placeholder;
+        },
+        getPlaceholder: () => ({ element: 'p', text: 'New Item Title' })
+      },
 
+      'i': {
+        create: (data) => {
+          const el = document.createElement('i');
+          el.textContent = data.text;
+          el.dataset.placeholder = data.text;
+          return [el];
+        },
+        startEdit: (elements) => elements[0].setAttribute('contenteditable', 'true'),
+        endEdit: (elements) => {
+          const el = elements[0];
+          el.removeAttribute('contenteditable');
+          if (el.textContent.trim() === '') el.textContent = el.dataset.placeholder;
+        },
+        getPlaceholder: () => ({ element: 'i', text: 'Add a description here' })
+      },
+
+      'a': {
+        create: (data) => {
+          const a = document.createElement('a');
+          a.href = data.href || 'https://';
+          a.textContent = data.text;
+          a.target = '_blank';
+          a.dataset.placeholder = data.text;
+          a.addEventListener('click', (e) => {
+            if (a.getAttribute('contenteditable') === 'true') e.preventDefault();
+          });
+
+          const urlField = document.createElement('div');
+          urlField.className = 'url-edit-field';
+          urlField.textContent = a.href;
+          urlField.dataset.placeholder = data.href || 'https://';
+
+          return [a, urlField];
+        },
+        startEdit: (elements) => {
+          const [a, urlField] = elements;
+          a.setAttribute('contenteditable', 'true');
+          urlField.classList.add('visible');
+          urlField.setAttribute('contenteditable', 'true');
+        },
+        endEdit: (elements) => {
+          const [a, urlField] = elements;
+          a.removeAttribute('contenteditable');
+          urlField.removeAttribute('contenteditable');
+
+          let newUrl = urlField.textContent.trim();
+          if (newUrl === '') newUrl = urlField.dataset.placeholder;
+          a.href = newUrl;
+          urlField.textContent = newUrl;
+          urlField.classList.remove('visible');
+
+          if (a.textContent.trim() === '') a.textContent = a.dataset.placeholder;
+        },
+        getPlaceholder: () => ({ element: 'a', text: 'Link text', href: 'https://example.com' })
+      }
+    };
+
+    const appContainer = document.getElementById('app-container');
     const textBlockContainer = document.createElement('div');
     textBlockContainer.className = 'text-block-container';
     appContainer.appendChild(textBlockContainer);
@@ -179,64 +235,54 @@
       selection.addRange(range);
     }
 
-    function applyEditableLogic(textBlock) {
-      // Get all children, including the hidden URL edit fields
-      const allChildren = Array.from(textBlock.children);
-
+    function applyEditableLogic(textBlock, componentInstances) {
       textBlock.addEventListener('dblclick', function () {
-        allChildren.forEach(el => {
-          // Make hidden URL fields visible during edit
-          if (el.classList.contains('url-edit-field')) {
-            el.classList.add('visible');
-          }
-          el.setAttribute('contenteditable', 'true');
-        });
+        componentInstances.forEach(comp => comp.startEdit());
 
-        const firstElement = allChildren[0];
-        firstElement.focus();
-        selectAllText(firstElement);
+        const editableElements = Array.from(textBlock.querySelectorAll('[contenteditable="true"]'));
+        if (editableElements.length > 0) {
+          editableElements[0].focus();
+          selectAllText(editableElements[0]);
+        }
       });
 
       textBlock.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
-          const currentElement = e.target;
-          const currentIndex = allChildren.indexOf(currentElement);
 
-          if (currentIndex >= 0 && currentIndex < allChildren.length - 1) {
-            const nextElement = allChildren[currentIndex + 1];
+          const editableElements = Array.from(textBlock.querySelectorAll('[contenteditable="true"]'));
+          const currentIndex = editableElements.indexOf(e.target);
+
+          if (currentIndex >= 0 && currentIndex < editableElements.length - 1) {
+            const nextElement = editableElements[currentIndex + 1];
             nextElement.focus();
             selectAllText(nextElement);
           } else {
-            currentElement.blur();
+            e.target.blur();
           }
+        }
+      });
+
+      // NEW: Intercept paste events to force plain text
+      textBlock.addEventListener('paste', function (e) {
+        console.log("PASTNG!!!!")
+        // Ensure we only mess with the paste if an element is actively being edited
+        if (e.target.getAttribute('contenteditable') === 'true') {
+          e.preventDefault(); // Stop the rich text paste (HTML, images, etc.)
+
+          // Get the plain text from the clipboard
+          const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+          // Insert the plain text at the current cursor position
+          // Note: execCommand is formally deprecated but remains the universally 
+          // supported way to do this while preserving the browser's undo/redo stack.
+          document.execCommand('insertText', false, text);
         }
       });
 
       textBlock.addEventListener('focusout', function (e) {
         if (!textBlock.contains(e.relatedTarget)) {
-
-          // First pass: Process URLs and hide the URL fields
-          allChildren.forEach((el, index) => {
-            if (el.classList.contains('url-edit-field')) {
-              const relatedAnchor = allChildren[index - 1]; // The 'a' tag is always right above it
-              let newUrl = el.textContent.trim();
-
-              if (newUrl === '') newUrl = el.dataset.placeholder;
-
-              relatedAnchor.href = newUrl;
-              el.textContent = newUrl; // Sync the text back
-              el.classList.remove('visible'); // Hide the field again
-            }
-          });
-
-          // Second pass: Remove contenteditable and check standard placeholders
-          allChildren.forEach(el => {
-            el.removeAttribute('contenteditable');
-            if (!el.classList.contains('url-edit-field') && el.textContent.trim() === '') {
-              el.textContent = el.dataset.placeholder;
-            }
-          });
+          componentInstances.forEach(comp => comp.endEdit());
         }
       });
     }
@@ -245,74 +291,43 @@
       const blockDiv = document.createElement('div');
       blockDiv.className = 'text-block';
 
+      const componentInstances = [];
+
       elementsData.forEach(elementData => {
-        const el = document.createElement(elementData.element);
-        el.textContent = elementData.text;
-        el.dataset.placeholder = elementData.text;
+        const definition = ElementRegistry[elementData.element];
 
-        // Special handling if the element is an anchor/link
-        if (elementData.element === 'a') {
-          el.href = elementData.href || 'https://';
-          el.target = '_blank'; // Open in new tab
+        if (definition) {
+          const domNodes = definition.create(elementData);
+          domNodes.forEach(node => blockDiv.appendChild(node));
 
-          // Prevent the link from actually navigating if the user clicks it while editing
-          el.addEventListener('click', (e) => {
-            if (el.getAttribute('contenteditable') === 'true') {
-              e.preventDefault();
-            }
+          componentInstances.push({
+            startEdit: () => definition.startEdit(domNodes),
+            endEdit: () => definition.endEdit(domNodes)
           });
-
-          // Append the visual anchor text
-          blockDiv.appendChild(el);
-
-          // Create and append the hidden URL editor immediately after the link
-          const urlInput = document.createElement('div');
-          urlInput.className = 'url-edit-field';
-          urlInput.textContent = el.href;
-          urlInput.dataset.placeholder = elementData.href || 'https://';
-          blockDiv.appendChild(urlInput);
-
-        } else {
-          // Standard elements (p, i)
-          blockDiv.appendChild(el);
         }
       });
 
-      applyEditableLogic(blockDiv);
+      applyEditableLogic(blockDiv, componentInstances);
       return blockDiv;
     }
 
     blocksData.forEach(blockInfo => {
-      const newBlock = createBlockElement(blockInfo.elements);
-      textBlockContainer.appendChild(newBlock);
+      textBlockContainer.appendChild(createBlockElement(blockInfo.elements));
     });
 
     const addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
     addBtn.textContent = '+';
-    addBtn.title = 'Add new block';
     textBlockContainer.appendChild(addBtn);
 
     addBtn.addEventListener('click', () => {
-      // Include a link in the default placeholder structure
-      const placeholderData = [
-        { element: "p", text: "New Item Title" },
-        { element: "i", text: "Add a description here" },
-        { element: "a", text: "Link text", href: "https://example.com" }
-      ];
+      const template = ['p', 'i', 'a'];
+      const placeholderData = template.map(type => ElementRegistry[type].getPlaceholder());
 
       const newBlock = createBlockElement(placeholderData);
       textBlockContainer.insertBefore(newBlock, addBtn);
 
-      // Instantly trigger edit mode on the new block
-      const allChildren = Array.from(newBlock.children);
-      allChildren.forEach(el => {
-        if (el.classList.contains('url-edit-field')) el.classList.add('visible');
-        el.setAttribute('contenteditable', 'true');
-      });
-      const firstElement = allChildren[0];
-      firstElement.focus();
-      selectAllText(firstElement);
+      newBlock.dispatchEvent(new Event('dblclick'));
     });
 
   </script>
