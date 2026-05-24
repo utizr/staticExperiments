@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Inline Edit Blocks with Links</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f4f4f9;
+    }
+
+    .container {
+      background-color: white;
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      min-width: 400px;
+    }
+
+    .text-block-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .text-block {
+      background-color: #f8f9fa;
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+    }
+
+    .text-block:hover {
+      background-color: #e9ecef;
+      cursor: pointer;
+    }
+
+    /* Generic styling for editable elements */
+    .text-block p,
+    .text-block i,
+    .text-block a,
+    .text-block .url-edit-field {
+      display: block;
+      color: #333;
+      padding: 6px;
+      margin: 0;
+      border: 1px dashed transparent;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      min-width: 250px;
+    }
+
+    .text-block p {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .text-block i {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    /* Anchor tag specific styling */
+    .text-block a {
+      color: #007bff;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .text-block a:hover {
+      text-decoration: underline;
+    }
+
+    .text-block a[contenteditable="true"] {
+      text-decoration: none;
+      /* Remove underline while editing */
+    }
+
+    /* URL editor field styling */
+    .text-block .url-edit-field {
+      display: none;
+      /* Hidden by default */
+      font-family: monospace;
+      font-size: 13px;
+      color: #d63384;
+      background-color: #fcf8fa;
+      margin-bottom: 4px;
+    }
+
+    /* Show the URL field when edit mode is active */
+    .text-block .url-edit-field.visible {
+      display: block;
+    }
+
+    /* Active editing state styling for all fields */
+    .text-block [contenteditable="true"] {
+      border-color: #007bff;
+      background-color: #fff;
+      outline: none;
+      cursor: text;
+    }
+
+    /* Styling for the Add Button */
+    .add-btn {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      font-size: 24px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      align-self: center;
+      transition: background-color 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+
+    .add-btn:hover {
+      background-color: #0056b3;
+      transform: scale(1.05);
+    }
+
+    .add-btn:active {
+      transform: scale(0.95);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container" id="app-container"></div>
+
+  <script>
+    // Data updated to include 'a' elements and 'href' values
+    const blocksData = [
+      {
+        type: "simple-list",
+        elements: [
+          { element: "p", text: "Search Engine" },
+          { element: "i", text: "Find anything on the web" },
+          { element: "a", text: "Go to Google", href: "https://google.com" }
+        ]
+      },
+      {
+        type: "simple-list",
+        elements: [
+          { element: "p", text: "Developer Docs" },
+          { element: "i", text: "Read the web documentation" },
+          { element: "a", text: "Visit MDN", href: "https://developer.mozilla.org" }
+        ]
+      }
+    ];
+
+    const appContainer = document.getElementById('app-container');
+
+    const textBlockContainer = document.createElement('div');
+    textBlockContainer.className = 'text-block-container';
+    appContainer.appendChild(textBlockContainer);
+
+    function selectAllText(element) {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    function applyEditableLogic(textBlock) {
+      // Get all children, including the hidden URL edit fields
+      const allChildren = Array.from(textBlock.children);
+
+      textBlock.addEventListener('dblclick', function () {
+        allChildren.forEach(el => {
+          // Make hidden URL fields visible during edit
+          if (el.classList.contains('url-edit-field')) {
+            el.classList.add('visible');
+          }
+          el.setAttribute('contenteditable', 'true');
+        });
+
+        const firstElement = allChildren[0];
+        firstElement.focus();
+        selectAllText(firstElement);
+      });
+
+      textBlock.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          const currentElement = e.target;
+          const currentIndex = allChildren.indexOf(currentElement);
+
+          if (currentIndex >= 0 && currentIndex < allChildren.length - 1) {
+            const nextElement = allChildren[currentIndex + 1];
+            nextElement.focus();
+            selectAllText(nextElement);
+          } else {
+            currentElement.blur();
+          }
+        }
+      });
+
+      textBlock.addEventListener('focusout', function (e) {
+        if (!textBlock.contains(e.relatedTarget)) {
+
+          // First pass: Process URLs and hide the URL fields
+          allChildren.forEach((el, index) => {
+            if (el.classList.contains('url-edit-field')) {
+              const relatedAnchor = allChildren[index - 1]; // The 'a' tag is always right above it
+              let newUrl = el.textContent.trim();
+
+              if (newUrl === '') newUrl = el.dataset.placeholder;
+
+              relatedAnchor.href = newUrl;
+              el.textContent = newUrl; // Sync the text back
+              el.classList.remove('visible'); // Hide the field again
+            }
+          });
+
+          // Second pass: Remove contenteditable and check standard placeholders
+          allChildren.forEach(el => {
+            el.removeAttribute('contenteditable');
+            if (!el.classList.contains('url-edit-field') && el.textContent.trim() === '') {
+              el.textContent = el.dataset.placeholder;
+            }
+          });
+        }
+      });
+    }
+
+    function createBlockElement(elementsData) {
+      const blockDiv = document.createElement('div');
+      blockDiv.className = 'text-block';
+
+      elementsData.forEach(elementData => {
+        const el = document.createElement(elementData.element);
+        el.textContent = elementData.text;
+        el.dataset.placeholder = elementData.text;
+
+        // Special handling if the element is an anchor/link
+        if (elementData.element === 'a') {
+          el.href = elementData.href || 'https://';
+          el.target = '_blank'; // Open in new tab
+
+          // Prevent the link from actually navigating if the user clicks it while editing
+          el.addEventListener('click', (e) => {
+            if (el.getAttribute('contenteditable') === 'true') {
+              e.preventDefault();
+            }
+          });
+
+          // Append the visual anchor text
+          blockDiv.appendChild(el);
+
+          // Create and append the hidden URL editor immediately after the link
+          const urlInput = document.createElement('div');
+          urlInput.className = 'url-edit-field';
+          urlInput.textContent = el.href;
+          urlInput.dataset.placeholder = elementData.href || 'https://';
+          blockDiv.appendChild(urlInput);
+
+        } else {
+          // Standard elements (p, i)
+          blockDiv.appendChild(el);
+        }
+      });
+
+      applyEditableLogic(blockDiv);
+      return blockDiv;
+    }
+
+    blocksData.forEach(blockInfo => {
+      const newBlock = createBlockElement(blockInfo.elements);
+      textBlockContainer.appendChild(newBlock);
+    });
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'add-btn';
+    addBtn.textContent = '+';
+    addBtn.title = 'Add new block';
+    textBlockContainer.appendChild(addBtn);
+
+    addBtn.addEventListener('click', () => {
+      // Include a link in the default placeholder structure
+      const placeholderData = [
+        { element: "p", text: "New Item Title" },
+        { element: "i", text: "Add a description here" },
+        { element: "a", text: "Link text", href: "https://example.com" }
+      ];
+
+      const newBlock = createBlockElement(placeholderData);
+      textBlockContainer.insertBefore(newBlock, addBtn);
+
+      // Instantly trigger edit mode on the new block
+      const allChildren = Array.from(newBlock.children);
+      allChildren.forEach(el => {
+        if (el.classList.contains('url-edit-field')) el.classList.add('visible');
+        el.setAttribute('contenteditable', 'true');
+      });
+      const firstElement = allChildren[0];
+      firstElement.focus();
+      selectAllText(firstElement);
+    });
+
+  </script>
+</body>
+
+</html>
