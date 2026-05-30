@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Responsive Draggable Blocks</title>
+  <title>Quick lists</title>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
@@ -37,7 +37,7 @@
       max-width: 35rem;
     }
 
-    .text-block-container {
+    .panel {
       display: flex;
       flex-direction: column;
       gap: 1rem;
@@ -199,6 +199,143 @@
     .add-btn:active {
       transform: scale(0.95);
     }
+
+    .delete-btn {
+      display: none;
+      width: 100%;
+      padding: 0.4rem;
+      margin-top: 0.25rem;
+      border: none;
+      border-radius: 0.25rem;
+      background-color: #f8d7da;
+      color: #842029;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .delete-btn.visible {
+      display: block;
+    }
+
+    .delete-btn:hover {
+      background-color: #f1aeb5;
+    }
+
+    .text-block.removing {
+      opacity: 0;
+      transform: scale(0.96);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .text-block.collapsing {
+      overflow: hidden;
+      margin: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-width: 0;
+      height: 0 !important;
+      transition: height 0.45s ease, padding 0.45s ease, margin 0.45s ease;
+      pointer-events: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.4);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.visible {
+      opacity: 1;
+    }
+
+    .modal {
+      background-color: white;
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+      width: 90%;
+      max-width: 20rem;
+      box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.visible .modal {
+      transform: scale(1);
+    }
+
+    .modal textarea {
+      width: 100%;
+      min-height: 6rem;
+      padding: 0.625rem;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      font-family: monospace;
+      font-size: 0.9375rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .modal textarea:focus {
+      border-color: #007bff;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .modal-buttons button {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: none;
+      border-radius: 0.375rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .modal-buttons button:active {
+      transform: scale(0.96);
+    }
+
+    .modal-btn-add {
+      background-color: #007bff;
+      color: white;
+    }
+
+    .modal-btn-add:hover {
+      background-color: #0056b3;
+    }
+
+    .modal-btn-prev {
+      background-color: #e9ecef;
+      color: #333;
+    }
+
+    .modal-btn-prev:hover {
+      background-color: #dee2e6;
+    }
+
+    .modal-btn-cancel {
+      background-color: #f8d7da;
+      color: #842029;
+    }
+
+    .modal-btn-cancel:hover {
+      background-color: #f1aeb5;
+    }
   </style>
 </head>
 
@@ -301,9 +438,9 @@
     };
 
     const appContainer = document.getElementById('app-container');
-    const textBlockContainer = document.createElement('div');
-    textBlockContainer.className = 'text-block-container';
-    appContainer.appendChild(textBlockContainer);
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    appContainer.appendChild(panel);
 
     let isDraggingBlock = false;
 
@@ -315,12 +452,13 @@
       selection.addRange(range);
     }
 
-    function applyEditableLogic(textBlock, componentInstances, handle) {
+    function applyEditableLogic(textBlock, componentInstances, handle, deleteBtn) {
 
       handle.addEventListener('click', function (e) {
         if (isDraggingBlock) return;
 
         componentInstances.forEach(comp => comp.startEdit());
+        deleteBtn.classList.add('visible');
 
         const editableElements = Array.from(textBlock.querySelectorAll('[contenteditable="true"]'));
         if (editableElements.length > 0) {
@@ -357,6 +495,7 @@
       textBlock.addEventListener('focusout', function (e) {
         if (!textBlock.contains(e.relatedTarget)) {
           componentInstances.forEach(comp => comp.endEdit());
+          deleteBtn.classList.remove('visible');
         }
       });
     }
@@ -387,16 +526,30 @@
         }
       });
 
-      applyEditableLogic(blockDiv, componentInstances, handle);
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        blockDiv.style.height = blockDiv.offsetHeight + 'px';
+        blockDiv.classList.add('removing');
+        setTimeout(() => {
+          blockDiv.classList.add('collapsing');
+          blockDiv.addEventListener('transitionend', () => blockDiv.remove(), { once: true });
+        }, 200);
+      });
+      blockDiv.appendChild(deleteBtn);
+
+      applyEditableLogic(blockDiv, componentInstances, handle, deleteBtn);
       return blockDiv;
     }
 
     blocksData.forEach(blockInfo => {
-      textBlockContainer.appendChild(createBlockElement(blockInfo.elements));
+      panel.appendChild(createBlockElement(blockInfo.elements));
     });
 
     // Initialize Sortable.js with Mobile optimizations
-    new Sortable(textBlockContainer, {
+    new Sortable(panel, {
       handle: '.block-handle',
       animation: 250,
       easing: "cubic-bezier(0.25, 1, 0.5, 1)",
@@ -421,17 +574,83 @@
     const addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
     addBtn.textContent = '+';
-    textBlockContainer.appendChild(addBtn);
+    panel.appendChild(addBtn);
 
-    addBtn.addEventListener('click', () => {
-      const template = ['a'];
-      const placeholderData = template.map(type => ElementRegistry[type].getPlaceholder());
+    let previousTemplate = null;
 
-      const newBlock = createBlockElement(placeholderData);
-      textBlockContainer.insertBefore(newBlock, addBtn);
+    function showAddModal() {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
 
-      newBlock.querySelector('.block-handle').click();
-    });
+      const modal = document.createElement('div');
+      modal.className = 'modal';
+
+      const textarea = document.createElement('textarea');
+      textarea.placeholder = 'Enter element types, one per line:\na\np\ni';
+
+      const btnRow = document.createElement('div');
+      btnRow.className = 'modal-buttons';
+
+      const addModalBtn = document.createElement('button');
+      addModalBtn.className = 'modal-btn-add';
+      addModalBtn.textContent = 'Add';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'modal-btn-prev';
+      prevBtn.textContent = 'Add previous';
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'modal-btn-cancel';
+      cancelBtn.textContent = 'Cancel';
+
+      btnRow.appendChild(addModalBtn);
+      btnRow.appendChild(prevBtn);
+      btnRow.appendChild(cancelBtn);
+      modal.appendChild(textarea);
+      modal.appendChild(btnRow);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+      textarea.focus();
+
+      function addBlockFromTemplate(types) {
+        const validTypes = types.filter(t => ElementRegistry[t]);
+        if (validTypes.length === 0) return;
+
+        previousTemplate = validTypes;
+        const placeholderData = validTypes.map(type => ElementRegistry[type].getPlaceholder());
+        const newBlock = createBlockElement(placeholderData);
+        panel.insertBefore(newBlock, addBtn);
+        newBlock.querySelector('.block-handle').click();
+      }
+
+      function closeModal() {
+        overlay.classList.remove('visible');
+        overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+      }
+
+      addModalBtn.addEventListener('click', () => {
+        const types = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+        closeModal();
+        addBlockFromTemplate(types);
+      });
+
+      prevBtn.addEventListener('click', () => {
+        closeModal();
+        if (previousTemplate) {
+          addBlockFromTemplate(previousTemplate);
+        }
+      });
+
+      cancelBtn.addEventListener('click', closeModal);
+
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeModal();
+      });
+    }
+
+    addBtn.addEventListener('click', showAddModal);
 
   </script>
 </body>
