@@ -539,6 +539,74 @@
     let isDraggingBlock = false;
     let previousTemplate = null;
 
+    // --- State Management ---
+    function saveState() {
+      const rootPanel = document.querySelector('#app-container > .panel');
+      if (!rootPanel) return;
+
+      function serialize(panel) {
+        const items = [];
+        const children = Array.from(panel.children).filter(el =>
+          el.classList.contains('text-block') || el.classList.contains('sub-panel-group')
+        );
+
+        children.forEach(child => {
+          if (child.classList.contains('sub-panel-group')) {
+            const innerPanel = child.querySelector('.panel');
+            items.push({
+              type: 'group',
+              children: serialize(innerPanel)
+            });
+          } else if (child.classList.contains('text-block')) {
+            const elementsData = [];
+            Array.from(child.children).forEach(el => {
+              if (el.tagName === 'H1') elementsData.push({ element: 'h', text: el.textContent });
+              if (el.tagName === 'P') elementsData.push({ element: 'p', text: el.textContent });
+              if (el.tagName === 'I') elementsData.push({ element: 'i', text: el.textContent });
+              if (el.tagName === 'A') {
+                elementsData.push({ element: 'a', text: el.textContent, href: el.href });
+              }
+            });
+            if (elementsData.length > 0) {
+              items.push({ type: 'block', elements: elementsData });
+            }
+          }
+        });
+        return items;
+      }
+
+      const state = serialize(rootPanel);
+      localStorage.setItem('quickListsState', JSON.stringify(state));
+    }
+
+    function loadState() {
+      const saved = localStorage.getItem('quickListsState');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse state', e);
+          return null;
+        }
+      }
+      return null;
+    }
+
+    function buildFromState(state, panelEl) {
+      const addBtn = panelEl.querySelector('.add-btn');
+      state.forEach(item => {
+        if (item.type === 'block') {
+          const block = createBlockElement(item.elements);
+          panelEl.insertBefore(block, addBtn);
+        } else if (item.type === 'group') {
+          const { groupDiv, innerPanel } = createSubPanelGroup();
+          buildFromState(item.children, innerPanel);
+          panelEl.insertBefore(groupDiv, addBtn);
+        }
+      });
+    }
+
+    // --- DOM Utilities ---
     function selectAllText(element) {
       const selection = window.getSelection();
       const range = document.createRange();
@@ -587,6 +655,7 @@
         if (!textBlock.contains(e.relatedTarget)) {
           componentInstances.forEach(comp => comp.endEdit());
           deleteBtn.classList.remove('visible');
+          saveState(); // Trigger save when edits are done
         }
       });
     }
@@ -624,7 +693,10 @@
         blockDiv.classList.add('removing');
         setTimeout(() => {
           blockDiv.classList.add('collapsing');
-          blockDiv.addEventListener('transitionend', () => blockDiv.remove(), { once: true });
+          blockDiv.addEventListener('transitionend', () => {
+            blockDiv.remove();
+            saveState(); // Save after successful deletion
+          }, { once: true });
         }, 200);
       });
       blockDiv.appendChild(deleteBtn);
@@ -679,7 +751,10 @@
         groupDiv.classList.add('removing');
         setTimeout(() => {
           groupDiv.classList.add('collapsing');
-          groupDiv.addEventListener('transitionend', () => groupDiv.remove(), { once: true });
+          groupDiv.addEventListener('transitionend', () => {
+            groupDiv.remove();
+            saveState(); // Save after panel deletion
+          }, { once: true });
         }, 300);
       });
 
@@ -694,8 +769,8 @@
       panelEl.appendChild(addBtn);
 
       new Sortable(panelEl, {
-        handle: '.block-handle', // Works for both text-blocks and sub-panel headers
-        draggable: '.text-block, .sub-panel-group', // Allow dragging both individual blocks and entire groups
+        handle: '.block-handle',
+        draggable: '.text-block, .sub-panel-group',
         animation: 250,
         easing: "cubic-bezier(0.25, 1, 0.5, 1)",
         ghostClass: 'sortable-ghost',
@@ -708,12 +783,12 @@
 
         onStart: function () {
           isDraggingBlock = true;
-          // Hide any open delete buttons when starting a drag
           document.querySelectorAll('.delete-panel-btn.visible').forEach(btn => btn.classList.remove('visible'));
         },
         onEnd: function () {
           setTimeout(() => {
             isDraggingBlock = false;
+            saveState(); // Trigger save on drop end
           }, 50);
         }
       });
@@ -758,6 +833,7 @@
           if (types.length === 1 && types[0] === 'panel') {
             const { groupDiv } = createSubPanelGroup();
             panelEl.insertBefore(groupDiv, addBtn);
+            saveState(); // Trigger save on add group
           } else {
             const validTypes = types.filter(t => ElementRegistry[t]);
             if (validTypes.length === 0) return;
@@ -766,8 +842,9 @@
             const placeholderData = validTypes.map(type => ElementRegistry[type].getPlaceholder());
             const newBlock = createBlockElement(placeholderData);
             panelEl.insertBefore(newBlock, addBtn);
-            // Auto trigger edit mode
-            newBlock.querySelector('.block-handle').click();
+
+            saveState(); // Trigger save on add block
+            newBlock.querySelector('.block-handle').click(); // Auto trigger edit mode
           }
         }
 
@@ -799,40 +876,44 @@
       addBtn.addEventListener('click', showAddModal);
     }
 
-    // --- Build Initial DOM Structure ---
+    // --- Bootstrapping the App ---
     const rootPanel = document.createElement('div');
     rootPanel.className = 'panel';
     appContainer.appendChild(rootPanel);
-
-    // Create a generic initial block
-    rootPanel.appendChild(createBlockElement([
-      { element: "p", text: "Search Engine" },
-      { element: "i", text: "Find anything on the web" }
-    ]));
-
-    // Create the "Game of Throwns" nested group
-    const subGroupData = createSubPanelGroup();
-    const subInnerPanel = subGroupData.innerPanel;
-
-    // Add elements into the sub-panel
-    subInnerPanel.insertBefore(
-      createBlockElement([{ element: "h", text: "Game of Throwns" }]),
-      subInnerPanel.querySelector('.add-btn')
-    );
-    subInnerPanel.insertBefore(
-      createBlockElement([{ element: "p", text: "John" }, { element: "i", text: "snow" }]),
-      subInnerPanel.querySelector('.add-btn')
-    );
-    subInnerPanel.insertBefore(
-      createBlockElement([{ element: "p", text: "Deneris" }, { element: "i", text: "mother of dragons" }]),
-      subInnerPanel.querySelector('.add-btn')
-    );
-
-    // Append the group to the root panel
-    rootPanel.appendChild(subGroupData.groupDiv);
-
-    // Initialize root panel sorting and adding
     initPanel(rootPanel, true);
+
+    const savedState = loadState();
+
+    if (savedState && savedState.length > 0) {
+      buildFromState(savedState, rootPanel);
+    } else {
+      // Create initial default state if nothing is in local storage
+      const defaultBlock = createBlockElement([
+        { element: "p", text: "Search Engine" },
+        { element: "i", text: "Find anything on the web" }
+      ]);
+      rootPanel.insertBefore(defaultBlock, rootPanel.querySelector('.add-btn'));
+
+      const subGroupData = createSubPanelGroup();
+      const subInnerPanel = subGroupData.innerPanel;
+
+      subInnerPanel.insertBefore(
+        createBlockElement([{ element: "h", text: "Game of Throwns" }]),
+        subInnerPanel.querySelector('.add-btn')
+      );
+      subInnerPanel.insertBefore(
+        createBlockElement([{ element: "p", text: "John" }, { element: "i", text: "snow" }]),
+        subInnerPanel.querySelector('.add-btn')
+      );
+      subInnerPanel.insertBefore(
+        createBlockElement([{ element: "p", text: "Deneris" }, { element: "i", text: "mother of dragons" }]),
+        subInnerPanel.querySelector('.add-btn')
+      );
+
+      rootPanel.insertBefore(subGroupData.groupDiv, rootPanel.querySelector('.add-btn'));
+
+      saveState(); // Initialize the first layout into local storage
+    }
 
   </script>
 </body>
