@@ -96,6 +96,7 @@
     .text-block p,
     .text-block i,
     .text-block a,
+    .text-block h1,
     .text-block .url-edit-field {
       display: block;
       color: #333;
@@ -117,6 +118,11 @@
       /* 18px */
       font-weight: 500;
       /* 4px */
+    }
+
+    .text-block h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
     }
 
     .text-block i {
@@ -364,6 +370,22 @@
     ];
 
     const ElementRegistry = {
+      'h': {
+        create: (data) => {
+          const el = document.createElement('h1');
+          el.textContent = data.text;
+          el.dataset.placeholder = data.text;
+          return [el];
+        },
+        startEdit: (elements) => elements[0].setAttribute('contenteditable', 'true'),
+        endEdit: (elements) => {
+          const el = elements[0];
+          el.removeAttribute('contenteditable');
+          if (el.textContent.trim() === '') el.textContent = el.dataset.placeholder;
+        },
+        getPlaceholder: () => ({ element: 'h', text: 'Header' })
+      },
+
       'p': {
         create: (data) => {
           const el = document.createElement('p');
@@ -438,11 +460,9 @@
     };
 
     const appContainer = document.getElementById('app-container');
-    const panel = document.createElement('div');
-    panel.className = 'panel';
-    appContainer.appendChild(panel);
 
     let isDraggingBlock = false;
+    let previousTemplate = null;
 
     function selectAllText(element) {
       const selection = window.getSelection();
@@ -544,113 +564,131 @@
       return blockDiv;
     }
 
+    function createSubPanel() {
+      const subPanel = document.createElement('div');
+      subPanel.className = 'panel';
+      initPanel(subPanel);
+      return subPanel;
+    }
+
+    function initPanel(panelEl) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-btn';
+      addBtn.textContent = '+';
+      panelEl.appendChild(addBtn);
+
+      new Sortable(panelEl, {
+        handle: '.block-handle',
+        animation: 250,
+        easing: "cubic-bezier(0.25, 1, 0.5, 1)",
+        ghostClass: 'sortable-ghost',
+        dragClass: 'sortable-drag',
+        draggable: '.text-block, .panel',
+        filter: '.add-btn',
+
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
+
+        onStart: function () {
+          isDraggingBlock = true;
+        },
+        onEnd: function () {
+          setTimeout(() => {
+            isDraggingBlock = false;
+          }, 50);
+        }
+      });
+
+      function showAddModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+
+        const textarea = document.createElement('textarea');
+        textarea.placeholder = 'Enter element types, one per line:\na, p, i, h\nOr type "panel" for a sub-panel';
+
+        const btnRow = document.createElement('div');
+        btnRow.className = 'modal-buttons';
+
+        const addModalBtn = document.createElement('button');
+        addModalBtn.className = 'modal-btn-add';
+        addModalBtn.textContent = 'Add';
+
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'modal-btn-prev';
+        prevBtn.textContent = 'Add previous';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'modal-btn-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        btnRow.appendChild(addModalBtn);
+        btnRow.appendChild(prevBtn);
+        btnRow.appendChild(cancelBtn);
+        modal.appendChild(textarea);
+        modal.appendChild(btnRow);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        requestAnimationFrame(() => overlay.classList.add('visible'));
+        textarea.focus();
+
+        function addFromInput(types) {
+          if (types.length === 1 && types[0] === 'panel') {
+            const subPanel = createSubPanel();
+            panelEl.insertBefore(subPanel, addBtn);
+          } else {
+            const validTypes = types.filter(t => ElementRegistry[t]);
+            if (validTypes.length === 0) return;
+
+            previousTemplate = validTypes;
+            const placeholderData = validTypes.map(type => ElementRegistry[type].getPlaceholder());
+            const newBlock = createBlockElement(placeholderData);
+            panelEl.insertBefore(newBlock, addBtn);
+            newBlock.querySelector('.block-handle').click();
+          }
+        }
+
+        function closeModal() {
+          overlay.classList.remove('visible');
+          overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
+        }
+
+        addModalBtn.addEventListener('click', () => {
+          const types = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
+          closeModal();
+          addFromInput(types);
+        });
+
+        prevBtn.addEventListener('click', () => {
+          closeModal();
+          if (previousTemplate) {
+            addFromInput(previousTemplate);
+          }
+        });
+
+        cancelBtn.addEventListener('click', closeModal);
+
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) closeModal();
+        });
+      }
+
+      addBtn.addEventListener('click', showAddModal);
+    }
+
+    const panel = document.createElement('div');
+    panel.className = 'panel';
+    appContainer.appendChild(panel);
+
     blocksData.forEach(blockInfo => {
       panel.appendChild(createBlockElement(blockInfo.elements));
     });
 
-    // Initialize Sortable.js with Mobile optimizations
-    new Sortable(panel, {
-      handle: '.block-handle',
-      animation: 250,
-      easing: "cubic-bezier(0.25, 1, 0.5, 1)",
-      ghostClass: 'sortable-ghost',
-      dragClass: 'sortable-drag',
-
-      // Touch & Mobile Configuration
-      delay: 150,                // Requires a 150ms hold before drag starts
-      delayOnTouchOnly: true,    // The delay only applies to touch screens, mouse dragging remains instant
-      touchStartThreshold: 5,    // The user's finger must move 5 pixels to cancel the "delay" (prevents accidental drags when clicking)
-
-      onStart: function () {
-        isDraggingBlock = true;
-      },
-      onEnd: function () {
-        setTimeout(() => {
-          isDraggingBlock = false;
-        }, 50);
-      }
-    });
-
-    const addBtn = document.createElement('button');
-    addBtn.className = 'add-btn';
-    addBtn.textContent = '+';
-    panel.appendChild(addBtn);
-
-    let previousTemplate = null;
-
-    function showAddModal() {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-
-      const modal = document.createElement('div');
-      modal.className = 'modal';
-
-      const textarea = document.createElement('textarea');
-      textarea.placeholder = 'Enter element types, one per line:\na\np\ni';
-
-      const btnRow = document.createElement('div');
-      btnRow.className = 'modal-buttons';
-
-      const addModalBtn = document.createElement('button');
-      addModalBtn.className = 'modal-btn-add';
-      addModalBtn.textContent = 'Add';
-
-      const prevBtn = document.createElement('button');
-      prevBtn.className = 'modal-btn-prev';
-      prevBtn.textContent = 'Add previous';
-
-      const cancelBtn = document.createElement('button');
-      cancelBtn.className = 'modal-btn-cancel';
-      cancelBtn.textContent = 'Cancel';
-
-      btnRow.appendChild(addModalBtn);
-      btnRow.appendChild(prevBtn);
-      btnRow.appendChild(cancelBtn);
-      modal.appendChild(textarea);
-      modal.appendChild(btnRow);
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
-
-      requestAnimationFrame(() => overlay.classList.add('visible'));
-      textarea.focus();
-
-      function addBlockFromTemplate(types) {
-        const validTypes = types.filter(t => ElementRegistry[t]);
-        if (validTypes.length === 0) return;
-
-        previousTemplate = validTypes;
-        const placeholderData = validTypes.map(type => ElementRegistry[type].getPlaceholder());
-        const newBlock = createBlockElement(placeholderData);
-        panel.insertBefore(newBlock, addBtn);
-        newBlock.querySelector('.block-handle').click();
-      }
-
-      function closeModal() {
-        overlay.classList.remove('visible');
-        overlay.addEventListener('transitionend', () => overlay.remove(), { once: true });
-      }
-
-      addModalBtn.addEventListener('click', () => {
-        const types = textarea.value.split('\n').map(l => l.trim()).filter(Boolean);
-        closeModal();
-        addBlockFromTemplate(types);
-      });
-
-      prevBtn.addEventListener('click', () => {
-        closeModal();
-        if (previousTemplate) {
-          addBlockFromTemplate(previousTemplate);
-        }
-      });
-
-      cancelBtn.addEventListener('click', closeModal);
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeModal();
-      });
-    }
-
-    addBtn.addEventListener('click', showAddModal);
+    initPanel(panel);
 
   </script>
 </body>
