@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modern ExecCommand Editor</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #f4f4f5;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .editor-container {
+      width: 100%;
+      max-width: 800px;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      background: #fafafa;
+      padding: 10px;
+      border-bottom: 1px solid #d4d4d8;
+      display: flex;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .toolbar button:hover {
+      background: #e4e4e7;
+    }
+
+    .editor-area {
+      min-height: 300px;
+      padding: 20px;
+      outline: none;
+      line-height: 1.6;
+    }
+
+    /* Just to make the allowed tags look nice */
+    .editor-area p { margin-top: 0; margin-bottom: 1em; }
+    .editor-area ul { margin-top: 0; padding-left: 20px; }
+  </style>
+</head>
+<body>
+
+  <div class="editor-container">
+    <div class="toolbar">
+      <button id="btn-bold">B</button>
+    </div>
+
+    <div id="myEditor" class="editor-area" contenteditable="true">
+      <p>Welcome to your hybrid rich text editor. This text is inside a standard paragraph.</p>
+      <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.</p>
+      <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all the crazy colors, fonts, and scripts disappear, leaving only the clean structure behind!</p>
+    </div>
+  </div>
+
+  <script>
+    const editor = document.getElementById('myEditor');
+    const btnBold = document.getElementById('btn-bold');
+
+    // ==========================================
+    // 1. TOOLBAR LOGIC (Make text Bold)
+    // ==========================================
+    
+    // CRITICAL GOTCHA: We must use 'mousedown' and 'e.preventDefault()' here.
+    // If we use 'click', clicking the button removes focus from the editor, 
+    // which clears the user's text selection BEFORE the bold command can run!
+    btnBold.addEventListener('mousedown', (e) => {
+      e.preventDefault(); 
+      document.execCommand('bold', false, null);
+    });
+
+    // ==========================================
+    // 2. SECURE PASTE LOGIC
+    // ==========================================
+    
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+
+      // 1. Grab raw HTML
+      let rawData = e.clipboardData.getData('text/html');
+      
+      if (!rawData) {
+        rawData = e.clipboardData.getData('text/plain');
+        rawData = `<p>${rawData.replace(/\n/g, '<br>')}</p>`;
+      }
+
+      console.log('1. RAW HTML FROM CLIPBOARD:\n', rawData);
+
+      // ==========================================
+      // PRE-PROCESS WITH DOMPARSER
+      // ==========================================
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(rawData, 'text/html');
+
+      // A. Unwrap <span> tags safely (move contents out, delete span)
+      const spans = Array.from(doc.querySelectorAll('span'));
+      spans.forEach(span => {
+        const fragment = doc.createDocumentFragment();
+        while (span.firstChild) fragment.appendChild(span.firstChild);
+        span.replaceWith(fragment);
+      });
+
+      // B. Smarter <div> handling
+      const divs = Array.from(doc.querySelectorAll('div'));
+      divs.forEach(div => {
+        // If the div contains block elements (like lists or other paragraphs)
+        // Replacing it with a <p> creates invalid HTML. So, we just unwrap it.
+        if (div.querySelector('ul, ol, li, p, div')) {
+          const fragment = doc.createDocumentFragment();
+          while (div.firstChild) fragment.appendChild(div.firstChild);
+          div.replaceWith(fragment);
+        } else {
+          // It's a leaf div (only text/inline elements). Safe to make a <p>.
+          const p = doc.createElement('p');
+          while (div.firstChild) p.appendChild(div.firstChild);
+          div.replaceWith(p);
+        }
+      });
+
+      // C. Rescue Orphaned <li> Tags
+      // If the clipboard omitted the <ul>, or it got stripped, wrap consecutive <li>s
+      const lis = Array.from(doc.querySelectorAll('li'));
+      lis.forEach(li => {
+        // If the LI does NOT have a UL or OL parent
+        if (li.parentElement && li.parentElement.tagName !== 'UL' && li.parentElement.tagName !== 'OL') {
+          const ul = doc.createElement('ul');
+          li.before(ul); // Insert a new UL right before the first orphaned LI
+          
+          // Grab this LI and any siblings immediately after it and group them
+          let current = li;
+          while (current && current.tagName === 'LI') {
+            let next = current.nextElementSibling;
+            ul.appendChild(current);
+            current = next;
+          }
+        }
+      });
+
+      // Turn our perfectly formatted DOM back into a string
+      const preProcessedHTML = doc.body.innerHTML;
+      console.log('2. PRE-PROCESSED HTML:\n', preProcessedHTML);
+
+      // ==========================================
+      // CONTINUE TO SANITIZATION
+      // ==========================================
+
+      let cleanHTML = '';
+
+      if (typeof Sanitizer !== 'undefined' && Element.prototype.setHTML) {
+        const tempDiv = document.createElement('div');
+        const mySanitizer = new Sanitizer({
+          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'strong', 'em', 'br', 'ul', 'li'], 
+          attributes: [] 
+        });
+        
+        tempDiv.setHTML(preProcessedHTML, { sanitizer: mySanitizer });
+        cleanHTML = tempDiv.innerHTML;
+      } 
+      else {
+        cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
+          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'strong', 'em', 'br', 'ul', 'li'],
+          ALLOWED_ATTR: [] 
+        });
+      }
+      
+      console.log('3. FINAL SANITIZED HTML:\n', cleanHTML);
+
+      // ==========================================
+      // NEW STEP: CONTEXT-AWARE LIST MERGING
+      // ==========================================
+      
+      // 1. Check where the user's cursor is right now
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        let cursorNode = selection.getRangeAt(0).startContainer;
+        
+        // If the cursor is on a text node, check its parent element
+        if (cursorNode.nodeType === 3) {
+          cursorNode = cursorNode.parentNode;
+        }
+        
+        // 2. Are we pasting inside an existing list item?
+        if (cursorNode.closest('li')) {
+          const temp = document.createElement('div');
+          temp.innerHTML = cleanHTML;
+          
+          // 3. Find top-level lists in the sanitized output and unwrap them
+          // We iterate only over the direct children of our pasted content
+          Array.from(temp.children).forEach(child => {
+            if (child.tagName === 'UL' || child.tagName === 'OL') {
+              // outerHTML replacement strips the <ul> wrapper but keeps the <li> contents intact!
+              child.outerHTML = child.innerHTML; 
+            }
+          });
+          
+          cleanHTML = temp.innerHTML;
+          console.log('4. CONTEXT-ADJUSTED HTML (Unwrapped for List Merge):\n', cleanHTML);
+        }
+      }
+
+      // 4. Insert the final HTML
+      document.execCommand('insertHTML', false, cleanHTML);
+    });
+  </script>
+
+</body>
+</html>
