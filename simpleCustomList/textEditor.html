@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Modern ExecCommand Editor</title>
-  
+  <title>Text Editor</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 
   <style>
@@ -57,10 +58,25 @@
     }
 
     /* Just to make the allowed tags look nice */
-    .editor-area p { margin-top: 0; margin-bottom: 1em; }
-    .editor-area ul { margin-top: 0; padding-left: 20px; }
+    .editor-area p {
+      margin-top: 0;
+      margin-bottom: 1em;
+    }
+
+    .editor-area ul {
+      margin-top: 0;
+      padding-left: 20px;
+    }
+
+    .editor-area code {
+      background-color: #878569;
+      color: white;
+      border-radius: 5px;
+      padding: 1px 4px;
+    }
   </style>
 </head>
+
 <body>
 
   <div class="editor-container">
@@ -70,8 +86,10 @@
 
     <div id="myEditor" class="editor-area" contenteditable="true">
       <p>Welcome to your hybrid rich text editor. This text is inside a standard paragraph.</p>
-      <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.</p>
-      <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all the crazy colors, fonts, and scripts disappear, leaving only the clean structure behind!</p>
+      <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.
+      </p>
+      <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all
+        the crazy colors, fonts, and scripts disappear, leaving only the clean structure behind!</p>
     </div>
   </div>
 
@@ -82,25 +100,25 @@
     // ==========================================
     // 1. TOOLBAR LOGIC (Make text Bold)
     // ==========================================
-    
+
     // CRITICAL GOTCHA: We must use 'mousedown' and 'e.preventDefault()' here.
     // If we use 'click', clicking the button removes focus from the editor, 
     // which clears the user's text selection BEFORE the bold command can run!
     btnBold.addEventListener('mousedown', (e) => {
-      e.preventDefault(); 
+      e.preventDefault();
       document.execCommand('bold', false, null);
     });
 
     // ==========================================
     // 2. SECURE PASTE LOGIC
     // ==========================================
-    
+
     editor.addEventListener('paste', (e) => {
       e.preventDefault();
 
       // 1. Grab raw HTML
       let rawData = e.clipboardData.getData('text/html');
-      
+
       if (!rawData) {
         rawData = e.clipboardData.getData('text/plain');
         rawData = `<p>${rawData.replace(/\n/g, '<br>')}</p>`;
@@ -147,7 +165,7 @@
         if (li.parentElement && li.parentElement.tagName !== 'UL' && li.parentElement.tagName !== 'OL') {
           const ul = doc.createElement('ul');
           li.before(ul); // Insert a new UL right before the first orphaned LI
-          
+
           // Grab this LI and any siblings immediately after it and group them
           let current = li;
           while (current && current.tagName === 'LI') {
@@ -156,6 +174,17 @@
             current = next;
           }
         }
+      });
+
+      // D. Unwrap <p> inside <li>
+      // Target only paragraphs that are descendants of a list item
+      const listParagraphs = Array.from(doc.querySelectorAll('li p'));
+      listParagraphs.forEach(p => {
+        const fragment = doc.createDocumentFragment();
+        // Move all children (text, bold tags, etc.) out of the <p>
+        while (p.firstChild) fragment.appendChild(p.firstChild);
+        // Replace the <p> entirely with its contents
+        p.replaceWith(fragment);
       });
 
       // Turn our perfectly formatted DOM back into a string
@@ -171,50 +200,50 @@
       if (typeof Sanitizer !== 'undefined' && Element.prototype.setHTML) {
         const tempDiv = document.createElement('div');
         const mySanitizer = new Sanitizer({
-          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'strong', 'em', 'br', 'ul', 'li'], 
-          attributes: [] 
+          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
+          attributes: []
         });
-        
+
         tempDiv.setHTML(preProcessedHTML, { sanitizer: mySanitizer });
         cleanHTML = tempDiv.innerHTML;
-      } 
+      }
       else {
         cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
-          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'strong', 'em', 'br', 'ul', 'li'],
-          ALLOWED_ATTR: [] 
+          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
+          ALLOWED_ATTR: []
         });
       }
-      
+
       console.log('3. FINAL SANITIZED HTML:\n', cleanHTML);
 
       // ==========================================
       // NEW STEP: CONTEXT-AWARE LIST MERGING
       // ==========================================
-      
+
       // 1. Check where the user's cursor is right now
       const selection = window.getSelection();
       if (selection.rangeCount > 0) {
         let cursorNode = selection.getRangeAt(0).startContainer;
-        
+
         // If the cursor is on a text node, check its parent element
         if (cursorNode.nodeType === 3) {
           cursorNode = cursorNode.parentNode;
         }
-        
+
         // 2. Are we pasting inside an existing list item?
         if (cursorNode.closest('li')) {
           const temp = document.createElement('div');
           temp.innerHTML = cleanHTML;
-          
+
           // 3. Find top-level lists in the sanitized output and unwrap them
           // We iterate only over the direct children of our pasted content
           Array.from(temp.children).forEach(child => {
             if (child.tagName === 'UL' || child.tagName === 'OL') {
               // outerHTML replacement strips the <ul> wrapper but keeps the <li> contents intact!
-              child.outerHTML = child.innerHTML; 
+              child.outerHTML = child.innerHTML;
             }
           });
-          
+
           cleanHTML = temp.innerHTML;
           console.log('4. CONTEXT-ADJUSTED HTML (Unwrapped for List Merge):\n', cleanHTML);
         }
@@ -223,7 +252,199 @@
       // 4. Insert the final HTML
       document.execCommand('insertHTML', false, cleanHTML);
     });
+
+
+    // when bold text on the end of the line and pressing enter, we should not 
+    // get into a paragraph with bold
+    editor.addEventListener('keydown', (e) => {
+      // Check for Enter key without Shift
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+
+        const range = sel.getRangeAt(0);
+
+        // Normalize the container
+        let container = range.startContainer;
+        const parent = container.nodeType === 3 ? container.parentNode : container;
+
+        // PRIORITIZE lists over paragraphs. 
+        // If we are anywhere inside an <li>, that is the block we want to duplicate.
+        const blockElement = parent.closest('li') || parent.closest('p');
+
+        if (blockElement) {
+          // Create a "Tail Range" from the caret to the end of the block element
+          const tailRange = range.cloneRange();
+          tailRange.selectNodeContents(blockElement);
+          tailRange.setStart(range.endContainer, range.endOffset);
+
+          // If there is no text between the caret and the end of the block...
+          if (tailRange.toString().trim().length === 0) {
+
+            // --- THE LIST FIX ---
+            // If we are in an empty list item, pressing Enter should exit the list natively.
+            // Bailing out here allows the browser to perform its standard double-enter exit.
+            if (blockElement.tagName.toLowerCase() === 'li' && blockElement.textContent.trim().length === 0) {
+              return;
+            }
+
+            e.preventDefault(); // Stop the browser from duplicating formatting tags
+
+            // 1. Create a clean new block dynamically matching the current tag ('p' or 'li')
+            const newTagName = blockElement.tagName.toLowerCase();
+            const newBlock = document.createElement(newTagName);
+            newBlock.innerHTML = '<br>'; // Give it height
+
+            // 2. Insert it immediately after the current block
+            if (blockElement.nextSibling) {
+              blockElement.parentNode.insertBefore(newBlock, blockElement.nextSibling);
+            } else {
+              blockElement.parentNode.appendChild(newBlock);
+            }
+
+            // 3. Move the caret inside the new clean block
+            sel.removeAllRanges();
+            const newRange = document.createRange();
+            newRange.setStart(newBlock, 0);
+            newRange.collapse(true);
+            sel.addRange(newRange);
+          }
+        }
+      }
+    });
+
+    editor.addEventListener("input", (event) => {
+      // if (event.isComposing || event.keyCode === 229) {
+      //   return;
+      // }
+      // // console.log("altKey", event.altKey);
+      // // console.log("ctrlKey", event.ctrlKey);
+      // // console.log("key", event.key);
+
+      // creating lists
+      if (event.inputType === "insertText" && event.data === "-") {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        let container = range.startContainer;
+
+        // Find the closest element node (p or li)
+        while (container && container.nodeType !== 1) {
+          container = container.parentNode;
+        }
+        if (!container) return;
+
+        // Only proceed if the element is empty except for the dash
+        if (
+          container.textContent.replace("\u200B", "") === "-"
+        ) {
+          // Remove the dash
+          container.textContent = "";
+
+          // Create UL/LI
+          const ul = document.createElement("ul");
+          const li = document.createElement("li");
+          ul.appendChild(li);
+
+          if (container.tagName === "P") {
+            // Replace <p> with <ul>
+            container.parentNode.replaceChild(ul, container);
+          } else if (container.tagName === "LI") {
+            // Insert <ul> after previous <li> and remove current <li>
+            const prevLi = container.previousElementSibling;
+            container.parentNode.removeChild(container);
+            if (prevLi) {
+              prevLi.appendChild(ul);
+            } else {
+              // If no previous li, insert at the start of the list
+              container.parentNode.parentNode.insertBefore(ul, container.parentNode.nextSibling);
+            }
+          } else {
+            // Fallback: just insert at caret
+            range.insertNode(ul);
+          }
+
+          // Move caret inside the new LI
+          const newRange = document.createRange();
+          newRange.selectNodeContents(li);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+
+          return;
+        }
+      }
+
+      // special formatting and escape from formatting
+      if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
+        // Map your shortcodes directly to execCommand strings
+        const inlineElementCommands = {
+          '.b': 'bold',
+          '.i': 'italic'
+        };
+
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        let container = range.startContainer;
+
+        if (container.nodeType === 3) {
+          const text = container.textContent;
+          const offset = range.startOffset;
+
+          if (offset >= 2) {
+            const lastTwoChars = text.substring(offset - 2, offset);
+            const command = inlineElementCommands[lastTwoChars];
+
+            if (command) {
+              // 1. Highlight the shortcode (e.g., the '.b')
+              sel.removeAllRanges();
+              const deleteRange = document.createRange();
+              deleteRange.setStart(container, offset - 2);
+              deleteRange.setEnd(container, offset);
+              sel.addRange(deleteRange);
+
+              // 2. Delete it natively. This preserves spaces, undo history, and caret position.
+              document.execCommand('delete', false, null);
+
+              // 3. Trigger the native formatting state
+              document.execCommand(command, false, null);
+
+              event.preventDefault();
+              return;
+            }
+
+            // Handle the double-space exit strategy
+            else if (/\s\s/.test(lastTwoChars)) {
+              if (container.parentNode && ['em', 'strong', 'b', 'i'].includes(container.parentNode.tagName.toLowerCase())) {
+
+                // Highlight the 2 spaces
+                sel.removeAllRanges();
+                const deleteRange = document.createRange();
+                deleteRange.setStart(container, offset - 1);
+                deleteRange.setEnd(container, offset);
+                sel.addRange(deleteRange);
+
+                // Delete them natively
+                document.execCommand('delete', false, null);
+
+                // Find out what command to toggle off based on parent tag
+                const parentTag = container.parentNode.tagName.toLowerCase();
+                const toggleCmd = (parentTag === 'strong' || parentTag === 'b') ? 'bold' : 'italic';
+
+                // Toggle the formatting off.
+                document.execCommand(toggleCmd, false, null);
+                return;
+              }
+            }
+          }
+        }
+      }
+    });
+
+
   </script>
 
 </body>
+
 </html>
