@@ -97,6 +97,9 @@
     const editor = document.getElementById('myEditor');
     const btnBold = document.getElementById('btn-bold');
 
+    // fix new element to P
+    document.execCommand('defaultParagraphSeparator', false, 'p');
+
     // ==========================================
     // 1. TOOLBAR LOGIC (Make text Bold)
     // ==========================================
