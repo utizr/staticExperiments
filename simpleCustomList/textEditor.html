@@ -86,7 +86,7 @@
 
     <div id="myEditor" class="editor-area" contenteditable="true">
       <p>Welcome to your hybrid rich text editor. This text is inside a standard paragraph.</p>
-      <p>v0.2</p>
+      <p>v0.3</p>
       <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.
       </p>
       <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all
@@ -204,7 +204,7 @@
       if (typeof Sanitizer !== 'undefined' && Element.prototype.setHTML) {
         const tempDiv = document.createElement('div');
         const mySanitizer = new Sanitizer({
-          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
+          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
           attributes: []
         });
 
@@ -213,7 +213,7 @@
       }
       else {
         cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
-          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
+          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
           ALLOWED_ATTR: []
         });
       }
@@ -383,7 +383,8 @@
       if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
         const inlineElementCommands = {
           '.b.': 'bold',
-          '.i.': 'italic'
+          '.i.': 'italic',
+          '.u.': 'underline'
         };
 
         const sel = window.getSelection();
@@ -394,11 +395,10 @@
         if (container.nodeType === 3) {
           const text = container.textContent;
           const offset = range.startOffset;
-
+          
           if (offset >= 3) {
             const lastThreeChars = text.substring(offset - 3, offset);
             const command = inlineElementCommands[lastThreeChars];
-
             if (command) {
               sel.removeAllRanges();
               const deleteRange = document.createRange();
@@ -412,11 +412,53 @@
               event.preventDefault();
               return;
             }
+            
+            // Handle .h1. .h2. .h3. .h4. to convert block to heading
+            else if (offset >= 4) {
+              const lastFour = text.substring(offset - 4, offset);
+              const headingMatch = lastFour.match(/^\.h([1-4])\.$/);
+              if (headingMatch) {
+                const level = headingMatch[1];
+                let block = container.parentNode;
+                while (block && block !== editor && !['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(block.tagName.toLowerCase())) {
+                  block = block.parentNode;
+                }
+                if (block && block !== editor) {
+                  sel.removeAllRanges();
+                  const deleteRange = document.createRange();
+                  deleteRange.setStart(container, offset - 4);
+                  deleteRange.setEnd(container, offset);
+                  sel.addRange(deleteRange);
+                  document.execCommand('delete', false, null);
 
-            // Handle .e. to exit formatting
+                  const heading = document.createElement('h' + level);
+                  heading.innerHTML = block.innerHTML;
+                  block.parentNode.replaceChild(heading, block);
+
+                  const newRange = document.createRange();
+                  newRange.selectNodeContents(heading);
+                  newRange.collapse(false);
+                  sel.removeAllRanges();
+                  sel.addRange(newRange);
+                  return;
+                }
+              }
+            }
+
+            // Handle .e. to exit all formatting (bold and italic)
             else if (lastThreeChars === '.e.') {
-              if (container.parentNode && ['em', 'strong', 'b', 'i'].includes(container.parentNode.tagName.toLowerCase())) {
+              const formattingTags = ['em', 'strong', 'b', 'i', 'u'];
+              let node = container.parentNode;
+              const activeCommands = new Set();
+              while (node && node !== editor) {
+                const tag = node.tagName && node.tagName.toLowerCase();
+                if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
+                if (tag === 'em' || tag === 'i') activeCommands.add('italic');
+                if (tag === 'u') activeCommands.add('underline');
+                node = node.parentNode;
+              }
 
+              if (activeCommands.size > 0) {
                 sel.removeAllRanges();
                 const deleteRange = document.createRange();
                 deleteRange.setStart(container, offset - 3);
@@ -425,10 +467,9 @@
 
                 document.execCommand('delete', false, null);
 
-                const parentTag = container.parentNode.tagName.toLowerCase();
-                const toggleCmd = (parentTag === 'strong' || parentTag === 'b') ? 'bold' : 'italic';
-
-                document.execCommand(toggleCmd, false, null);
+                for (const cmd of activeCommands) {
+                  document.execCommand(cmd, false, null);
+                }
                 return;
               }
             }
