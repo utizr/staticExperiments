@@ -413,6 +413,33 @@
               return;
             }
             
+            // Handle .e. to exit all formatting (bold and italic)
+            else if (lastThreeChars === '.e.') {
+              const formattingTags = ['em', 'strong', 'b', 'i', 'u'];
+              let node = container.parentNode;
+              const activeCommands = new Set();
+              while (node && node !== editor) {
+                const tag = node.tagName && node.tagName.toLowerCase();
+                if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
+                if (tag === 'em' || tag === 'i') activeCommands.add('italic');
+                if (tag === 'u') activeCommands.add('underline');
+                node = node.parentNode;
+              }
+              if (activeCommands.size > 0) {
+                sel.removeAllRanges();
+                const deleteRange = document.createRange();
+                deleteRange.setStart(container, offset - 3);
+                deleteRange.setEnd(container, offset);
+                sel.addRange(deleteRange);
+
+                document.execCommand('delete', false, null);
+
+                for (const cmd of activeCommands) {
+                  document.execCommand(cmd, false, null);
+                }
+                return;
+              }
+            }
             // Handle .h1. .h2. .h3. .h4. to convert block to heading
             else if (offset >= 4) {
               const lastFour = text.substring(offset - 4, offset);
@@ -445,34 +472,7 @@
               }
             }
 
-            // Handle .e. to exit all formatting (bold and italic)
-            else if (lastThreeChars === '.e.') {
-              const formattingTags = ['em', 'strong', 'b', 'i', 'u'];
-              let node = container.parentNode;
-              const activeCommands = new Set();
-              while (node && node !== editor) {
-                const tag = node.tagName && node.tagName.toLowerCase();
-                if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
-                if (tag === 'em' || tag === 'i') activeCommands.add('italic');
-                if (tag === 'u') activeCommands.add('underline');
-                node = node.parentNode;
-              }
 
-              if (activeCommands.size > 0) {
-                sel.removeAllRanges();
-                const deleteRange = document.createRange();
-                deleteRange.setStart(container, offset - 3);
-                deleteRange.setEnd(container, offset);
-                sel.addRange(deleteRange);
-
-                document.execCommand('delete', false, null);
-
-                for (const cmd of activeCommands) {
-                  document.execCommand(cmd, false, null);
-                }
-                return;
-              }
-            }
           }
         }
       }
