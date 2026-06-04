@@ -86,7 +86,7 @@
 
     <div id="myEditor" class="editor-area" contenteditable="true">
       <p>Welcome to your hybrid rich text editor. This text is inside a standard paragraph.</p>
-      <p>v0.1</p>
+      <p>v0.2</p>
       <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.
       </p>
       <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all
@@ -381,10 +381,9 @@
 
       // special formatting and escape from formatting
       if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
-        // Map your shortcodes directly to execCommand strings
         const inlineElementCommands = {
-          '.b': 'bold',
-          '.i': 'italic'
+          '.b.': 'bold',
+          '.i.': 'italic'
         };
 
         const sel = window.getSelection();
@@ -396,47 +395,39 @@
           const text = container.textContent;
           const offset = range.startOffset;
 
-          if (offset >= 2) {
-            const lastTwoChars = text.substring(offset - 2, offset);
-            const command = inlineElementCommands[lastTwoChars];
+          if (offset >= 3) {
+            const lastThreeChars = text.substring(offset - 3, offset);
+            const command = inlineElementCommands[lastThreeChars];
 
             if (command) {
-              // 1. Highlight the shortcode (e.g., the '.b')
               sel.removeAllRanges();
               const deleteRange = document.createRange();
-              deleteRange.setStart(container, offset - 2);
+              deleteRange.setStart(container, offset - 3);
               deleteRange.setEnd(container, offset);
               sel.addRange(deleteRange);
 
-              // 2. Delete it natively. This preserves spaces, undo history, and caret position.
               document.execCommand('delete', false, null);
-
-              // 3. Trigger the native formatting state
               document.execCommand(command, false, null);
 
               event.preventDefault();
               return;
             }
 
-            // Handle the double-space exit strategy
-            else if (/\s\s/.test(lastTwoChars)) {
+            // Handle .e. to exit formatting
+            else if (lastThreeChars === '.e.') {
               if (container.parentNode && ['em', 'strong', 'b', 'i'].includes(container.parentNode.tagName.toLowerCase())) {
 
-                // Highlight the 2 spaces
                 sel.removeAllRanges();
                 const deleteRange = document.createRange();
-                deleteRange.setStart(container, offset - 1);
+                deleteRange.setStart(container, offset - 3);
                 deleteRange.setEnd(container, offset);
                 sel.addRange(deleteRange);
 
-                // Delete them natively
                 document.execCommand('delete', false, null);
 
-                // Find out what command to toggle off based on parent tag
                 const parentTag = container.parentNode.tagName.toLowerCase();
                 const toggleCmd = (parentTag === 'strong' || parentTag === 'b') ? 'bold' : 'italic';
 
-                // Toggle the formatting off.
                 document.execCommand(toggleCmd, false, null);
                 return;
               }
