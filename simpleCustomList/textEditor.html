@@ -69,10 +69,91 @@
     }
 
     .editor-area code {
-      background-color: #878569;
-      color: white;
+      background-color: #1e1e2e;
+      color: #cdd6f4;
       border-radius: 5px;
-      padding: 1px 4px;
+      padding: 1px 5px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+    }
+
+    .editor-area pre {
+      background-color: #1e1e2e;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0.5em 0 1em;
+    }
+
+    .editor-area pre code {
+      background-color: transparent;
+      color: #cdd6f4;
+      padding: 0;
+      border-radius: 0;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    .format-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .format-modal {
+      background: white;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      min-width: 260px;
+    }
+
+    .format-modal label {
+      display: block;
+      font-size: 13px;
+      color: #71717a;
+      margin-bottom: 8px;
+    }
+
+    .format-modal input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .format-modal input:focus {
+      border-color: #a1a1aa;
+      box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.3);
+    }
+
+    .format-modal input + input {
+      margin-top: 8px;
+    }
+
+    .format-modal .btn-cancel {
+      margin-top: 12px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      color: #71717a;
+      transition: background 0.15s;
+    }
+
+    .format-modal .btn-cancel:hover {
+      background: #f4f4f5;
     }
   </style>
 </head>
@@ -97,6 +178,7 @@
   <script>
     const editor = document.getElementById('myEditor');
     const btnBold = document.getElementById('btn-bold');
+    const ALLOWED_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'];
 
     // fix new element to P
     document.execCommand('defaultParagraphSeparator', false, 'p');
@@ -191,6 +273,20 @@
         p.replaceWith(fragment);
       });
 
+      // E. Unwrap any element not in our allow list
+      // The Sanitizer API removes custom/unknown elements AND their children,
+      // so we unwrap them here to preserve nested allowed content like <pre><code>.
+      const allowedTags = new Set(ALLOWED_TAGS);
+      const allElements = Array.from(doc.body.querySelectorAll('*'));
+      for (let idx = allElements.length - 1; idx >= 0; idx--) {
+        const el = allElements[idx];
+        if (!allowedTags.has(el.tagName.toLowerCase())) {
+          const fragment = doc.createDocumentFragment();
+          while (el.firstChild) fragment.appendChild(el.firstChild);
+          el.replaceWith(fragment);
+        }
+      }
+
       // Turn our perfectly formatted DOM back into a string
       const preProcessedHTML = doc.body.innerHTML;
       console.log('2. PRE-PROCESSED HTML:\n', preProcessedHTML);
@@ -201,24 +297,27 @@
 
       let cleanHTML = '';
 
+      let processor = '';
       if (typeof Sanitizer !== 'undefined' && Element.prototype.setHTML) {
+        processor = 'Sanitizer';
         const tempDiv = document.createElement('div');
         const mySanitizer = new Sanitizer({
-          elements: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
-          attributes: []
+          elements: ALLOWED_TAGS,
+          attributes: [{ name: 'href', elements: ['a'] }]
         });
 
         tempDiv.setHTML(preProcessedHTML, { sanitizer: mySanitizer });
         cleanHTML = tempDiv.innerHTML;
       }
       else {
+        processor = 'DOMPurify';
         cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
-          ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'],
-          ALLOWED_ATTR: []
+          ALLOWED_TAGS: ALLOWED_TAGS,
+          ALLOWED_ATTR: ['href']
         });
       }
 
-      console.log('3. FINAL SANITIZED HTML:\n', cleanHTML);
+      console.log('3. FINAL SANITIZED HTML (using ' + processor + '):\n', cleanHTML);
 
       // ==========================================
       // NEW STEP: CONTEXT-AWARE LIST MERGING
@@ -261,12 +360,25 @@
     // when bold text on the end of the line and pressing enter, we should not 
     // get into a paragraph with bold
     editor.addEventListener('keydown', (e) => {
+      if (e.key === 'e' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const sel = window.getSelection();
+        const savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+        openFormatModal(savedRange);
+        return;
+      }
+
       // Check for Enter key without Shift
       if (e.key === 'Enter' && !e.shiftKey) {
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
 
-        const range = sel.getRangeAt(0);
+        let range = sel.getRangeAt(0);
+
+        if (!range.collapsed) {
+          range.deleteContents();
+          range = sel.getRangeAt(0);
+        }
 
         // Normalize the container
         let container = range.startContainer;
@@ -379,14 +491,8 @@
         }
       }
 
-      // special formatting and escape from formatting
+      // ".f." opens the formatting modal
       if (event.inputType === "insertText" || event.inputType === "insertCompositionText") {
-        const inlineElementCommands = {
-          '.b.': 'bold',
-          '.i.': 'italic',
-          '.u.': 'underline'
-        };
-
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
         const range = sel.getRangeAt(0);
@@ -395,89 +501,199 @@
         if (container.nodeType === 3) {
           const text = container.textContent;
           const offset = range.startOffset;
-          
-          if (offset >= 3) {
-            const lastThreeChars = text.substring(offset - 3, offset);
-            const command = inlineElementCommands[lastThreeChars];
-            if (command) {
-              sel.removeAllRanges();
-              const deleteRange = document.createRange();
-              deleteRange.setStart(container, offset - 3);
-              deleteRange.setEnd(container, offset);
-              sel.addRange(deleteRange);
 
-              document.execCommand('delete', false, null);
-              document.execCommand(command, false, null);
+          if (offset >= 3 && text.substring(offset - 3, offset) === '.f.') {
+            // Delete the ".f." trigger text
+            sel.removeAllRanges();
+            const deleteRange = document.createRange();
+            deleteRange.setStart(container, offset - 3);
+            deleteRange.setEnd(container, offset);
+            sel.addRange(deleteRange);
+            document.execCommand('delete', false, null);
 
-              event.preventDefault();
-              return;
-            }
-            
-            // Handle .e. to exit all formatting (bold and italic)
-            else if (lastThreeChars === '.e.') {
-              const formattingTags = ['em', 'strong', 'b', 'i', 'u'];
-              let node = container.parentNode;
-              const activeCommands = new Set();
-              while (node && node !== editor) {
-                const tag = node.tagName && node.tagName.toLowerCase();
-                if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
-                if (tag === 'em' || tag === 'i') activeCommands.add('italic');
-                if (tag === 'u') activeCommands.add('underline');
-                node = node.parentNode;
-              }
-              if (activeCommands.size > 0) {
-                sel.removeAllRanges();
-                const deleteRange = document.createRange();
-                deleteRange.setStart(container, offset - 3);
-                deleteRange.setEnd(container, offset);
-                sel.addRange(deleteRange);
+            // Save the selection so we can restore it after the modal
+            const savedSel = window.getSelection();
+            const savedRange = savedSel.rangeCount > 0 ? savedSel.getRangeAt(0).cloneRange() : null;
 
-                document.execCommand('delete', false, null);
-
-                for (const cmd of activeCommands) {
-                  document.execCommand(cmd, false, null);
-                }
-                return;
-              }
-            }
-            // Handle .h1. .h2. .h3. .h4. to convert block to heading
-            else if (offset >= 4) {
-              const lastFour = text.substring(offset - 4, offset);
-              const headingMatch = lastFour.match(/^\.h([1-4])\.$/);
-              if (headingMatch) {
-                const level = headingMatch[1];
-                let block = container.parentNode;
-                while (block && block !== editor && !['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(block.tagName.toLowerCase())) {
-                  block = block.parentNode;
-                }
-                if (block && block !== editor) {
-                  sel.removeAllRanges();
-                  const deleteRange = document.createRange();
-                  deleteRange.setStart(container, offset - 4);
-                  deleteRange.setEnd(container, offset);
-                  sel.addRange(deleteRange);
-                  document.execCommand('delete', false, null);
-
-                  const heading = document.createElement('h' + level);
-                  heading.innerHTML = block.innerHTML;
-                  block.parentNode.replaceChild(heading, block);
-
-                  const newRange = document.createRange();
-                  newRange.selectNodeContents(heading);
-                  newRange.collapse(false);
-                  sel.removeAllRanges();
-                  sel.addRange(newRange);
-                  return;
-                }
-              }
-            }
-
-
+            openFormatModal(savedRange);
+            return;
           }
         }
       }
     });
 
+
+    function openFormatModal(savedRange) {
+      const overlay = document.createElement('div');
+      overlay.className = 'format-modal-overlay';
+
+      const modal = document.createElement('div');
+      modal.className = 'format-modal';
+
+      const label = document.createElement('label');
+      label.textContent = 'b = bold, i = italic, u = underline, l = link, h1–h6 = heading, e = exit formatting, clear = clear all';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'b / i / u / l / h1-h6 / e';
+
+      modal.appendChild(label);
+      modal.appendChild(input);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      requestAnimationFrame(() => input.focus());
+
+      const commands = { b: 'bold', i: 'italic', u: 'underline' };
+
+      function close() {
+        overlay.remove();
+        // Restore cursor position in the editor
+        if (savedRange) {
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(savedRange);
+        }
+      }
+
+      function apply() {
+        const val = input.value.trim().toLowerCase();
+
+        if (val === 'l') {
+          showLinkForm();
+          return;
+        }
+
+        if (val === 'clear') {
+          overlay.remove();
+          editor.innerHTML = '<p><br></p>';
+          const sel = window.getSelection();
+          const newRange = document.createRange();
+          newRange.setStart(editor.firstChild, 0);
+          newRange.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(newRange);
+          return;
+        }
+
+        const headingMatch = val.match(/^h([1-6])$/);
+        if (headingMatch) {
+          close();
+          const sel = window.getSelection();
+          if (!sel.rangeCount) return;
+          let block = sel.getRangeAt(0).startContainer;
+          if (block.nodeType === 3) block = block.parentNode;
+          while (block && block !== editor && !['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(block.tagName.toLowerCase())) {
+            block = block.parentNode;
+          }
+          if (block && block !== editor) {
+            const heading = document.createElement('h' + headingMatch[1]);
+            heading.innerHTML = block.innerHTML;
+            block.parentNode.replaceChild(heading, block);
+            const newRange = document.createRange();
+            newRange.selectNodeContents(heading);
+            newRange.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+          }
+          return;
+        }
+
+        close();
+
+        if (commands[val]) {
+          document.execCommand(commands[val], false, null);
+        } else if (val === 'e') {
+          const sel = window.getSelection();
+          if (!sel.rangeCount) return;
+          let node = sel.getRangeAt(0).startContainer;
+          if (node.nodeType === 3) node = node.parentNode;
+
+          const activeCommands = new Set();
+          while (node && node !== editor) {
+            const tag = node.tagName && node.tagName.toLowerCase();
+            if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
+            if (tag === 'em' || tag === 'i') activeCommands.add('italic');
+            if (tag === 'u') activeCommands.add('underline');
+            node = node.parentNode;
+          }
+          for (const cmd of activeCommands) {
+            document.execCommand(cmd, false, null);
+          }
+        }
+      }
+
+      function showLinkForm() {
+        modal.innerHTML = '';
+
+        const linkLabel = document.createElement('label');
+        linkLabel.textContent = 'Insert link';
+
+        const textInput = document.createElement('input');
+        textInput.type = 'text';
+        textInput.placeholder = 'Link text';
+
+        const hrefInput = document.createElement('input');
+        hrefInput.type = 'text';
+        hrefInput.placeholder = 'https://...';
+
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn-cancel';
+        cancelBtn.textContent = 'Cancel';
+
+        modal.appendChild(linkLabel);
+        modal.appendChild(textInput);
+        modal.appendChild(hrefInput);
+        modal.appendChild(cancelBtn);
+
+        requestAnimationFrame(() => textInput.focus());
+
+        function insertLink() {
+          const text = textInput.value.trim();
+          const href = hrefInput.value.trim();
+          if (!text || !href) return;
+
+          close();
+          const linkHTML = `<a href="${href.replace(/"/g, '&quot;')}">${DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })}</a>`;
+          document.execCommand('insertHTML', false, linkHTML);
+        }
+
+        function onKeydown(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            insertLink();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+          }
+        }
+
+        textInput.addEventListener('keydown', onKeydown);
+        hrefInput.addEventListener('keydown', onKeydown);
+
+        cancelBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          close();
+        });
+      }
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          apply();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          close();
+        }
+      });
+
+      overlay.addEventListener('mousedown', (e) => {
+        if (e.target === overlay) {
+          e.preventDefault();
+          close();
+        }
+      });
+    }
 
   </script>
 
