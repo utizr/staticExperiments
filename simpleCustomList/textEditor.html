@@ -162,7 +162,7 @@
 
   <div class="editor-container">
     <div class="toolbar">
-      <button id="btn-bold">B</button>
+      <button id="btn-mode">Edit</button>
     </div>
 
     <div id="myEditor" class="editor-area" contenteditable="true">
@@ -177,22 +177,52 @@
 
   <script>
     const editor = document.getElementById('myEditor');
-    const btnBold = document.getElementById('btn-bold');
+    const btnMode = document.getElementById('btn-mode');
     const ALLOWED_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'];
 
     // fix new element to P
     document.execCommand('defaultParagraphSeparator', false, 'p');
 
     // ==========================================
-    // 1. TOOLBAR LOGIC (Make text Bold)
+    // LOAD & AUTO-SAVE
     // ==========================================
 
-    // CRITICAL GOTCHA: We must use 'mousedown' and 'e.preventDefault()' here.
-    // If we use 'click', clicking the button removes focus from the editor, 
-    // which clears the user's text selection BEFORE the bold command can run!
-    btnBold.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      document.execCommand('bold', false, null);
+    const STORAGE_KEY = 'textEditor_content';
+
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      editor.innerHTML = saved;
+    }
+
+    let saveTimer = null;
+    function scheduleSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, editor.innerHTML);
+      }, 1000);
+    }
+
+    editor.addEventListener('input', scheduleSave);
+    editor.addEventListener('paste', () => setTimeout(scheduleSave, 0));
+
+    // ==========================================
+    // 1. TOOLBAR LOGIC (Edit / Read toggle)
+    // ==========================================
+
+    function updateModeButton() {
+      const isEditable = editor.contentEditable === 'true';
+      btnMode.textContent = isEditable ? 'Read' : 'Edit';
+    }
+
+    updateModeButton();
+
+    btnMode.addEventListener('click', () => {
+      const isEditable = editor.contentEditable === 'true';
+      editor.contentEditable = isEditable ? 'false' : 'true';
+      updateModeButton();
+      if (editor.contentEditable === 'true') {
+        editor.focus();
+      }
     });
 
     // ==========================================
@@ -303,7 +333,7 @@
         const tempDiv = document.createElement('div');
         const mySanitizer = new Sanitizer({
           elements: ALLOWED_TAGS,
-          attributes: [{ name: 'href', elements: ['a'] }]
+          attributes: [{ name: 'href', elements: ['a'] }, { name: 'target', elements: ['a'] }]
         });
 
         tempDiv.setHTML(preProcessedHTML, { sanitizer: mySanitizer });
@@ -313,7 +343,7 @@
         processor = 'DOMPurify';
         cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
           ALLOWED_TAGS: ALLOWED_TAGS,
-          ALLOWED_ATTR: ['href']
+          ALLOWED_ATTR: ['href', 'target']
         });
       }
 
@@ -352,7 +382,13 @@
         }
       }
 
-      // 4. Insert the final HTML
+      // 4. Ensure all links open in a new tab
+      const linkTemp = document.createElement('div');
+      linkTemp.innerHTML = cleanHTML;
+      linkTemp.querySelectorAll('a[href]').forEach(a => a.setAttribute('target', '_blank'));
+      cleanHTML = linkTemp.innerHTML;
+
+      // 5. Insert the final HTML
       document.execCommand('insertHTML', false, cleanHTML);
     });
 
@@ -567,6 +603,7 @@
         if (val === 'clear') {
           overlay.remove();
           editor.innerHTML = '<p><br></p>';
+          localStorage.removeItem(STORAGE_KEY);
           const sel = window.getSelection();
           const newRange = document.createRange();
           newRange.setStart(editor.firstChild, 0);
@@ -654,7 +691,7 @@
           if (!text || !href) return;
 
           close();
-          const linkHTML = `<a href="${href.replace(/"/g, '&quot;')}">${DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })}</a>`;
+          const linkHTML = `<a href="${href.replace(/"/g, '&quot;')}" target="_blank">${DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })}</a>`;
           document.execCommand('insertHTML', false, linkHTML);
         }
 
