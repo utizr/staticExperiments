@@ -69,8 +69,8 @@
     }
 
     .editor-area code {
-      background-color: #1e1e2e;
-      color: #cdd6f4;
+      background-color: #efefef;
+      color: #040404;
       border-radius: 5px;
       padding: 1px 5px;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
@@ -78,7 +78,7 @@
     }
 
     .editor-area pre {
-      background-color: #1e1e2e;
+      background-color: #efefef;
       border-radius: 8px;
       padding: 16px;
       overflow-x: auto;
@@ -87,7 +87,7 @@
 
     .editor-area pre code {
       background-color: transparent;
-      color: #cdd6f4;
+      color: #040404;
       padding: 0;
       border-radius: 0;
       font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
@@ -136,7 +136,7 @@
       box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.3);
     }
 
-    .format-modal input + input {
+    .format-modal input+input {
       margin-top: 8px;
     }
 
@@ -590,6 +590,7 @@
           sel.removeAllRanges();
           sel.addRange(savedRange);
         }
+        setTimeout(scheduleSave, 0);
       }
 
       function apply() {
