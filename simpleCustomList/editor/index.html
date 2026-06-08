@@ -24,10 +24,14 @@
       border: 1px solid #d4d4d8;
       border-radius: 8px;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
+      overflow: clip;
+      position: relative;
     }
 
     .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
       background: #fafafa;
       padding: 10px;
       border-bottom: 1px solid #d4d4d8;
@@ -163,6 +167,7 @@
   <div class="editor-container">
     <div class="toolbar">
       <button id="btn-mode">Edit</button>
+      <button id="btn-format">Format</button>
     </div>
 
     <div id="myEditor" class="editor-area" contenteditable="true">
@@ -210,6 +215,15 @@
 
     btnMode.addEventListener('click', () => {
       editorInstance.toggleMode();
+    });
+
+    // Toolbar: Format button (works on mobile where keyboard shortcuts aren't available)
+    const btnFormat = document.getElementById('btn-format');
+    btnFormat.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+    });
+    btnFormat.addEventListener('click', () => {
+      editorInstance.openFormatModal();
     });
   </script>
 

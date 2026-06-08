@@ -548,6 +548,25 @@ const SimpleEditor = (() => {
     }
 
     // ==========================================
+    // SELECTION TRACKING
+    // ==========================================
+
+    // Keep track of the last known selection within the editor so that
+    // external toolbar buttons can act on it even after focus moves away.
+    let lastSavedRange = null;
+
+    function handleSelectionChange() {
+      const sel = window.getSelection();
+      if (!sel.rangeCount) return;
+      const range = sel.getRangeAt(0);
+      if (element.contains(range.commonAncestorContainer)) {
+        lastSavedRange = range.cloneRange();
+      }
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange, { signal });
+
+    // ==========================================
     // WIRE UP EVENT LISTENERS
     // ==========================================
 
@@ -589,6 +608,11 @@ const SimpleEditor = (() => {
       off(event, fn) {
         if (!listeners[event]) return this;
         listeners[event] = listeners[event].filter(f => f !== fn);
+        return this;
+      },
+
+      openFormatModal() {
+        openFormatModal(lastSavedRange);
         return this;
       },
 
