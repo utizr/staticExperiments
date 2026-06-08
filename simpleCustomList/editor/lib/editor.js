@@ -208,7 +208,7 @@ const SimpleEditor = (() => {
 
       let cleanHTML = sanitizeHTML(rawData, allowedTags, {
         allowedAttributes: { a: ['href', 'target'] },
-        tagConversion: { strong: 'b', em: 'i' }
+        tagConversions: { strong: 'b', em: 'i' }
       });
 
       // Context-aware list merging
