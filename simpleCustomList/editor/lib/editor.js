@@ -38,18 +38,26 @@ const SimpleEditor = (() => {
     // PASTE SANITIZATION
     // ==========================================
 
-    function handlePaste(e) {
-      e.preventDefault();
 
-      let rawData = e.clipboardData.getData('text/html');
-
-      if (!rawData) {
-        rawData = e.clipboardData.getData('text/plain');
-        rawData = `<p>${rawData.replace(/\n/g, '<br>')}</p>`;
-      }
+    /**
+     * Sanitizes an HTML string based on allowed tags, attributes, and tag conversions.
+     * Unsupported tags are unwrapped, preserving their inner content.
+     * * @param {string} htmlString - The dirty HTML string.
+     * @param {string[]} allowedTags - Array of allowed tag names (e.g., ['p', 'a', 'strong']).
+     * @param {Object} [options={}] - Configuration options.
+     * @param {Object} [options.allowedAttributes={}] - Map of tags to allowed attributes (e.g., { a: ['href'] }).
+     * @param {Object} [options.tagConversions={}] - Map of tags to convert (e.g., { b: 'strong' }).
+     * @returns {string} - The sanitized HTML string.
+     */
+    function sanitizeHTML(htmlString, allowedTags, options = {}) {
+      // Destructure options with defaults
+      const { allowedAttributes = {}, tagConversions = {} } = options;
 
       const parser = new DOMParser();
-      const doc = parser.parseFromString(rawData, 'text/html');
+      const doc = parser.parseFromString(htmlString, 'text/html');
+
+
+      // PRE PROCESSING
 
       // Unwrap <span> tags
       const spans = Array.from(doc.querySelectorAll('span'));
@@ -107,26 +115,101 @@ const SimpleEditor = (() => {
         }
       }
 
-      const preProcessedHTML = doc.body.innerHTML;
+      // add target:_blank to links
+      doc.querySelectorAll('a[href]').forEach(a => a.setAttribute('target', '_blank'));
 
-      // Sanitization
-      let cleanHTML = '';
-      if (typeof Sanitizer !== 'undefined' && Element.prototype.setHTML) {
-        const tempDiv = document.createElement('div');
-        const mySanitizer = new Sanitizer({
-          elements: allowedTags,
-          attributes: [{ name: 'href', elements: ['a'] }, { name: 'target', elements: ['a'] }]
-        });
-        tempDiv.setHTML(preProcessedHTML, { sanitizer: mySanitizer });
-        cleanHTML = tempDiv.innerHTML;
-      } else if (typeof DOMPurify !== 'undefined') {
-        cleanHTML = DOMPurify.sanitize(preProcessedHTML, {
-          ALLOWED_TAGS: allowedTags,
-          ALLOWED_ATTR: ['href', 'target']
-        });
-      } else {
-        cleanHTML = preProcessedHTML;
+
+      // Normalize arrays and objects to lowercase for safe comparison
+      const safeTags = allowedTags.map(tag => tag.toLowerCase());
+
+      const conversions = Object.entries(tagConversions).reduce((acc, [key, value]) => {
+        acc[key.toLowerCase()] = value.toLowerCase();
+        return acc;
+      }, {});
+
+      function processNode(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+          return document.createTextNode(node.textContent);
+        }
+
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const originalTagName = node.tagName.toLowerCase();
+
+          // Apply conversion if it exists, otherwise use the original tag
+          const tagName = conversions[originalTagName] || originalTagName;
+
+          // Case A: The resulting tag is ALLOWED
+          if (safeTags.includes(tagName)) {
+            const el = document.createElement(tagName);
+
+            // Note: Attributes are validated against the *new* tag name
+            const permittedAttrs = allowedAttributes[tagName] || [];
+
+            for (const attr of node.attributes) {
+              if (permittedAttrs.includes(attr.name)) {
+                // Prevent `javascript:` URIs
+                if (attr.name === 'href' && attr.value.trim().toLowerCase().startsWith('javascript:')) {
+                  continue;
+                }
+                el.setAttribute(attr.name, attr.value);
+              }
+            }
+
+            for (const child of node.childNodes) {
+              const processedChild = processNode(child);
+              if (processedChild) {
+                el.appendChild(processedChild);
+              }
+            }
+            return el;
+          }
+
+          // Case B: The resulting tag is NOT ALLOWED (Unwrap)
+          else {
+            const fragment = document.createDocumentFragment();
+            for (const child of node.childNodes) {
+              const processedChild = processNode(child);
+              if (processedChild) {
+                fragment.appendChild(processedChild);
+              }
+            }
+            return fragment;
+          }
+        }
+
+        return null;
       }
+
+      const resultFragment = document.createDocumentFragment();
+      for (const child of doc.body.childNodes) {
+        const processedChild = processNode(child);
+        if (processedChild) {
+          resultFragment.appendChild(processedChild);
+        }
+      }
+
+      const tempContainer = document.createElement('div');
+      tempContainer.appendChild(resultFragment);
+      return tempContainer.innerHTML;
+    }
+
+
+
+    function handlePaste(e) {
+      e.preventDefault();
+
+      let rawData = e.clipboardData.getData('text/html');
+
+      // TODO we should attempt markdown parsing here.
+      if (!rawData) {
+        rawData = e.clipboardData.getData('text/plain');
+        rawData = `<p>${rawData.replace(/\n/g, '<br>')}</p>`;
+      }
+
+      let cleanHTML = sanitizeHTML(rawData, allowedTags, {
+        allowedAttributes: { a: ['href', 'target'] },
+        tagConversion: { strong: 'b', em: 'i' }
+      });
 
       // Context-aware list merging
       const selection = window.getSelection();
@@ -369,9 +452,7 @@ const SimpleEditor = (() => {
             notifyChange();
           } else {
             close();
-            const sanitizedText = typeof DOMPurify !== 'undefined'
-              ? DOMPurify.sanitize(text, { ALLOWED_TAGS: [] })
-              : text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const sanitizedText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const linkHTML = `<a href="${href.replace(/"/g, '&quot;')}" target="_blank">${sanitizedText}</a>`;
             document.execCommand('insertHTML', false, linkHTML);
             notifyChange();
