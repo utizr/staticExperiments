@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Text Editor</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #f4f4f5;
+      padding: 2rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .editor-container {
+      width: 100%;
+      max-width: 800px;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .toolbar {
+      background: #fafafa;
+      padding: 10px;
+      border-bottom: 1px solid #d4d4d8;
+      display: flex;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .toolbar button:hover {
+      background: #e4e4e7;
+    }
+
+    .editor-area {
+      min-height: 300px;
+      padding: 20px;
+      outline: none;
+      line-height: 1.6;
+    }
+
+    /* Just to make the allowed tags look nice */
+    .editor-area p {
+      margin-top: 0;
+      margin-bottom: 1em;
+    }
+
+    .editor-area ul {
+      margin-top: 0;
+      padding-left: 20px;
+    }
+
+    .editor-area code {
+      background-color: #efefef;
+      color: #040404;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+    }
+
+    .editor-area pre {
+      background-color: #efefef;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0.5em 0 1em;
+    }
+
+    .editor-area pre code {
+      background-color: transparent;
+      color: #040404;
+      padding: 0;
+      border-radius: 0;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre;
+    }
+
+    .format-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .format-modal {
+      background: white;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      min-width: 260px;
+    }
+
+    .format-modal label {
+      display: block;
+      font-size: 13px;
+      color: #71717a;
+      margin-bottom: 8px;
+    }
+
+    .format-modal input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .format-modal input:focus {
+      border-color: #a1a1aa;
+      box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.3);
+    }
+
+    .format-modal input+input {
+      margin-top: 8px;
+    }
+
+    .format-modal .btn-cancel {
+      margin-top: 12px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      color: #71717a;
+      transition: background 0.15s;
+    }
+
+    .format-modal .btn-cancel:hover {
+      background: #f4f4f5;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="editor-container">
+    <div class="toolbar">
+      <button id="btn-mode">Edit</button>
+    </div>
+
+    <div id="myEditor" class="editor-area" contenteditable="true">
+      <p>Welcome to your hybrid rich text editor. This text is inside a standard paragraph.</p>
+      <p>v0.3</p>
+      <p>You can see that we have some <b>bold text</b> right here, as well as some <i>italicized text</i> for emphasis.
+      </p>
+      <p>Try copying something really messy from another website or Microsoft Word, and paste it below. You will see all
+        the crazy colors, fonts, and scripts disappear, leaving only the clean structure behind!</p>
+    </div>
+  </div>
+
+  <script src="lib/editor.js"></script>
+  <script>
+    const editorEl = document.getElementById('myEditor');
+    const btnMode = document.getElementById('btn-mode');
+    const STORAGE_KEY = 'textEditor_content';
+
+    // Load saved content
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      editorEl.innerHTML = saved;
+    }
+
+    // Mount the editor
+    const editorInstance = SimpleEditor.mount(editorEl);
+
+    // Auto-save on change
+    let saveTimer = null;
+    editorInstance.on('change', (html) => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        localStorage.setItem(STORAGE_KEY, html);
+      }, 1000);
+    });
+
+    // Toolbar: Edit / Read toggle
+    function updateModeButton() {
+      btnMode.textContent = editorInstance.mode === 'edit' ? 'Read' : 'Edit';
+    }
+
+    updateModeButton();
+
+    editorInstance.on('modechange', updateModeButton);
+
+    btnMode.addEventListener('click', () => {
+      editorInstance.toggleMode();
+    });
+  </script>
+
+</body>
+
+</html>
