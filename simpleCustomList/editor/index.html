@@ -181,12 +181,13 @@
   <script>
     const editorEl = document.getElementById('myEditor');
     const btnMode = document.getElementById('btn-mode');
-    const STORAGE_KEY = 'textEditor_content';
+    const STORAGE_KEY = 'textEditor_content_json';
 
     // Load saved content
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      editorEl.innerHTML = saved;
+      const jsonObject = JSON.parse(saved);
+      editorEl.innerHTML = SimpleEditor.jsonToHtmlString(jsonObject);
     }
 
     // Mount the editor
@@ -197,7 +198,8 @@
     editorInstance.on('change', (html) => {
       if (saveTimer) clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, html);
+        const jsonString = JSON.stringify(SimpleEditor.htmlStringToJson(html));
+        localStorage.setItem(STORAGE_KEY, jsonString);
       }, 1000);
     });
 

@@ -715,7 +715,165 @@ const SimpleEditor = (() => {
     return instance;
   }
 
-  return { mount };
+  // HELPERS
+
+
+  /**
+   * Recursively converts a DOM node into a custom JSON structure.
+   * Filters out whitespace-only text nodes (like \n).
+   * * @param {Node} node - The DOM element or text node to convert.
+   * @returns {Object|string|null} The JSON object, a text string, or null for ignored nodes.
+   */
+  function domToJson(node) {
+    // 1. Handle Text Nodes
+    if (node.nodeType === Node.TEXT_NODE) {
+      // If the text node is purely whitespace, line breaks, or tabs, ignore it
+      if (node.nodeValue.trim() === '') {
+        return null;
+      }
+      // Return the original text (preserving inline spaces between words)
+      return node.nodeValue;
+    }
+
+    // 2. Handle Element Nodes (div, span, p, b, etc.)
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const obj = {
+        t: node.tagName.toLowerCase(),
+        a: [],
+        c: []
+      };
+
+      // Extract Attributes
+      if (node.hasAttributes()) {
+        for (const attr of node.attributes) {
+          obj.a.push({ name: attr.name, value: attr.value });
+        }
+      }
+
+      // Extract Children recursively
+      if (node.hasChildNodes()) {
+        for (const child of node.childNodes) {
+          const childJson = domToJson(child);
+          // Ignore null returns (filtered text nodes, comments, etc.)
+          if (childJson !== null) {
+            obj.c.push(childJson);
+          }
+        }
+      }
+
+      return obj;
+    }
+
+    // 3. Ignore Comments and other non-essential node types
+    return null;
+  }
+
+  /**
+   * Helper function to convert raw HTML strings directly to JSON.
+   * * @param {string} htmlString - The innerHTML string you want to convert.
+   */
+  function htmlStringToJson(htmlString) {
+    const template = document.createElement('template');
+    template.innerHTML = htmlString.trim();
+
+    const result = [];
+    for (const child of template.content.childNodes) {
+      const parsed = domToJson(child);
+      if (parsed !== null) {
+        result.push(parsed);
+      }
+    }
+
+    // Return a single object if there's exactly one root node, otherwise return the array
+    return result.length === 1 ? result[0] : result;
+  }
+
+
+  /**
+   * Recursively converts your custom JSON AST back into live DOM nodes.
+   * @param {Object|string|Array} json - The JSON AST to convert.
+   * @returns {Node|DocumentFragment|null} The constructed DOM node.
+   */
+  function jsonToDom(json) {
+    // 1. Handle Arrays (Multiple root elements)
+    if (Array.isArray(json)) {
+      const fragment = document.createDocumentFragment();
+      for (const item of json) {
+        const node = jsonToDom(item);
+        if (node) fragment.appendChild(node);
+      }
+      return fragment;
+    }
+
+    // 2. Handle Text Nodes
+    if (typeof json === 'string') {
+      return document.createTextNode(json);
+    }
+
+    // 3. Handle Element Nodes
+    if (typeof json === 'object' && json !== null) {
+      // Create the base element
+      const el = document.createElement(json.t);
+
+      // Apply attributes
+      if (json.a && Array.isArray(json.a)) {
+        for (const attr of json.a) {
+          el.setAttribute(attr.name, attr.value);
+        }
+      }
+
+      // Append children recursively
+      if (json.c && Array.isArray(json.c)) {
+        for (const childJson of json.c) {
+          const childNode = jsonToDom(childJson);
+          if (childNode) {
+            el.appendChild(childNode);
+          }
+        }
+      }
+
+      return el;
+    }
+
+    // Fallback for invalid data
+    return null;
+  }
+
+  /**
+   * Helper function to convert your JSON AST directly into a raw HTML string.
+   * @param {Object|string|Array} json - The JSON AST.
+   * @returns {string} The reconstructed HTML string.
+   */
+  function jsonToHtmlString(json) {
+    const node = jsonToDom(json);
+
+    if (!node) return '';
+
+    // DocumentFragments don't have an outerHTML property, 
+    // so we append it to a temporary container to read the innerHTML.
+    if (node instanceof DocumentFragment) {
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(node);
+      return tempDiv.innerHTML;
+    }
+
+    // Regular Elements
+    if (node instanceof Element) {
+      return node.outerHTML;
+    }
+
+    // Pure Text Nodes
+    if (node instanceof Text) {
+      // Escaping might be necessary here depending on your security needs,
+      // but for exact restoration, textContent/nodeValue works.
+      return node.nodeValue;
+    }
+
+    return '';
+  }
+
+
+  return { mount, jsonToHtmlString, htmlStringToJson };
 
 })();
 
