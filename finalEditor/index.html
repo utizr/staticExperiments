@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=overlays-content">
+  <title>Text Editor</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #f4f4f5;
+      display: flex;
+      justify-content: center;
+      margin: 1px 2px 200px;
+      height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .app-layout {
+      display: flex;
+      width: 100%;
+      max-width: 900px;
+      height: 100%;
+    }
+
+    /* --- Organizer Sidebar Styles --- */
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .sidebar {
+      width: 90%;
+      max-width: 400px;
+      height: 80vh;
+      max-height: 600px;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 15px;
+      background: #fafafa;
+      border-bottom: 1px solid #d4d4d8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: #18181b;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .sidebar-header button,
+    .folder-title button {
+      padding: 4px 8px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .sidebar-header button:hover,
+    .folder-title button:hover {
+      background: #e4e4e7;
+    }
+
+    .folder-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px 10px;
+    }
+
+    .folder-item {
+      margin-bottom: 15px;
+      border-radius: 6px;
+      transition: margin 0.2s;
+    }
+
+    .folder-title {
+      font-weight: bold;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      color: #52525b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px;
+    }
+
+    .folder-name-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      cursor: text;
+      padding: 4px 6px;
+      margin: 0 4px;
+      border-radius: 4px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .folder-name-text:hover {
+      background: #e4e4e7;
+      color: #18181b;
+    }
+
+    .folder-name-text[contenteditable="true"] {
+      background: #ffffff;
+      color: #000;
+      box-shadow: inset 0 0 0 2px #3b82f6;
+      outline: none;
+      cursor: text;
+    }
+
+    .note-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .note-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 10px;
+      font-size: 14px;
+      color: #3f3f46;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .note-name-text {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .note-item:hover {
+      background: #f4f4f5;
+    }
+
+    .note-item.active {
+      background: #e4e4e7;
+      color: #000;
+      font-weight: 600;
+    }
+
+    .drag-handle {
+      cursor: grab;
+      padding: 0 8px 0 0;
+      color: #a1a1aa;
+      touch-action: none;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+    }
+
+    .drag-handle:hover {
+      color: #52525b;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .drop-target-before {
+      box-shadow: inset 0 2px 0 0 #3b82f6;
+    }
+
+    .drop-target-after {
+      box-shadow: inset 0 -2px 0 0 #3b82f6;
+    }
+
+    .drop-target-inside {
+      background-color: #eff6ff !important;
+      border-radius: 6px;
+    }
+
+    /* --- Editor Styles --- */
+    .editor-container {
+      flex: 1;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      overflow: clip;
+      position: relative;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #fafafa;
+      padding: 10px;
+      border-bottom: 1px solid #d4d4d8;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar-left {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      align-items: center;
+    }
+
+    .toolbar input[type="text"] {
+      flex: 1;
+      padding: 6px 12px;
+      font-size: 16px;
+      font-weight: bold;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      outline: none;
+      background: transparent;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .toolbar input[type="text"]:focus {
+      border-color: #d4d4d8;
+      background: white;
+    }
+
+    .toolbar input[type="text"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .toolbar button {
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 4px;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar button:hover {
+      background: #e4e4e7;
+    }
+
+    #btn-menu {
+      font-size: 16px;
+      padding: 6px 10px;
+    }
+
+    .editor-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      outline: none;
+      line-height: 1.6;
+    }
+
+    .editor-area p {
+      margin-top: 0;
+      margin-bottom: 1em;
+    }
+
+    .editor-area ul {
+      margin-top: 0;
+      padding-left: 20px;
+    }
+
+    .editor-area code {
+      background-color: #efefef;
+      color: #040404;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: 'SF Mono', monospace;
+      font-size: 13px;
+    }
+
+    .editor-area pre {
+      background-color: #efefef;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 0.5em 0 1em;
+    }
+
+    .editor-area pre code {
+      background-color: transparent;
+      padding: 0;
+      font-size: 13px;
+      white-space: pre;
+    }
+
+    /* --- Format Modal Styles (Assuming Editor Library still needs this) --- */
+    .format-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .format-modal {
+      background: white;
+      border-radius: 10px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      min-width: 260px;
+    }
+
+    .format-modal label {
+      display: block;
+      font-size: 13px;
+      color: #71717a;
+      margin-bottom: 8px;
+    }
+
+    .format-modal input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      font-size: 16px;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .format-modal input:focus {
+      border-color: #a1a1aa;
+      box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.3);
+    }
+
+    .format-modal input+input {
+      margin-top: 8px;
+    }
+
+    .format-modal .btn-cancel {
+      margin-top: 12px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      background: white;
+      border: 1px solid #d4d4d8;
+      border-radius: 6px;
+      color: #71717a;
+      transition: background 0.15s;
+    }
+
+    .format-modal .btn-cancel:hover {
+      background: #f4f4f5;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="app-layout">
+    <div class="editor-container">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-menu" title="Open Folders">☰</button>
+          <input type="text" id="note-title-input" placeholder="Note Title..." disabled>
+        </div>
+        <div>
+          <button id="btn-mode">📝</button>
+          <button id="btn-format">🪄</button>
+        </div>
+      </div>
+
+      <div id="myEditor" class="editor-area" contenteditable="true">
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/editor.js"></script>
+  <script src="lib/organizer.js"></script>
+  <script>
+    // --- App State & Bootstrapping ---
+    const STORAGE_KEY = 'textEditor_app_data';
+    let appData = { folders: [], notes: [] };
+    let currentNoteId = null;
+
+    const generateId = () => Math.random().toString(36).substring(2, 9);
+    const saveData = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+    // Initial Load
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      appData = JSON.parse(saved);
+    } else {
+      const defaultFolderId = generateId();
+      const defaultNoteId = generateId();
+      appData.folders.push({ id: defaultFolderId, name: 'General Notes' });
+      appData.notes.push({ id: defaultNoteId, folderId: defaultFolderId, title: 'Welcome to your hybrid rich text editor', content: null });
+      saveData();
+    }
+
+    if (appData.notes.length > 0) currentNoteId = appData.notes[0].id;
+
+    // --- DOM Elements ---
+    const editorEl = document.getElementById('myEditor');
+    const titleInput = document.getElementById('note-title-input');
+    const btnMenu = document.getElementById('btn-menu');
+
+    // --- Mount Libraries ---
+    const editorInstance = SimpleEditor.mount(editorEl);
+    const organizer = new SidebarOrganizer(appData);
+
+    // --- Controller Logic ---
+    function loadNoteIntoEditor(noteId) {
+      currentNoteId = noteId;
+      const note = appData.notes.find(n => n.id === noteId);
+
+      if (note) {
+        titleInput.value = note.title;
+        titleInput.disabled = false;
+        editorEl.innerHTML = note.content ? SimpleEditor.jsonToHtmlString(note.content) : '<p><br></p>';
+        organizer.setActiveNote(noteId);
+      }
+    }
+
+    // React to Organizer Events
+    organizer.on('change', (newData) => {
+      appData = newData; // Sync local state
+      saveData();        // Persist to storage
+    });
+
+    organizer.on('select', (noteId) => {
+      loadNoteIntoEditor(noteId);
+    });
+
+    // React to Host Header Events
+    btnMenu.addEventListener('click', () => organizer.open());
+
+    titleInput.addEventListener('change', (e) => {
+      if (currentNoteId) {
+        const note = appData.notes.find(n => n.id === currentNoteId);
+        if (note) {
+          note.title = e.target.value || 'Untitled Note';
+          saveData();
+          organizer.updateData(appData); // Sync back to organizer UI
+        }
+      }
+    });
+
+    // React to Editor Content Events
+    let saveTimer = null;
+    editorInstance.on('change', (html) => {
+      if (!currentNoteId) return;
+      if (saveTimer) clearTimeout(saveTimer);
+
+      saveTimer = setTimeout(() => {
+        const note = appData.notes.find(n => n.id === currentNoteId);
+        if (note) {
+          note.content = SimpleEditor.htmlStringToJson(html);
+          saveData();
+        }
+      }, 1000);
+    });
+
+    // Editor Toolbar Overrides
+    const btnMode = document.getElementById('btn-mode');
+    const btnFormat = document.getElementById('btn-format');
+
+    const updateModeButton = () => btnMode.textContent = editorInstance.mode === 'edit' ? '📖' : '📝';
+    updateModeButton();
+
+    editorInstance.on('modechange', updateModeButton);
+    btnMode.addEventListener('click', () => editorInstance.toggleMode());
+    btnFormat.addEventListener('mousedown', (e) => e.preventDefault());
+    btnFormat.addEventListener('click', () => editorInstance.openFormatModal());
+
+    // Final Init
+    if (currentNoteId) loadNoteIntoEditor(currentNoteId);
+  </script>
+
+</body>
+
+</html>
