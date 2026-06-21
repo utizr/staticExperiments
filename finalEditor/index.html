@@ -8,12 +8,16 @@
   <style>
     body {
       font-family: system-ui, -apple-system, sans-serif;
-      background-color: #f4f4f5;
+      background-color: #1f1b1a;
+      /* Deep warm espresso */
+      color: #e8e4e1;
+      /* Warm off-white */
       display: flex;
       justify-content: center;
       margin: 1px 2px 200px;
       height: 100vh;
       box-sizing: border-box;
+      color-scheme: dark;
     }
 
     .app-layout {
@@ -27,7 +31,7 @@
     .sidebar-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(20, 15, 13, 0.8);
       display: none;
       align-items: center;
       justify-content: center;
@@ -39,10 +43,10 @@
       max-width: 400px;
       height: 80vh;
       max-height: 600px;
-      background: white;
-      border: 1px solid #d4d4d8;
+      background: #2a2422;
+      border: 1px solid #4a403d;
       border-radius: 10px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -50,8 +54,8 @@
 
     .sidebar-header {
       padding: 15px;
-      background: #fafafa;
-      border-bottom: 1px solid #d4d4d8;
+      background: #362f2d;
+      border-bottom: 1px solid #4a403d;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -60,7 +64,7 @@
     .sidebar-header h3 {
       margin: 0;
       font-size: 16px;
-      color: #18181b;
+      color: #f5f1ee;
     }
 
     .header-actions {
@@ -74,15 +78,16 @@
       font-size: 12px;
       font-weight: bold;
       cursor: pointer;
-      background: white;
-      border: 1px solid #d4d4d8;
+      background: #2a2422;
+      border: 1px solid #4a403d;
       border-radius: 4px;
+      color: #e8e4e1;
       transition: background 0.2s;
     }
 
     .sidebar-header button:hover,
     .folder-title button:hover {
-      background: #e4e4e7;
+      background: #4a403d;
     }
 
     .folder-list {
@@ -103,7 +108,7 @@
       display: flex;
       align-items: center;
       margin-bottom: 8px;
-      color: #52525b;
+      color: #a69e9a;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       padding: 4px;
@@ -122,14 +127,14 @@
     }
 
     .folder-name-text:hover {
-      background: #e4e4e7;
-      color: #18181b;
+      background: #362f2d;
+      color: #ffffff;
     }
 
     .folder-name-text[contenteditable="true"] {
-      background: #ffffff;
-      color: #000;
-      box-shadow: inset 0 0 0 2px #3b82f6;
+      background: #1f1b1a;
+      color: #ffffff;
+      box-shadow: inset 0 0 0 2px #c2410c;
       outline: none;
       cursor: text;
     }
@@ -148,7 +153,7 @@
       align-items: center;
       padding: 8px 10px;
       font-size: 14px;
-      color: #3f3f46;
+      color: #d6d2d0;
       cursor: pointer;
       border-radius: 6px;
       transition: background 0.15s;
@@ -162,19 +167,20 @@
     }
 
     .note-item:hover {
-      background: #f4f4f5;
+      background: #362f2d;
     }
 
     .note-item.active {
-      background: #e4e4e7;
-      color: #000;
+      background: #65710a;
+      color: #ffedd5;
       font-weight: 600;
     }
 
+    /* Rich terracotta active state */
     .drag-handle {
       cursor: grab;
       padding: 0 8px 0 0;
-      color: #a1a1aa;
+      color: #7a706c;
       touch-action: none;
       user-select: none;
       display: flex;
@@ -184,7 +190,7 @@
     }
 
     .drag-handle:hover {
-      color: #52525b;
+      color: #e8e4e1;
     }
 
     .drag-handle:active {
@@ -192,25 +198,43 @@
     }
 
     .drop-target-before {
-      box-shadow: inset 0 2px 0 0 #3b82f6;
+      box-shadow: inset 0 2px 0 0 #ea580c;
     }
 
     .drop-target-after {
-      box-shadow: inset 0 -2px 0 0 #3b82f6;
+      box-shadow: inset 0 -2px 0 0 #ea580c;
     }
 
     .drop-target-inside {
-      background-color: #eff6ff !important;
+      background-color: #4a1f0f !important;
       border-radius: 6px;
     }
 
     /* --- Editor Styles --- */
+    /* --- Editor Link Styles --- */
+    .editor-area a {
+      color: #afc220;
+      /* Warm bright orange */
+      text-decoration: underline;
+      text-decoration-color: #afc220;
+      /* Muted underline */
+      text-underline-offset: 3px;
+      text-decoration-thickness: 1px;
+      transition: color 0.2s, text-decoration-color 0.2s;
+    }
+
+    .editor-area a:hover {
+      color: #d0e721;
+      /* Lighter peach/orange on hover */
+      text-decoration-color: #d0e721;
+    }
+
     .editor-container {
       flex: 1;
-      background: white;
-      border: 1px solid #d4d4d8;
+      background: #2a2422;
+      border: 1px solid #4a403d;
       border-radius: 8px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
       display: flex;
       flex-direction: column;
       overflow: clip;
@@ -221,9 +245,9 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: #fafafa;
+      background: #362f2d;
       padding: 10px;
-      border-bottom: 1px solid #d4d4d8;
+      border-bottom: 1px solid #4a403d;
       display: flex;
       gap: 8px;
       align-items: center;
@@ -242,6 +266,7 @@
       padding: 6px 12px;
       font-size: 16px;
       font-weight: bold;
+      color: #e8e4e1;
       border: 1px solid transparent;
       border-radius: 4px;
       outline: none;
@@ -250,8 +275,9 @@
     }
 
     .toolbar input[type="text"]:focus {
-      border-color: #d4d4d8;
-      background: white;
+      border-color: #c2410c;
+      /* Burnt orange focus */
+      background: #1f1b1a;
     }
 
     .toolbar input[type="text"]:disabled {
@@ -264,8 +290,9 @@
       font-size: 14px;
       font-weight: bold;
       cursor: pointer;
-      background: white;
-      border: 1px solid #d4d4d8;
+      background: #2a2422;
+      border: 1px solid #4a403d;
+      color: #e8e4e1;
       border-radius: 4px;
       transition: background 0.2s;
       display: flex;
@@ -274,7 +301,7 @@
     }
 
     .toolbar button:hover {
-      background: #e4e4e7;
+      background: #4a403d;
     }
 
     #btn-menu {
@@ -301,20 +328,22 @@
     }
 
     .editor-area code {
-      background-color: #efefef;
-      color: #040404;
+      background-color: #1f1b1a;
+      color: #fdba74;
       border-radius: 5px;
       padding: 1px 5px;
       font-family: 'SF Mono', monospace;
       font-size: 13px;
+      border: 1px solid #3d3330;
     }
 
     .editor-area pre {
-      background-color: #efefef;
+      background-color: #1f1b1a;
       border-radius: 8px;
       padding: 16px;
       overflow-x: auto;
       margin: 0.5em 0 1em;
+      border: 1px solid #4a403d;
     }
 
     .editor-area pre code {
@@ -322,13 +351,15 @@
       padding: 0;
       font-size: 13px;
       white-space: pre;
+      border: none;
+      color: #e8e4e1;
     }
 
-    /* --- Format Modal Styles (Assuming Editor Library still needs this) --- */
+    /* --- Format Modal Styles --- */
     .format-modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(20, 15, 13, 0.8);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -336,17 +367,18 @@
     }
 
     .format-modal {
-      background: white;
+      background: #2a2422;
       border-radius: 10px;
       padding: 20px 24px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
       min-width: 260px;
+      border: 1px solid #4a403d;
     }
 
     .format-modal label {
       display: block;
       font-size: 13px;
-      color: #71717a;
+      color: #a69e9a;
       margin-bottom: 8px;
     }
 
@@ -355,14 +387,16 @@
       box-sizing: border-box;
       padding: 8px 12px;
       font-size: 16px;
-      border: 1px solid #d4d4d8;
+      background: #1f1b1a;
+      color: #e8e4e1;
+      border: 1px solid #4a403d;
       border-radius: 6px;
       outline: none;
     }
 
     .format-modal input:focus {
-      border-color: #a1a1aa;
-      box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.3);
+      border-color: #ea580c;
+      box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
     }
 
     .format-modal input+input {
@@ -374,15 +408,16 @@
       padding: 6px 14px;
       font-size: 13px;
       cursor: pointer;
-      background: white;
-      border: 1px solid #d4d4d8;
+      background: #362f2d;
+      border: 1px solid #4a403d;
       border-radius: 6px;
-      color: #71717a;
-      transition: background 0.15s;
+      color: #a69e9a;
+      transition: background 0.15s, color 0.15s;
     }
 
     .format-modal .btn-cancel:hover {
-      background: #f4f4f5;
+      background: #4a403d;
+      color: #f5f1ee;
     }
   </style>
 </head>
