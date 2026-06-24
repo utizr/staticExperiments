@@ -244,7 +244,7 @@ const SimpleEditor = (() => {
     // ==========================================
 
     function handleKeydown(e) {
-      // Cmd/Ctrl+E opens format modal
+      // Cmd/Ctrl+J opens format modal
       if (e.key === 'j' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         const sel = window.getSelection();
@@ -260,6 +260,7 @@ const SimpleEditor = (() => {
 
         let range = sel.getRangeAt(0);
 
+        // If there's an active selection, delete its contents first
         if (!range.collapsed) {
           range.deleteContents();
           range = sel.getRangeAt(0);
@@ -274,11 +275,68 @@ const SimpleEditor = (() => {
           tailRange.selectNodeContents(blockElement);
           tailRange.setStart(range.endContainer, range.endOffset);
 
+          // Check if we are at the end of the block element
           if (tailRange.toString().trim().length === 0) {
+
+            // --- NEW LOGIC: Handling empty LI elements (Double Enter) ---
             if (blockElement.tagName.toLowerCase() === 'li' && blockElement.textContent.trim().length === 0) {
+              e.preventDefault(); // Stop the browser from creating invalid HTML
+
+              const parentList = blockElement.parentElement; // The immediate UL or OL
+              const parentListItem = parentList.closest('li'); // The wrapping LI (if nested)
+
+              // 1. Clean up the current empty LI
+              blockElement.remove();
+
+              // 2. If the nested list is now empty, remove it too
+              if (parentList.children.length === 0) {
+                parentList.remove();
+              }
+
+              if (parentListItem) {
+                // SCENARIO A: We are in a nested list
+                // Step out one level by creating a new LI after the parent LI
+                const newLi = document.createElement('li');
+                newLi.innerHTML = '<br>';
+
+                if (parentListItem.nextSibling) {
+                  parentListItem.parentNode.insertBefore(newLi, parentListItem.nextSibling);
+                } else {
+                  parentListItem.parentNode.appendChild(newLi);
+                }
+
+                // Move cursor to the new list item
+                sel.removeAllRanges();
+                const newRange = document.createRange();
+                newRange.setStart(newLi, 0);
+                newRange.collapse(true);
+                sel.addRange(newRange);
+
+              } else {
+                // SCENARIO B: We are at the top-level list
+                // Break out of the list entirely into a new paragraph
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+
+                if (parentList.nextSibling) {
+                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
+                } else {
+                  parentList.parentNode.appendChild(p);
+                }
+
+                // Move cursor to the new paragraph
+                sel.removeAllRanges();
+                const newRange = document.createRange();
+                newRange.setStart(p, 0);
+                newRange.collapse(true);
+                sel.addRange(newRange);
+              }
+
               return;
             }
+            // --- END NEW LOGIC ---
 
+            // Normal Enter behavior for populated LIs or Ps
             e.preventDefault();
             const newTagName = blockElement.tagName.toLowerCase();
             const newBlock = document.createElement(newTagName);
