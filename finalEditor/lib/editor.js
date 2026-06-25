@@ -785,6 +785,171 @@ const SimpleEditor = (() => {
     element.addEventListener('input', handleInput, { signal });
 
     // ==========================================
+    // BLOCK DRAG & DROP (Notion-style)
+    // ==========================================
+
+    const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'pre', 'li']);
+    const DRAG_ICON = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="5" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="9" cy="19" r="1.5"></circle><circle cx="15" cy="5" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="15" cy="19" r="1.5"></circle></svg>`;
+
+    const blockHandle = document.createElement('div');
+    blockHandle.className = 'editor-block-handle';
+    blockHandle.innerHTML = DRAG_ICON;
+    Object.assign(blockHandle.style, {
+      position: 'fixed', display: 'none', opacity: '0',
+      transition: 'opacity 0.15s',
+      zIndex: '10', cursor: 'grab', touchAction: 'none', userSelect: 'none'
+    });
+    document.body.appendChild(blockHandle);
+
+    let hoveredBlock = null;
+    let hideHandleTimer = null;
+
+    function findBlock(node) {
+      while (node && node !== element) {
+        if (node.nodeType === 1 && BLOCK_TAGS.has(node.tagName.toLowerCase())) return node;
+        node = node.parentNode;
+      }
+      return null;
+    }
+
+    function positionHandle(block) {
+      const rect = block.getBoundingClientRect();
+      const lineHeight = parseFloat(getComputedStyle(block).lineHeight) || 24;
+      blockHandle.style.left = (rect.left - 22) + 'px';
+      blockHandle.style.top = (rect.top + (lineHeight - 18) / 2) + 'px';
+      blockHandle.style.display = 'flex';
+      blockHandle.style.opacity = '1';
+    }
+
+    function showHandle(block) {
+      clearTimeout(hideHandleTimer);
+      hoveredBlock = block;
+      positionHandle(block);
+    }
+
+    function scheduleHideHandle() {
+      clearTimeout(hideHandleTimer);
+      hideHandleTimer = setTimeout(() => {
+        blockHandle.style.opacity = '0';
+        blockHandle.style.display = 'none';
+        hoveredBlock = null;
+      }, 150);
+    }
+
+    element.addEventListener('mousemove', (e) => {
+      if (element.contentEditable !== 'true') return;
+      if (blockDnd.active) return;
+      const block = findBlock(e.target);
+      if (block && block !== hoveredBlock) showHandle(block);
+    }, { signal });
+
+    element.addEventListener('mouseleave', () => {
+      if (!blockDnd.active) scheduleHideHandle();
+    }, { signal });
+
+    element.addEventListener('scroll', () => {
+      if (hoveredBlock && !blockDnd.active) positionHandle(hoveredBlock);
+    }, { signal });
+
+    blockHandle.addEventListener('mouseenter', () => clearTimeout(hideHandleTimer));
+    blockHandle.addEventListener('mouseleave', () => {
+      if (!blockDnd.active) scheduleHideHandle();
+    });
+
+    function insertAtPosition(el, ref, position) {
+      const next = position === 'before' ? ref : ref.nextSibling;
+      if (next) ref.parentNode.insertBefore(el, next);
+      else ref.parentNode.appendChild(el);
+    }
+
+    function nearestBlockByY(y, exclude) {
+      let best = null, bestDist = Infinity;
+      for (const child of element.children) {
+        const tag = child.tagName.toLowerCase();
+        if (!BLOCK_TAGS.has(tag)) continue;
+        const items = (tag === 'ul' || tag === 'ol')
+          ? [child, ...child.querySelectorAll('li')]
+          : [child];
+        for (const b of items) {
+          if (b === exclude) continue;
+          const r = b.getBoundingClientRect();
+          const d = Math.abs(y - (r.top + r.height / 2));
+          if (d < bestDist) { bestDist = d; best = b; }
+        }
+      }
+      return best;
+    }
+
+    const blockDnd = new DragDrop({
+      container: element,
+      onDragStart: () => {
+        blockHandle.style.opacity = '0';
+        blockHandle.style.display = 'none';
+      },
+      onDragEnd: () => { hoveredBlock = null; },
+
+      resolveDropTarget: (e, meta) => {
+        const hit = document.elementFromPoint(e.clientX, e.clientY);
+        if (!hit) return null;
+
+        let block = findBlock(hit);
+
+        if (!block && element.contains(hit)) {
+          block = nearestBlockByY(e.clientY, meta.el);
+        }
+
+        if (!block || block === meta.el || meta.el.contains(block)) return null;
+
+        const rect = block.getBoundingClientRect();
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        return { el: block, position: isAbove ? 'before' : 'after' };
+      },
+
+      onDrop: (meta, target) => {
+        const src = meta.el;
+        const dst = target.el;
+        const pos = target.position;
+        const srcTag = src.tagName.toLowerCase();
+        const dstTag = dst.tagName.toLowerCase();
+        const srcIsLi = srcTag === 'li';
+        const dstIsLi = dstTag === 'li';
+
+        const srcList = srcIsLi ? src.parentElement : null;
+        src.remove();
+        if (srcList && srcList.children.length === 0) srcList.remove();
+
+        if (dstIsLi) {
+          const li = srcIsLi ? src : document.createElement('li');
+          if (!srcIsLi) li.innerHTML = src.innerHTML;
+          insertAtPosition(li, dst, pos);
+        } else if (dstTag === 'ul' || dstTag === 'ol') {
+          const li = srcIsLi ? src : document.createElement('li');
+          if (!srcIsLi) li.innerHTML = src.innerHTML;
+          if (pos === 'before' && dst.firstChild) {
+            dst.insertBefore(li, dst.firstChild);
+          } else {
+            dst.appendChild(li);
+          }
+        } else {
+          if (srcIsLi) {
+            const p = document.createElement('p');
+            p.innerHTML = src.innerHTML;
+            insertAtPosition(p, dst, pos);
+          } else {
+            insertAtPosition(src, dst, pos);
+          }
+        }
+
+        notifyChange();
+      }
+    });
+
+    blockHandle.addEventListener('pointerdown', (e) => {
+      if (!hoveredBlock) return;
+      blockDnd.start(e, { el: hoveredBlock }, hoveredBlock);
+    });
+
+    // ==========================================
     // PUBLIC INSTANCE API
     // ==========================================
 
@@ -837,6 +1002,8 @@ const SimpleEditor = (() => {
 
       destroy() {
         abortController.abort();
+        blockDnd.destroy();
+        blockHandle.remove();
         element.contentEditable = 'false';
       }
     };

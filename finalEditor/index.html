@@ -210,6 +210,23 @@
       border-radius: 6px;
     }
 
+    /* --- Editor Block Drag Handle --- */
+    .editor-block-handle {
+      padding: 2px 4px;
+      border-radius: 3px;
+      color: #7a706c;
+      justify-content: center;
+    }
+
+    .editor-block-handle:hover {
+      color: #e8e4e1;
+      background: #362f2d;
+    }
+
+    .editor-block-handle:active {
+      cursor: grabbing;
+    }
+
     /* --- Editor Styles --- */
     /* --- Editor Link Styles --- */
     .editor-area a {
@@ -442,6 +459,7 @@
     </div>
   </div>
 
+  <script src="lib/dragndrop.js"></script>
   <script src="lib/editor.js"></script>
   <script src="lib/organizer.js"></script>
   <script>

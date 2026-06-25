@@ -4,13 +4,6 @@ class SidebarOrganizer {
     this.currentNoteId = null;
     this.listeners = {};
 
-    // Drag and drop state
-    this.dragState = {
-      itemType: null, itemId: null, sourceEl: null, cloneEl: null,
-      startX: 0, startY: 0, initLeft: 0, initTop: 0,
-      dropTargetId: null, dropTargetType: null, dropPosition: null
-    };
-
     this.initDOM();
     this.render();
   }
@@ -88,9 +81,12 @@ class SidebarOrganizer {
       }
     });
 
-    // Bind drag handlers to this instance
-    this.handleDragMove = this.handleDragMove.bind(this);
-    this.endDrag = this.endDrag.bind(this);
+    // Drag & drop via reusable DragDrop
+    this.dnd = new DragDrop({
+      container: this.overlay,
+      resolveDropTarget: (e, meta) => this._resolveDropTarget(e, meta),
+      onDrop: (meta, target) => this._handleDrop(meta, target)
+    });
   }
 
   // --- Core Rendering ---
@@ -110,7 +106,7 @@ class SidebarOrganizer {
       const fHandle = document.createElement('div');
       fHandle.className = 'drag-handle';
       fHandle.innerHTML = dragIcon;
-      fHandle.onpointerdown = (e) => this.startDrag(e, 'folder', folder.id, folderDiv);
+      fHandle.onpointerdown = (e) => this.dnd.start(e, { type: 'folder', id: folder.id }, folderDiv);
 
       const fTitleText = document.createElement('span');
       fTitleText.className = 'folder-name-text';
@@ -151,7 +147,7 @@ class SidebarOrganizer {
         nHandle.className = 'drag-handle';
         nHandle.innerHTML = dragIcon;
         nHandle.onclick = (e) => e.stopPropagation();
-        nHandle.onpointerdown = (e) => this.startDrag(e, 'note', note.id, noteLi);
+        nHandle.onpointerdown = (e) => this.dnd.start(e, { type: 'note', id: note.id }, noteLi);
 
         const nTitleText = document.createElement('span');
         nTitleText.className = 'note-name-text';
@@ -214,115 +210,61 @@ class SidebarOrganizer {
     });
   }
 
-  // --- Drag & Drop Logic ---
-  startDrag(e, type, id, sourceEl) {
-    if (e.cancelable) e.preventDefault();
-    this.dragState.itemType = type;
-    this.dragState.itemId = id;
-    this.dragState.sourceEl = sourceEl;
+  // --- Drag & Drop Callbacks ---
 
-    const rect = sourceEl.getBoundingClientRect();
-    this.dragState.startX = e.clientX;
-    this.dragState.startY = e.clientY;
-    this.dragState.initLeft = rect.left;
-    this.dragState.initTop = rect.top;
-
-    this.dragState.cloneEl = sourceEl.cloneNode(true);
-    Object.assign(this.dragState.cloneEl.style, {
-      position: 'fixed', left: rect.left + 'px', top: rect.top + 'px', width: rect.width + 'px',
-      opacity: '0.9', boxShadow: '0 10px 25px rgba(0,0,0,0.15)', pointerEvents: 'none', zIndex: '9999'
-    });
-    document.body.appendChild(this.dragState.cloneEl);
-    sourceEl.style.opacity = '0.3';
-
-    document.addEventListener('pointermove', this.handleDragMove, { passive: false });
-    document.addEventListener('pointerup', this.endDrag);
-  }
-
-  clearDropStyles() {
-    this.overlay.querySelectorAll('.drop-target-before, .drop-target-after, .drop-target-inside').forEach(el => {
-      el.classList.remove('drop-target-before', 'drop-target-after', 'drop-target-inside');
-    });
-    this.dragState.dropTargetId = null;
-    this.dragState.dropPosition = null;
-  }
-
-  handleDragMove(e) {
-    if (!this.dragState.cloneEl) return;
-    e.preventDefault();
-    this.dragState.cloneEl.style.left = (this.dragState.initLeft + e.clientX - this.dragState.startX) + 'px';
-    this.dragState.cloneEl.style.top = (this.dragState.initTop + e.clientY - this.dragState.startY) + 'px';
-    this.clearDropStyles();
-
+  _resolveDropTarget(e, meta) {
     const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-    if (!targetEl) return;
+    if (!targetEl) return null;
 
     const noteTarget = targetEl.closest('.note-item');
     const folderTarget = targetEl.closest('.folder-title');
     const folderItemTarget = targetEl.closest('.folder-item');
 
-    if (this.dragState.itemType === 'note') {
-      if (noteTarget && noteTarget.dataset.id !== this.dragState.itemId) {
+    if (meta.type === 'note') {
+      if (noteTarget && noteTarget.dataset.id !== meta.id) {
         const rect = noteTarget.getBoundingClientRect();
-        const isAbove = e.clientY < rect.top + (rect.height / 2);
-        this.dragState.dropTargetId = noteTarget.dataset.id;
-        this.dragState.dropTargetType = 'note';
-        this.dragState.dropPosition = isAbove ? 'before' : 'after';
-        noteTarget.classList.add(isAbove ? 'drop-target-before' : 'drop-target-after');
-      } else if (folderTarget) {
-        this.dragState.dropTargetId = folderTarget.dataset.id;
-        this.dragState.dropTargetType = 'folder';
-        this.dragState.dropPosition = 'inside';
-        folderTarget.classList.add('drop-target-inside');
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        return { el: noteTarget, id: noteTarget.dataset.id, type: 'note', position: isAbove ? 'before' : 'after' };
       }
-    } else if (this.dragState.itemType === 'folder') {
-      if (folderItemTarget && folderItemTarget.dataset.id !== this.dragState.itemId) {
+      if (folderTarget) {
+        return { el: folderTarget, id: folderTarget.dataset.id, type: 'folder', position: 'inside' };
+      }
+    } else if (meta.type === 'folder') {
+      if (folderItemTarget && folderItemTarget.dataset.id !== meta.id) {
         const rect = folderItemTarget.getBoundingClientRect();
-        const isAbove = e.clientY < rect.top + (rect.height / 2);
-        this.dragState.dropTargetId = folderItemTarget.dataset.id;
-        this.dragState.dropTargetType = 'folder';
-        this.dragState.dropPosition = isAbove ? 'before' : 'after';
-        const titleToHighlight = folderItemTarget.querySelector('.folder-title');
-        if (titleToHighlight) titleToHighlight.classList.add(isAbove ? 'drop-target-before' : 'drop-target-after');
+        const isAbove = e.clientY < rect.top + rect.height / 2;
+        const titleEl = folderItemTarget.querySelector('.folder-title');
+        return { el: titleEl || folderItemTarget, id: folderItemTarget.dataset.id, type: 'folder', position: isAbove ? 'before' : 'after' };
       }
     }
+
+    return null;
   }
 
-  endDrag() {
-    document.removeEventListener('pointermove', this.handleDragMove);
-    document.removeEventListener('pointerup', this.endDrag);
+  _handleDrop(meta, target) {
+    if (meta.type === 'note') {
+      const noteIndex = this.data.notes.findIndex(n => n.id === meta.id);
+      const note = this.data.notes.splice(noteIndex, 1)[0];
 
-    if (this.dragState.cloneEl) this.dragState.cloneEl.remove();
-    if (this.dragState.sourceEl) this.dragState.sourceEl.style.opacity = '';
-
-    const { itemType, itemId, dropTargetId, dropTargetType, dropPosition } = this.dragState;
-    this.clearDropStyles();
-
-    if (dropTargetId) {
-      if (itemType === 'note') {
-        const noteIndex = this.data.notes.findIndex(n => n.id === itemId);
-        const note = this.data.notes.splice(noteIndex, 1)[0];
-
-        if (dropPosition === 'inside' && dropTargetType === 'folder') {
-          note.folderId = dropTargetId;
-          this.data.notes.push(note);
-        } else if (dropTargetType === 'note') {
-          const targetNoteIndex = this.data.notes.findIndex(n => n.id === dropTargetId);
-          note.folderId = this.data.notes[targetNoteIndex].folderId;
-          const insertIndex = dropPosition === 'before' ? targetNoteIndex : targetNoteIndex + 1;
-          this.data.notes.splice(insertIndex, 0, note);
-        }
-      } else if (itemType === 'folder') {
-        const folderIndex = this.data.folders.findIndex(f => f.id === itemId);
-        const folder = this.data.folders.splice(folderIndex, 1)[0];
-
-        const targetFolderIndex = this.data.folders.findIndex(f => f.id === dropTargetId);
-        const insertIndex = dropPosition === 'before' ? targetFolderIndex : targetFolderIndex + 1;
-        this.data.folders.splice(insertIndex, 0, folder);
+      if (target.position === 'inside' && target.type === 'folder') {
+        note.folderId = target.id;
+        this.data.notes.push(note);
+      } else if (target.type === 'note') {
+        const targetNoteIndex = this.data.notes.findIndex(n => n.id === target.id);
+        note.folderId = this.data.notes[targetNoteIndex].folderId;
+        const insertIndex = target.position === 'before' ? targetNoteIndex : targetNoteIndex + 1;
+        this.data.notes.splice(insertIndex, 0, note);
       }
-      this.emit('change', this.data);
-      this.render();
+    } else if (meta.type === 'folder') {
+      const folderIndex = this.data.folders.findIndex(f => f.id === meta.id);
+      const folder = this.data.folders.splice(folderIndex, 1)[0];
+
+      const targetFolderIndex = this.data.folders.findIndex(f => f.id === target.id);
+      const insertIndex = target.position === 'before' ? targetFolderIndex : targetFolderIndex + 1;
+      this.data.folders.splice(insertIndex, 0, folder);
     }
-    this.dragState = { itemType: null, itemId: null, sourceEl: null, cloneEl: null, dropTargetId: null, dropPosition: null };
+
+    this.emit('change', this.data);
+    this.render();
   }
 }
