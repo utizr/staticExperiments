@@ -433,7 +433,52 @@ const SimpleEditor = (() => {
         }
       }
 
+      ensureParagraphWrapper();
       notifyChange();
+    }
+
+    function ensureParagraphWrapper() {
+      if (element.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol, pre')) return;
+
+      const sel = window.getSelection();
+
+      if (!element.textContent && !element.querySelector('br')) {
+        element.innerHTML = '<p><br></p>';
+        const newRange = document.createRange();
+        newRange.setStart(element.firstChild, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        return;
+      }
+
+      let cursorOffset = null;
+      if (sel.rangeCount) {
+        const range = sel.getRangeAt(0);
+        if (element.contains(range.startContainer)) {
+          cursorOffset = range.startOffset;
+        }
+      }
+
+      const p = document.createElement('p');
+      while (element.firstChild) {
+        p.appendChild(element.firstChild);
+      }
+      element.appendChild(p);
+
+      if (cursorOffset !== null) {
+        const newRange = document.createRange();
+        const textNode = p.firstChild;
+        if (textNode && textNode.nodeType === 3) {
+          newRange.setStart(textNode, Math.min(cursorOffset, textNode.length));
+          newRange.collapse(true);
+        } else {
+          newRange.selectNodeContents(p);
+          newRange.collapse(false);
+        }
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
     }
 
     // ==========================================
