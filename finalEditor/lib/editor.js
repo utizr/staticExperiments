@@ -34,6 +34,15 @@ const SimpleEditor = (() => {
       emit('change', element.innerHTML);
     }
 
+    function isURL(str) {
+      try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    }
+
     // ==========================================
     // PASTE SANITIZATION
     // ==========================================
@@ -198,6 +207,24 @@ const SimpleEditor = (() => {
     function handlePaste(e) {
       e.preventDefault();
 
+      const plainText = e.clipboardData.getData('text/plain').trim();
+      const selection = window.getSelection();
+
+      if (selection.rangeCount > 0 && !selection.isCollapsed && isURL(plainText)) {
+        const range = selection.getRangeAt(0);
+        const anchor = document.createElement('a');
+        anchor.href = plainText;
+        anchor.target = '_blank';
+        anchor.appendChild(range.extractContents());
+        range.insertNode(anchor);
+        range.setStartAfter(anchor);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        notifyChange();
+        return;
+      }
+
       let rawData = e.clipboardData.getData('text/html');
 
       // TODO we should attempt markdown parsing here.
@@ -212,7 +239,6 @@ const SimpleEditor = (() => {
       });
 
       // Context-aware list merging
-      const selection = window.getSelection();
       if (selection.rangeCount > 0) {
         let cursorNode = selection.getRangeAt(0).startContainer;
         if (cursorNode.nodeType === 3) cursorNode = cursorNode.parentNode;
