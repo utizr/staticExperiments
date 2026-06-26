@@ -460,6 +460,7 @@
   </div>
 
   <script src="lib/dragndrop.js"></script>
+  <script src="lib/converter.js"></script>
   <script src="lib/editor.js"></script>
   <script src="lib/organizer.js"></script>
   <script>
@@ -502,7 +503,7 @@
       if (note) {
         titleInput.value = note.title;
         titleInput.disabled = false;
-        editorEl.innerHTML = note.content ? SimpleEditor.jsonToHtmlString(note.content) : '<p><br></p>';
+        editorEl.innerHTML = note.content ? Converter.jsonToHtmlString(note.content) : '<p><br></p>';
         organizer.setActiveNote(noteId);
       }
     }
@@ -540,7 +541,7 @@
       saveTimer = setTimeout(() => {
         const note = appData.notes.find(n => n.id === currentNoteId);
         if (note) {
-          note.content = SimpleEditor.htmlStringToJson(html);
+          note.content = Converter.htmlStringToJson(html);
           saveData();
         }
       }, 1000);

@@ -1,5 +1,15 @@
 /**
- * SimpleEditor - A lightweight WYSIWYG editor library.
+ * SimpleEditor — A lightweight, dependency-free WYSIWYG editor.
+ *
+ * Turns any HTMLElement into a contentEditable rich-text surface with:
+ *   - Paste sanitization (delegates to Converter.sanitizeHTML from converter.js)
+ *   - Keyboard-driven formatting via a modal (Cmd/Ctrl+J or ".f." trigger)
+ *   - Auto list creation (type "-" at the start of a line)
+ *   - Notion-style block drag & drop (requires DragDrop from dragndrop.js)
+ *
+ * Dependencies (loaded before this script):
+ *   - lib/dragndrop.js  → DragDrop
+ *   - lib/converter.js  → Converter (sanitizeHTML, DOM↔JSON helpers)
  *
  * Usage:
  *   const editor = SimpleEditor.mount(document.getElementById('my-div'), { allowedTags: [...] });
@@ -8,7 +18,16 @@
  */
 const SimpleEditor = (() => {
 
-  const DEFAULT_ALLOWED_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'b', 'i', 'a', 'u', 'strong', 'pre', 'code', 'em', 'br', 'ul', 'ol', 'li'];
+  const DEFAULT_ALLOWED_TAGS = [
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'b', 'i', 'a', 'u', 'strong', 'em',
+    'pre', 'code', 'br',
+    'ul', 'ol', 'li',
+  ];
+
+  // ════════════════════════════════════════════
+  //  mount() — Main entry point
+  // ════════════════════════════════════════════
 
   function mount(element, options = {}) {
     if (!element || !(element instanceof HTMLElement)) {
@@ -16,13 +35,21 @@ const SimpleEditor = (() => {
     }
 
     const allowedTags = options.allowedTags || DEFAULT_ALLOWED_TAGS;
-    const allowedTagSet = new Set(allowedTags);
+
+    // Event bus: maps event names → arrays of listener functions.
     const listeners = { change: [], modechange: [] };
+
+    // A single AbortController governs every event listener the editor
+    // registers. Calling abort() in destroy() removes them all at once.
     const abortController = new AbortController();
     const signal = abortController.signal;
 
     element.contentEditable = 'true';
+
+    // Tell the browser to wrap bare text in <p> tags (not <div>) on Enter.
     document.execCommand('defaultParagraphSeparator', false, 'p');
+
+    // ── Event helpers ──────────────────────────
 
     function emit(event, data) {
       for (const fn of listeners[event] || []) {
@@ -43,166 +70,9 @@ const SimpleEditor = (() => {
       }
     }
 
-    // ==========================================
-    // PASTE SANITIZATION
-    // ==========================================
-
-
-    /**
-     * Sanitizes an HTML string based on allowed tags, attributes, and tag conversions.
-     * Unsupported tags are unwrapped, preserving their inner content.
-     * * @param {string} htmlString - The dirty HTML string.
-     * @param {string[]} allowedTags - Array of allowed tag names (e.g., ['p', 'a', 'strong']).
-     * @param {Object} [options={}] - Configuration options.
-     * @param {Object} [options.allowedAttributes={}] - Map of tags to allowed attributes (e.g., { a: ['href'] }).
-     * @param {Object} [options.tagConversions={}] - Map of tags to convert (e.g., { b: 'strong' }).
-     * @returns {string} - The sanitized HTML string.
-     */
-    function sanitizeHTML(htmlString, allowedTags, options = {}) {
-      // Destructure options with defaults
-      const { allowedAttributes = {}, tagConversions = {} } = options;
-
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(htmlString, 'text/html');
-
-
-      // PRE PROCESSING
-
-      // Unwrap <span> tags
-      const spans = Array.from(doc.querySelectorAll('span'));
-      spans.forEach(span => {
-        const fragment = doc.createDocumentFragment();
-        while (span.firstChild) fragment.appendChild(span.firstChild);
-        span.replaceWith(fragment);
-      });
-
-      // Smarter <div> handling
-      const divs = Array.from(doc.querySelectorAll('div'));
-      divs.forEach(div => {
-        if (div.querySelector('ul, ol, li, p, div')) {
-          const fragment = doc.createDocumentFragment();
-          while (div.firstChild) fragment.appendChild(div.firstChild);
-          div.replaceWith(fragment);
-        } else {
-          const p = doc.createElement('p');
-          while (div.firstChild) p.appendChild(div.firstChild);
-          div.replaceWith(p);
-        }
-      });
-
-      // Rescue orphaned <li> tags
-      const lis = Array.from(doc.querySelectorAll('li'));
-      lis.forEach(li => {
-        if (li.parentElement && li.parentElement.tagName !== 'UL' && li.parentElement.tagName !== 'OL') {
-          const ul = doc.createElement('ul');
-          li.before(ul);
-          let current = li;
-          while (current && current.tagName === 'LI') {
-            let next = current.nextElementSibling;
-            ul.appendChild(current);
-            current = next;
-          }
-        }
-      });
-
-      // Unwrap <p> inside <li>
-      const listParagraphs = Array.from(doc.querySelectorAll('li p'));
-      listParagraphs.forEach(p => {
-        const fragment = doc.createDocumentFragment();
-        while (p.firstChild) fragment.appendChild(p.firstChild);
-        p.replaceWith(fragment);
-      });
-
-      // Unwrap any element not in the allow list
-      const allElements = Array.from(doc.body.querySelectorAll('*'));
-      for (let idx = allElements.length - 1; idx >= 0; idx--) {
-        const el = allElements[idx];
-        if (!allowedTagSet.has(el.tagName.toLowerCase())) {
-          const fragment = doc.createDocumentFragment();
-          while (el.firstChild) fragment.appendChild(el.firstChild);
-          el.replaceWith(fragment);
-        }
-      }
-
-      // add target:_blank to links
-      doc.querySelectorAll('a[href]').forEach(a => a.setAttribute('target', '_blank'));
-
-
-      // Normalize arrays and objects to lowercase for safe comparison
-      const safeTags = allowedTags.map(tag => tag.toLowerCase());
-
-      const conversions = Object.entries(tagConversions).reduce((acc, [key, value]) => {
-        acc[key.toLowerCase()] = value.toLowerCase();
-        return acc;
-      }, {});
-
-      function processNode(node) {
-        if (node.nodeType === Node.TEXT_NODE) {
-          return document.createTextNode(node.textContent);
-        }
-
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const originalTagName = node.tagName.toLowerCase();
-
-          // Apply conversion if it exists, otherwise use the original tag
-          const tagName = conversions[originalTagName] || originalTagName;
-
-          // Case A: The resulting tag is ALLOWED
-          if (safeTags.includes(tagName)) {
-            const el = document.createElement(tagName);
-
-            // Note: Attributes are validated against the *new* tag name
-            const permittedAttrs = allowedAttributes[tagName] || [];
-
-            for (const attr of node.attributes) {
-              if (permittedAttrs.includes(attr.name)) {
-                // Prevent `javascript:` URIs
-                if (attr.name === 'href' && attr.value.trim().toLowerCase().startsWith('javascript:')) {
-                  continue;
-                }
-                el.setAttribute(attr.name, attr.value);
-              }
-            }
-
-            for (const child of node.childNodes) {
-              const processedChild = processNode(child);
-              if (processedChild) {
-                el.appendChild(processedChild);
-              }
-            }
-            return el;
-          }
-
-          // Case B: The resulting tag is NOT ALLOWED (Unwrap)
-          else {
-            const fragment = document.createDocumentFragment();
-            for (const child of node.childNodes) {
-              const processedChild = processNode(child);
-              if (processedChild) {
-                fragment.appendChild(processedChild);
-              }
-            }
-            return fragment;
-          }
-        }
-
-        return null;
-      }
-
-      const resultFragment = document.createDocumentFragment();
-      for (const child of doc.body.childNodes) {
-        const processedChild = processNode(child);
-        if (processedChild) {
-          resultFragment.appendChild(processedChild);
-        }
-      }
-
-      const tempContainer = document.createElement('div');
-      tempContainer.appendChild(resultFragment);
-      return tempContainer.innerHTML;
-    }
-
-
+    // ════════════════════════════════════════════
+    //  Paste Handling
+    // ════════════════════════════════════════════
 
     function handlePaste(e) {
       e.preventDefault();
@@ -210,6 +80,9 @@ const SimpleEditor = (() => {
       const plainText = e.clipboardData.getData('text/plain').trim();
       const selection = window.getSelection();
 
+      // ── URL-over-selection: wrap selected text in a link ──
+      // If the user has text selected and pastes a URL, turn the selection
+      // into an anchor instead of replacing it with the URL text.
       if (selection.rangeCount > 0 && !selection.isCollapsed && isURL(plainText)) {
         const range = selection.getRangeAt(0);
         const anchor = document.createElement('a');
@@ -225,20 +98,24 @@ const SimpleEditor = (() => {
         return;
       }
 
-      let rawData = e.clipboardData.getData('text/html');
+      // ── HTML paste (with plain-text fallback) ──
+      let rawHTML = e.clipboardData.getData('text/html');
 
-      // TODO we should attempt markdown parsing here.
-      if (!rawData) {
-        rawData = e.clipboardData.getData('text/plain');
-        rawData = `<p>${rawData.replace(/\n/g, '<br>')}</p>`;
+      if (!rawHTML) {
+        // No HTML on the clipboard — treat plain text as a paragraph,
+        // converting newlines to <br> so line breaks are preserved.
+        // TODO: attempt markdown parsing here for richer results.
+        rawHTML = `<p>${plainText.replace(/\n/g, '<br>')}</p>`;
       }
 
-      let cleanHTML = sanitizeHTML(rawData, allowedTags, {
+      let cleanHTML = Converter.sanitizeHTML(rawHTML, allowedTags, {
         allowedAttributes: { a: ['href', 'target'] },
-        tagConversions: { strong: 'b', em: 'i' }
+        tagConversions: { strong: 'b', em: 'i' },
       });
 
-      // Context-aware list merging
+      // ── Context-aware list merging ──
+      // When pasting inside a list item, strip the outer <ul>/<ol> wrapper
+      // so the pasted items merge into the existing list instead of nesting.
       if (selection.rangeCount > 0) {
         let cursorNode = selection.getRangeAt(0).startContainer;
         if (cursorNode.nodeType === 3) cursorNode = cursorNode.parentNode;
@@ -255,7 +132,7 @@ const SimpleEditor = (() => {
         }
       }
 
-      // Ensure links open in new tab
+      // Ensure every link opens in a new tab (belt-and-suspenders).
       const linkTemp = document.createElement('div');
       linkTemp.innerHTML = cleanHTML;
       linkTemp.querySelectorAll('a[href]').forEach(a => a.setAttribute('target', '_blank'));
@@ -265,12 +142,12 @@ const SimpleEditor = (() => {
       notifyChange();
     }
 
-    // ==========================================
-    // KEYDOWN HANDLING
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Keyboard Handling (keydown)
+    // ════════════════════════════════════════════
 
     function handleKeydown(e) {
-      // Cmd/Ctrl+J opens format modal
+      // ── Cmd/Ctrl+J → open the format modal ──
       if (e.key === 'j' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         const sel = window.getSelection();
@@ -279,129 +156,126 @@ const SimpleEditor = (() => {
         return;
       }
 
-      // Enter key: clean paragraph/list item creation
+      // ── Enter key — custom paragraph/list splitting ──
+      // We intercept Enter (without Shift) so we can:
+      //   • create clean new <p> or <li> elements (no leftover <br><div>),
+      //   • handle double-Enter in an empty <li> to break out of the list.
       if (e.key === 'Enter' && !e.shiftKey) {
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
 
         let range = sel.getRangeAt(0);
 
-        // If there's an active selection, delete its contents first
+        // Delete the selected content first (if any) before splitting.
         if (!range.collapsed) {
           range.deleteContents();
           range = sel.getRangeAt(0);
         }
 
-        let container = range.startContainer;
+        const container = range.startContainer;
         const parent = container.nodeType === 3 ? container.parentNode : container;
         const blockElement = parent.closest('li') || parent.closest('p');
 
-        if (blockElement) {
-          const tailRange = range.cloneRange();
-          tailRange.selectNodeContents(blockElement);
-          tailRange.setStart(range.endContainer, range.endOffset);
+        if (!blockElement) return;
 
-          // Check if we are at the end of the block element
-          if (tailRange.toString().trim().length === 0) {
+        // Build a range covering everything *after* the cursor to the end
+        // of the current block. If that tail is empty, the cursor is at the
+        // very end of the block.
+        const tailRange = range.cloneRange();
+        tailRange.selectNodeContents(blockElement);
+        tailRange.setStart(range.endContainer, range.endOffset);
+        const cursorAtEnd = tailRange.toString().trim().length === 0;
 
-            // --- NEW LOGIC: Handling empty LI elements (Double Enter) ---
-            if (blockElement.tagName.toLowerCase() === 'li' && blockElement.textContent.trim().length === 0) {
-              e.preventDefault(); // Stop the browser from creating invalid HTML
+        if (!cursorAtEnd) return; // let the browser handle mid-block Enter
 
-              const parentList = blockElement.parentElement; // The immediate UL or OL
-              const parentListItem = parentList.closest('li'); // The wrapping LI (if nested)
+        // ── Double-Enter in an empty <li>: break out of the list ──
+        if (blockElement.tagName.toLowerCase() === 'li' && blockElement.textContent.trim().length === 0) {
+          e.preventDefault();
 
-              // 1. Clean up the current empty LI
-              blockElement.remove();
+          const parentList = blockElement.parentElement;       // immediate <ul>/<ol>
+          const parentListItem = parentList.closest('li');     // wrapping <li> if nested
 
-              // 2. If the nested list is now empty, remove it too
-              if (parentList.children.length === 0) {
-                parentList.remove();
-              }
+          blockElement.remove();
+          if (parentList.children.length === 0) parentList.remove();
 
-              if (parentListItem) {
-                // SCENARIO A: We are in a nested list
-                // Step out one level by creating a new LI after the parent LI
-                const newLi = document.createElement('li');
-                newLi.innerHTML = '<br>';
+          if (parentListItem) {
+            // Nested list → step out one level by appending a new <li>
+            // after the parent list item.
+            const newLi = document.createElement('li');
+            newLi.innerHTML = '<br>';
 
-                if (parentListItem.nextSibling) {
-                  parentListItem.parentNode.insertBefore(newLi, parentListItem.nextSibling);
-                } else {
-                  parentListItem.parentNode.appendChild(newLi);
-                }
-
-                // Move cursor to the new list item
-                sel.removeAllRanges();
-                const newRange = document.createRange();
-                newRange.setStart(newLi, 0);
-                newRange.collapse(true);
-                sel.addRange(newRange);
-
-              } else {
-                // SCENARIO B: We are at the top-level list
-                // Break out of the list entirely into a new paragraph
-                const p = document.createElement('p');
-                p.innerHTML = '<br>';
-
-                if (parentList.nextSibling) {
-                  parentList.parentNode.insertBefore(p, parentList.nextSibling);
-                } else {
-                  parentList.parentNode.appendChild(p);
-                }
-
-                // Move cursor to the new paragraph
-                sel.removeAllRanges();
-                const newRange = document.createRange();
-                newRange.setStart(p, 0);
-                newRange.collapse(true);
-                sel.addRange(newRange);
-              }
-
-              return;
-            }
-            // --- END NEW LOGIC ---
-
-            // Normal Enter behavior for populated LIs or Ps
-            e.preventDefault();
-            const newTagName = blockElement.tagName.toLowerCase();
-            const newBlock = document.createElement(newTagName);
-            newBlock.innerHTML = '<br>';
-
-            if (blockElement.nextSibling) {
-              blockElement.parentNode.insertBefore(newBlock, blockElement.nextSibling);
+            if (parentListItem.nextSibling) {
+              parentListItem.parentNode.insertBefore(newLi, parentListItem.nextSibling);
             } else {
-              blockElement.parentNode.appendChild(newBlock);
+              parentListItem.parentNode.appendChild(newLi);
             }
 
             sel.removeAllRanges();
             const newRange = document.createRange();
-            newRange.setStart(newBlock, 0);
+            newRange.setStart(newLi, 0);
+            newRange.collapse(true);
+            sel.addRange(newRange);
+          } else {
+            // Top-level list → break out into a new <p>.
+            const p = document.createElement('p');
+            p.innerHTML = '<br>';
+
+            if (parentList.nextSibling) {
+              parentList.parentNode.insertBefore(p, parentList.nextSibling);
+            } else {
+              parentList.parentNode.appendChild(p);
+            }
+
+            sel.removeAllRanges();
+            const newRange = document.createRange();
+            newRange.setStart(p, 0);
             newRange.collapse(true);
             sel.addRange(newRange);
           }
+          return;
         }
+
+        // ── Normal end-of-block Enter: create a new sibling block ──
+        e.preventDefault();
+        const newBlock = document.createElement(blockElement.tagName.toLowerCase());
+        newBlock.innerHTML = '<br>';
+
+        if (blockElement.nextSibling) {
+          blockElement.parentNode.insertBefore(newBlock, blockElement.nextSibling);
+        } else {
+          blockElement.parentNode.appendChild(newBlock);
+        }
+
+        sel.removeAllRanges();
+        const newRange = document.createRange();
+        newRange.setStart(newBlock, 0);
+        newRange.collapse(true);
+        sel.addRange(newRange);
       }
     }
 
-    // ==========================================
-    // INPUT HANDLING (list creation, format trigger)
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Input Handling (auto-list, format trigger)
+    // ════════════════════════════════════════════
 
     function handleInput(event) {
-      // List creation with "-"
+
+      // ── Auto-list creation ──
+      // Typing "-" as the only content of a block converts it into a <ul>.
+      // This mimics the Notion/Bear shortcut for quickly starting a list.
       if (event.inputType === 'insertText' && event.data === '-') {
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
         const range = sel.getRangeAt(0);
-        let container = range.startContainer;
 
-        while (container && container.nodeType !== 1) {
-          container = container.parentNode;
-        }
+        // Walk up from the cursor to the nearest element node.
+        let container = range.startContainer;
+        while (container && container.nodeType !== 1) container = container.parentNode;
         if (!container) return;
 
-        if (container.textContent.replace('\u200B', '') === '-') {
+        // Only trigger if the block's entire visible text is just "-".
+        const textWithoutZWSP = container.textContent.replace('\u200B', '');
+        if (textWithoutZWSP === '-') {
           container.textContent = '';
 
           const ul = document.createElement('ul');
@@ -409,8 +283,11 @@ const SimpleEditor = (() => {
           ul.appendChild(li);
 
           if (container.tagName === 'P') {
+            // Replace the paragraph with the new list.
             container.parentNode.replaceChild(ul, container);
           } else if (container.tagName === 'LI') {
+            // Inside an existing list — nest a sub-list under the
+            // previous sibling, or insert after the parent list.
             const prevLi = container.previousElementSibling;
             container.parentNode.removeChild(container);
             if (prevLi) {
@@ -432,18 +309,22 @@ const SimpleEditor = (() => {
         }
       }
 
-      // ".f." trigger for format modal
+      // ── ".f." trigger for format modal ──
+      // Typing ".f." anywhere opens the format modal (handy on mobile or
+      // when you don't want to reach for Cmd+J).  The three characters are
+      // deleted before the modal opens.
       if (event.inputType === 'insertText' || event.inputType === 'insertCompositionText') {
         const sel = window.getSelection();
         if (!sel.rangeCount) return;
         const range = sel.getRangeAt(0);
-        let container = range.startContainer;
+        const container = range.startContainer;
 
         if (container.nodeType === 3) {
           const text = container.textContent;
           const offset = range.startOffset;
 
           if (offset >= 3 && text.substring(offset - 3, offset) === '.f.') {
+            // Select the ".f." characters and delete them.
             sel.removeAllRanges();
             const deleteRange = document.createRange();
             deleteRange.setStart(container, offset - 3);
@@ -463,11 +344,20 @@ const SimpleEditor = (() => {
       notifyChange();
     }
 
+    /**
+     * Guarantees the editor always has at least one block-level wrapper.
+     *
+     * Browsers can leave bare text nodes directly inside the contentEditable
+     * root (e.g. after deleting the last paragraph). This wraps any stray
+     * content in a <p> so the DOM stays consistent and Enter handling works.
+     */
     function ensureParagraphWrapper() {
+      // Already has block content — nothing to do.
       if (element.querySelector('p, h1, h2, h3, h4, h5, h6, ul, ol, pre')) return;
 
       const sel = window.getSelection();
 
+      // Editor is completely empty — seed it with an empty paragraph.
       if (!element.textContent && !element.querySelector('br')) {
         element.innerHTML = '<p><br></p>';
         const newRange = document.createRange();
@@ -478,6 +368,7 @@ const SimpleEditor = (() => {
         return;
       }
 
+      // There's loose text — wrap it in <p> and restore the cursor position.
       let cursorOffset = null;
       if (sel.rangeCount) {
         const range = sel.getRangeAt(0);
@@ -487,9 +378,7 @@ const SimpleEditor = (() => {
       }
 
       const p = document.createElement('p');
-      while (element.firstChild) {
-        p.appendChild(element.firstChild);
-      }
+      while (element.firstChild) p.appendChild(element.firstChild);
       element.appendChild(p);
 
       if (cursorOffset !== null) {
@@ -507,12 +396,21 @@ const SimpleEditor = (() => {
       }
     }
 
-    // ==========================================
-    // FORMAT MODAL
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Format Modal
+    // ════════════════════════════════════════════
+    //
+    // A lightweight modal that accepts single-key commands:
+    //   b = bold,  i = italic,  u = underline,  l = link,
+    //   h1–h6 = convert block to heading,  e = exit/remove formatting,
+    //   clear = wipe entire editor content.
+    //
+    // The modal restores the user's original selection on close so that
+    // formatting commands apply to the right text.
 
     function openFormatModal(savedRange) {
-      // Detect if cursor is inside a link
+      // If the cursor is already inside a link, jump straight to
+      // the link-editing form instead of showing the command menu.
       let existingLink = null;
       if (savedRange) {
         let node = savedRange.startContainer;
@@ -529,8 +427,10 @@ const SimpleEditor = (() => {
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
 
-      const commands = { b: 'bold', i: 'italic', u: 'underline' };
+      // Maps single-key shortcuts to execCommand names.
+      const inlineCommands = { b: 'bold', i: 'italic', u: 'underline' };
 
+      /** Close the modal and restore the saved selection. */
       function close() {
         overlay.remove();
         if (savedRange) {
@@ -540,6 +440,8 @@ const SimpleEditor = (() => {
         }
         notifyChange();
       }
+
+      // ── Link editing sub-form ──────────────────
 
       function showLinkForm(linkEl) {
         modal.innerHTML = '';
@@ -574,45 +476,41 @@ const SimpleEditor = (() => {
           if (!text || !href) return;
 
           if (linkEl) {
+            // Update the existing link in-place.
             linkEl.setAttribute('href', href);
             linkEl.setAttribute('target', '_blank');
             linkEl.textContent = text;
             close();
             notifyChange();
           } else {
+            // Insert a brand-new link at the saved cursor position.
             close();
-            const sanitizedText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const linkHTML = `<a href="${href.replace(/"/g, '&quot;')}" target="_blank">${sanitizedText}</a>`;
-            document.execCommand('insertHTML', false, linkHTML);
+            const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const safeHref = href.replace(/"/g, '&quot;');
+            document.execCommand('insertHTML', false,
+              `<a href="${safeHref}" target="_blank">${safeText}</a>`);
             notifyChange();
           }
         }
 
         function onKeydown(e) {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            insertLink();
-          } else if (e.key === 'Escape') {
-            e.preventDefault();
-            close();
-          }
+          if (e.key === 'Enter') { e.preventDefault(); insertLink(); }
+          else if (e.key === 'Escape') { e.preventDefault(); close(); }
         }
 
         textInput.addEventListener('keydown', onKeydown);
         hrefInput.addEventListener('keydown', onKeydown);
-        cancelBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          close();
-        });
+        cancelBtn.addEventListener('click', (e) => { e.preventDefault(); close(); });
       }
 
-      // If cursor is inside a link, go straight to link editing
+      // If the cursor is inside a link, skip the command menu entirely.
       if (existingLink) {
         showLinkForm(existingLink);
         return;
       }
 
-      // Normal format modal UI
+      // ── Command menu UI ────────────────────────
+
       const label = document.createElement('label');
       label.textContent = 'b = bold, i = italic, u = underline, l = link, h1\u2013h6 = heading, e = exit formatting, clear = clear all';
 
@@ -628,11 +526,13 @@ const SimpleEditor = (() => {
       function apply() {
         const val = input.value.trim().toLowerCase();
 
+        // "l" → switch to the link form.
         if (val === 'l') {
           showLinkForm(null);
           return;
         }
 
+        // "clear" → wipe editor content and start fresh.
         if (val === 'clear') {
           overlay.remove();
           element.innerHTML = '<p><br></p>';
@@ -646,11 +546,14 @@ const SimpleEditor = (() => {
           return;
         }
 
+        // "h1"–"h6" → convert the enclosing block to a heading.
         const headingMatch = val.match(/^h([1-6])$/);
         if (headingMatch) {
           close();
           const sel = window.getSelection();
           if (!sel.rangeCount) return;
+
+          // Walk up from the cursor to find the nearest replaceable block.
           let block = sel.getRangeAt(0).startContainer;
           if (block.nodeType === 3) block = block.parentNode;
           while (block && block !== element && !['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(block.tagName.toLowerCase())) {
@@ -660,6 +563,7 @@ const SimpleEditor = (() => {
             const heading = document.createElement('h' + headingMatch[1]);
             heading.innerHTML = block.innerHTML;
             block.parentNode.replaceChild(heading, block);
+
             const newRange = document.createRange();
             newRange.selectNodeContents(heading);
             newRange.collapse(false);
@@ -670,99 +574,104 @@ const SimpleEditor = (() => {
           return;
         }
 
+        // Apply inline formatting or remove all formatting ("e").
         close();
         element.focus();
 
-        if (commands[val]) {
-          document.execCommand(commands[val], false, null);
+        if (inlineCommands[val]) {
+          document.execCommand(inlineCommands[val], false, null);
+
         } else if (val === 'e') {
-          const sel = window.getSelection();
-          if (!sel.rangeCount) return;
-
-          const formattingCmds = ['bold', 'italic', 'underline'];
-
-          if (!sel.getRangeAt(0).collapsed) {
-            const range = sel.getRangeAt(0);
-            const container = range.commonAncestorContainer;
-            const root = container.nodeType === 3 ? container.parentNode : container;
-
-            const formattingTags = { b: 'bold', strong: 'bold', i: 'italic', em: 'italic', u: 'underline' };
-            const cmdsToRemove = new Set();
-
-            // Check if any ancestor of the selection is a formatting element
-            let ancestor = root;
-            while (ancestor && ancestor !== element) {
-              const tag = ancestor.tagName && ancestor.tagName.toLowerCase();
-              if (formattingTags[tag]) cmdsToRemove.add(formattingTags[tag]);
-              ancestor = ancestor.parentNode;
-            }
-
-            // Check for formatting elements within the selection
-            if (root.querySelectorAll) {
-              root.querySelectorAll('b, strong, i, em, u').forEach(el => {
-                if (range.intersectsNode(el)) {
-                  cmdsToRemove.add(formattingTags[el.tagName.toLowerCase()]);
-                }
-              });
-            }
-
-            // execCommand is a toggle with no "remove only" mode.
-            // When a selection is partially formatted (e.g. "hello <b>world</b> foo"),
-            // queryCommandState returns false and a single execCommand call would
-            // APPLY bold to everything instead of removing it.
-            // So we call it twice: once to normalize (all bold), once to remove (all plain).
-            // If the selection is already fully formatted, one call suffices.
-            for (const cmd of cmdsToRemove) {
-              if (!document.queryCommandState(cmd)) {
-                document.execCommand(cmd, false, null);
-              }
-              document.execCommand(cmd, false, null);
-            }
-          } else {
-            // Collapsed cursor: walk up the DOM to find active formatting
-            let node = sel.getRangeAt(0).startContainer;
-            if (node.nodeType === 3) node = node.parentNode;
-
-            const activeCommands = new Set();
-            while (node && node !== element) {
-              const tag = node.tagName && node.tagName.toLowerCase();
-              if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
-              if (tag === 'em' || tag === 'i') activeCommands.add('italic');
-              if (tag === 'u') activeCommands.add('underline');
-              node = node.parentNode;
-            }
-            for (const cmd of activeCommands) {
-              document.execCommand(cmd, false, null);
-            }
-          }
+          removeFormattingAroundCursor();
         }
+
         notifyChange();
       }
 
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          apply();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          close();
+      /**
+       * Removes all inline formatting (bold/italic/underline) from the
+       * current selection or, if the cursor is collapsed, toggles off any
+       * formatting inherited from ancestor elements.
+       *
+       * execCommand is a toggle with no "remove only" mode.  When a
+       * selection is *partially* formatted (e.g. "hello <b>world</b> foo"),
+       * queryCommandState returns false and a single execCommand call would
+       * APPLY bold everywhere. We work around this by calling it twice:
+       * once to normalize (apply to all), once to remove.
+       */
+      function removeFormattingAroundCursor() {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+
+        const FORMATTING_TAGS = { b: 'bold', strong: 'bold', i: 'italic', em: 'italic', u: 'underline' };
+
+        if (!sel.getRangeAt(0).collapsed) {
+          // Selection exists — detect which formatting commands are active.
+          const range = sel.getRangeAt(0);
+          const root = range.commonAncestorContainer;
+          const rootEl = root.nodeType === 3 ? root.parentNode : root;
+          const cmdsToRemove = new Set();
+
+          // Check ancestors of the selection root.
+          let ancestor = rootEl;
+          while (ancestor && ancestor !== element) {
+            const tag = ancestor.tagName && ancestor.tagName.toLowerCase();
+            if (FORMATTING_TAGS[tag]) cmdsToRemove.add(FORMATTING_TAGS[tag]);
+            ancestor = ancestor.parentNode;
+          }
+
+          // Check formatting elements *within* the selection.
+          if (rootEl.querySelectorAll) {
+            rootEl.querySelectorAll('b, strong, i, em, u').forEach(el => {
+              if (range.intersectsNode(el)) {
+                cmdsToRemove.add(FORMATTING_TAGS[el.tagName.toLowerCase()]);
+              }
+            });
+          }
+
+          // Double-toggle trick: normalize then remove.
+          for (const cmd of cmdsToRemove) {
+            if (!document.queryCommandState(cmd)) document.execCommand(cmd, false, null);
+            document.execCommand(cmd, false, null);
+          }
+        } else {
+          // Collapsed cursor — walk up the DOM to find active formatting
+          // and toggle each one off.
+          let node = sel.getRangeAt(0).startContainer;
+          if (node.nodeType === 3) node = node.parentNode;
+
+          const activeCommands = new Set();
+          while (node && node !== element) {
+            const tag = node.tagName && node.tagName.toLowerCase();
+            if (tag === 'strong' || tag === 'b') activeCommands.add('bold');
+            if (tag === 'em' || tag === 'i') activeCommands.add('italic');
+            if (tag === 'u') activeCommands.add('underline');
+            node = node.parentNode;
+          }
+          for (const cmd of activeCommands) {
+            document.execCommand(cmd, false, null);
+          }
         }
+      }
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); apply(); }
+        else if (e.key === 'Escape') { e.preventDefault(); close(); }
       });
 
+      // Clicking the overlay backdrop closes the modal.
       overlay.addEventListener('mousedown', (e) => {
-        if (e.target === overlay) {
-          e.preventDefault();
-          close();
-        }
+        if (e.target === overlay) { e.preventDefault(); close(); }
       });
     }
 
-    // ==========================================
-    // SELECTION TRACKING
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Selection Tracking
+    // ════════════════════════════════════════════
 
-    // Keep track of the last known selection within the editor so that
-    // external toolbar buttons can act on it even after focus moves away.
+    // Persist the last known selection within the editor so that external
+    // toolbar buttons (or the format modal) can act on it even after the
+    // editor loses focus.
     let lastSavedRange = null;
 
     function handleSelectionChange() {
@@ -776,19 +685,26 @@ const SimpleEditor = (() => {
 
     document.addEventListener('selectionchange', handleSelectionChange, { signal });
 
-    // ==========================================
-    // WIRE UP EVENT LISTENERS
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Register Core Event Listeners
+    // ════════════════════════════════════════════
 
     element.addEventListener('paste', handlePaste, { signal });
     element.addEventListener('keydown', handleKeydown, { signal });
     element.addEventListener('input', handleInput, { signal });
 
-    // ==========================================
-    // BLOCK DRAG & DROP (Notion-style)
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Block Drag & Drop (Notion-style)
+    // ════════════════════════════════════════════
+    //
+    // Each top-level block (<p>, <h*>, <li>, <ul>, <ol>, <pre>) gets a
+    // drag handle that appears on hover.  Dragging a block repositions it
+    // within the editor, automatically converting between <li> and <p>
+    // when dropping across list/non-list boundaries.
 
     const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'pre', 'li']);
+
+    // Six-dot "grip" icon (Notion-style drag handle).
     const DRAG_ICON = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="5" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="9" cy="19" r="1.5"></circle><circle cx="15" cy="5" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="15" cy="19" r="1.5"></circle></svg>`;
 
     const blockHandle = document.createElement('div');
@@ -797,13 +713,15 @@ const SimpleEditor = (() => {
     Object.assign(blockHandle.style, {
       position: 'fixed', display: 'none', opacity: '0',
       transition: 'opacity 0.15s',
-      zIndex: '10', cursor: 'grab', touchAction: 'none', userSelect: 'none'
+      zIndex: '10', cursor: 'grab', touchAction: 'none', userSelect: 'none',
     });
     document.body.appendChild(blockHandle);
 
     let hoveredBlock = null;
     let hideHandleTimer = null;
 
+    /** Walk from `node` up toward the editor root, returning the first
+     *  element whose tag is in BLOCK_TAGS (i.e. a draggable block). */
     function findBlock(node) {
       while (node && node !== element) {
         if (node.nodeType === 1 && BLOCK_TAGS.has(node.tagName.toLowerCase())) return node;
@@ -812,6 +730,7 @@ const SimpleEditor = (() => {
       return null;
     }
 
+    /** Positions the drag handle to the left of the given block. */
     function positionHandle(block) {
       const rect = block.getBoundingClientRect();
       const lineHeight = parseFloat(getComputedStyle(block).lineHeight) || 24;
@@ -856,14 +775,18 @@ const SimpleEditor = (() => {
       if (!blockDnd.active) scheduleHideHandle();
     });
 
+    /** Insert `el` before or after `ref` depending on `position`. */
     function insertAtPosition(el, ref, position) {
       const next = position === 'before' ? ref : ref.nextSibling;
       if (next) ref.parentNode.insertBefore(el, next);
       else ref.parentNode.appendChild(el);
     }
 
+    /** Find the editor child block whose vertical centre is closest to `y`,
+     *  ignoring `exclude` (the block being dragged). */
     function nearestBlockByY(y, exclude) {
-      let best = null, bestDist = Infinity;
+      let best = null;
+      let bestDist = Infinity;
       for (const child of element.children) {
         const tag = child.tagName.toLowerCase();
         if (!BLOCK_TAGS.has(tag)) continue;
@@ -880,20 +803,28 @@ const SimpleEditor = (() => {
       return best;
     }
 
+    // Wire up the DragDrop helper (from dragndrop.js) to handle the actual
+    // pointer tracking, placeholder rendering, and drop callbacks.
     const blockDnd = new DragDrop({
       container: element,
+
       onDragStart: () => {
         blockHandle.style.opacity = '0';
         blockHandle.style.display = 'none';
       },
+
       onDragEnd: () => { hoveredBlock = null; },
 
+      /** Determine which block the cursor is hovering over and whether
+       *  the drop should go above or below it. */
       resolveDropTarget: (e, meta) => {
         const hit = document.elementFromPoint(e.clientX, e.clientY);
         if (!hit) return null;
 
         let block = findBlock(hit);
 
+        // If the pointer is inside the editor but not directly over a block,
+        // snap to the nearest block by vertical distance.
         if (!block && element.contains(hit)) {
           block = nearestBlockByY(e.clientY, meta.el);
         }
@@ -905,6 +836,7 @@ const SimpleEditor = (() => {
         return { el: block, position: isAbove ? 'before' : 'after' };
       },
 
+      /** Execute the drop — handles <li>↔<p> conversion automatically. */
       onDrop: (meta, target) => {
         const src = meta.el;
         const dst = target.el;
@@ -914,15 +846,18 @@ const SimpleEditor = (() => {
         const srcIsLi = srcTag === 'li';
         const dstIsLi = dstTag === 'li';
 
+        // Detach the source element and clean up any emptied list.
         const srcList = srcIsLi ? src.parentElement : null;
         src.remove();
         if (srcList && srcList.children.length === 0) srcList.remove();
 
         if (dstIsLi) {
+          // Dropping onto a list item → ensure src becomes a <li>.
           const li = srcIsLi ? src : document.createElement('li');
           if (!srcIsLi) li.innerHTML = src.innerHTML;
           insertAtPosition(li, dst, pos);
         } else if (dstTag === 'ul' || dstTag === 'ol') {
+          // Dropping onto a list container → append as a <li>.
           const li = srcIsLi ? src : document.createElement('li');
           if (!srcIsLi) li.innerHTML = src.innerHTML;
           if (pos === 'before' && dst.firstChild) {
@@ -931,6 +866,7 @@ const SimpleEditor = (() => {
             dst.appendChild(li);
           }
         } else {
+          // Dropping onto a non-list block → ensure src becomes a <p>.
           if (srcIsLi) {
             const p = document.createElement('p');
             p.innerHTML = src.innerHTML;
@@ -941,25 +877,33 @@ const SimpleEditor = (() => {
         }
 
         notifyChange();
-      }
+      },
     });
 
+    // Initiate a drag when the user presses down on the handle.
+    // `hoveredBlock` is set by the mousemove listener above and tracks
+    // which block the handle is currently attached to.  We pass it to
+    // DragDrop.start() both as drag metadata ({ el }) and as the DOM
+    // element to visually ghost during the drag.
     blockHandle.addEventListener('pointerdown', (e) => {
       if (!hoveredBlock) return;
       blockDnd.start(e, { el: hoveredBlock }, hoveredBlock);
     });
 
-    // ==========================================
-    // PUBLIC INSTANCE API
-    // ==========================================
+    // ════════════════════════════════════════════
+    //  Public Instance API
+    // ════════════════════════════════════════════
 
     const instance = {
       element,
 
+      /** Current mode: 'edit' or 'read'. */
       get mode() {
         return element.contentEditable === 'true' ? 'edit' : 'read';
       },
 
+      /** Switch between 'edit' and 'read' modes. Focuses the element
+       *  when entering edit mode. */
       setMode(mode) {
         if (mode !== 'edit' && mode !== 'read') {
           throw new Error('Mode must be "edit" or "read"');
@@ -974,6 +918,7 @@ const SimpleEditor = (() => {
         return instance.setMode(instance.mode === 'edit' ? 'read' : 'edit');
       },
 
+      /** Register an event listener. Supported events: 'change', 'modechange'. */
       on(event, fn) {
         if (!listeners[event]) listeners[event] = [];
         listeners[event].push(fn);
@@ -986,6 +931,7 @@ const SimpleEditor = (() => {
         return this;
       },
 
+      /** Programmatically open the format modal using the last known selection. */
       openFormatModal() {
         openFormatModal(lastSavedRange);
         return this;
@@ -1000,176 +946,19 @@ const SimpleEditor = (() => {
         notifyChange();
       },
 
+      /** Tear down the editor: remove all event listeners and the drag handle. */
       destroy() {
         abortController.abort();
         blockDnd.destroy();
         blockHandle.remove();
         element.contentEditable = 'false';
-      }
+      },
     };
 
     return instance;
   }
 
-  // HELPERS
-
-
-  /**
-   * Recursively converts a DOM node into a custom JSON structure.
-   * Filters out whitespace-only text nodes (like \n).
-   * * @param {Node} node - The DOM element or text node to convert.
-   * @returns {Object|string|null} The JSON object, a text string, or null for ignored nodes.
-   */
-  function domToJson(node) {
-    // 1. Handle Text Nodes
-    if (node.nodeType === Node.TEXT_NODE) {
-      // If the text node is purely whitespace, line breaks, or tabs, ignore it
-      if (node.nodeValue.trim() === '') {
-        return null;
-      }
-      // Return the original text (preserving inline spaces between words)
-      return node.nodeValue;
-    }
-
-    // 2. Handle Element Nodes (div, span, p, b, etc.)
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const obj = {
-        t: node.tagName.toLowerCase(),
-        a: [],
-        c: []
-      };
-
-      // Extract Attributes
-      if (node.hasAttributes()) {
-        for (const attr of node.attributes) {
-          obj.a.push({ name: attr.name, value: attr.value });
-        }
-      }
-
-      // Extract Children recursively
-      if (node.hasChildNodes()) {
-        for (const child of node.childNodes) {
-          const childJson = domToJson(child);
-          // Ignore null returns (filtered text nodes, comments, etc.)
-          if (childJson !== null) {
-            obj.c.push(childJson);
-          }
-        }
-      }
-
-      return obj;
-    }
-
-    // 3. Ignore Comments and other non-essential node types
-    return null;
-  }
-
-  /**
-   * Helper function to convert raw HTML strings directly to JSON.
-   * * @param {string} htmlString - The innerHTML string you want to convert.
-   */
-  function htmlStringToJson(htmlString) {
-    const template = document.createElement('template');
-    template.innerHTML = htmlString.trim();
-
-    const result = [];
-    for (const child of template.content.childNodes) {
-      const parsed = domToJson(child);
-      if (parsed !== null) {
-        result.push(parsed);
-      }
-    }
-
-    // Return a single object if there's exactly one root node, otherwise return the array
-    return result.length === 1 ? result[0] : result;
-  }
-
-
-  /**
-   * Recursively converts your custom JSON AST back into live DOM nodes.
-   * @param {Object|string|Array} json - The JSON AST to convert.
-   * @returns {Node|DocumentFragment|null} The constructed DOM node.
-   */
-  function jsonToDom(json) {
-    // 1. Handle Arrays (Multiple root elements)
-    if (Array.isArray(json)) {
-      const fragment = document.createDocumentFragment();
-      for (const item of json) {
-        const node = jsonToDom(item);
-        if (node) fragment.appendChild(node);
-      }
-      return fragment;
-    }
-
-    // 2. Handle Text Nodes
-    if (typeof json === 'string') {
-      return document.createTextNode(json);
-    }
-
-    // 3. Handle Element Nodes
-    if (typeof json === 'object' && json !== null) {
-      // Create the base element
-      const el = document.createElement(json.t);
-
-      // Apply attributes
-      if (json.a && Array.isArray(json.a)) {
-        for (const attr of json.a) {
-          el.setAttribute(attr.name, attr.value);
-        }
-      }
-
-      // Append children recursively
-      if (json.c && Array.isArray(json.c)) {
-        for (const childJson of json.c) {
-          const childNode = jsonToDom(childJson);
-          if (childNode) {
-            el.appendChild(childNode);
-          }
-        }
-      }
-
-      return el;
-    }
-
-    // Fallback for invalid data
-    return null;
-  }
-
-  /**
-   * Helper function to convert your JSON AST directly into a raw HTML string.
-   * @param {Object|string|Array} json - The JSON AST.
-   * @returns {string} The reconstructed HTML string.
-   */
-  function jsonToHtmlString(json) {
-    const node = jsonToDom(json);
-
-    if (!node) return '';
-
-    // DocumentFragments don't have an outerHTML property, 
-    // so we append it to a temporary container to read the innerHTML.
-    if (node instanceof DocumentFragment) {
-      const tempDiv = document.createElement('div');
-      tempDiv.appendChild(node);
-      return tempDiv.innerHTML;
-    }
-
-    // Regular Elements
-    if (node instanceof Element) {
-      return node.outerHTML;
-    }
-
-    // Pure Text Nodes
-    if (node instanceof Text) {
-      // Escaping might be necessary here depending on your security needs,
-      // but for exact restoration, textContent/nodeValue works.
-      return node.nodeValue;
-    }
-
-    return '';
-  }
-
-
-  return { mount, jsonToHtmlString, htmlStringToJson };
+  return { mount };
 
 })();
 
