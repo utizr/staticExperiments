@@ -1,7 +1,11 @@
 class SidebarOrganizer {
   constructor(initialData) {
-    this.data = initialData || { folders: [], notes: [] };
+    this.data = initialData || {
+      personas: [], workspaces: [], folders: [], notes: [],
+      currentPersonaId: null, currentWorkspaceId: null
+    };
     this.currentNoteId = null;
+    this.expandedCard = 'folders'; // 'personas' | 'workspaces' | 'folders'
     this.listeners = {};
 
     this.initDOM();
@@ -33,6 +37,7 @@ class SidebarOrganizer {
 
   open() {
     this.overlay.style.display = 'flex';
+    this.expandedCard = 'folders';
     this.render();
   }
 
@@ -45,43 +50,102 @@ class SidebarOrganizer {
     return Math.random().toString(36).substring(2, 9);
   }
 
+  get currentPersona() {
+    return this.data.personas.find(p => p.id === this.data.currentPersonaId) || this.data.personas[0];
+  }
+
+  get currentWorkspace() {
+    return this.data.workspaces.find(w => w.id === this.data.currentWorkspaceId) || this.data.workspaces[0];
+  }
+
+  switchPersona(personaId) {
+    this.data.currentPersonaId = personaId;
+    // Select first workspace in this persona
+    const ws = this.data.workspaces.find(w => w.personaId === personaId);
+    this.data.currentWorkspaceId = ws ? ws.id : null;
+    this.expandedCard = 'workspaces';
+    this.emit('change', this.data);
+    this.emit('persona-switch', personaId);
+    this.render();
+  }
+
+  switchWorkspace(workspaceId) {
+    this.data.currentWorkspaceId = workspaceId;
+    this.expandedCard = 'folders';
+    this.emit('change', this.data);
+    this.emit('workspace-switch', workspaceId);
+    this.render();
+  }
+
   // --- UI Initialization ---
   initDOM() {
     this.overlay = document.createElement('div');
     this.overlay.className = 'sidebar-overlay';
 
     this.overlay.innerHTML = `
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <h3>Folders</h3>
-          <div class="header-actions">
-            <button id="org-btn-new-folder">+ New</button>
-            <button id="org-btn-close">✕</button>
+      <div class="org-stack">
+        <div class="org-panel org-panel-ps" data-panel="personas">
+          <div class="org-panel-tab">
+            <div class="org-panel-tab-text">
+              <span class="org-panel-tab-type">Persona</span>
+              <span class="org-panel-tab-value" id="org-ps-tab-value">—</span>
+            </div>
           </div>
+          <div class="org-panel-content" id="org-ps-content"></div>
         </div>
-        <div id="org-folder-list" class="folder-list"></div>
-      </aside>
+        <div class="org-panel org-panel-ws" data-panel="workspaces">
+          <div class="org-panel-tab">
+            <div class="org-panel-tab-text">
+              <span class="org-panel-tab-type">Workspace</span>
+              <span class="org-panel-tab-value" id="org-ws-tab-value">—</span>
+            </div>
+          </div>
+          <div class="org-panel-content" id="org-ws-content"></div>
+        </div>
+        <div class="org-panel org-panel-fl" data-panel="folders">
+          <div class="org-panel-tab">
+            <div class="org-panel-tab-text">
+              <span class="org-panel-tab-type">Folder</span>
+              <span class="org-panel-tab-value" id="org-fl-tab-value">—</span>
+            </div>
+          </div>
+          <div class="org-panel-content" id="org-fl-content"></div>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(this.overlay);
-    this.folderListEl = this.overlay.querySelector('#org-folder-list');
 
-    // Basic UI Events
-    this.overlay.querySelector('#org-btn-close').addEventListener('click', () => this.close());
+    this.psPanel = this.overlay.querySelector('.org-panel-ps');
+    this.wsPanel = this.overlay.querySelector('.org-panel-ws');
+    this.flPanel = this.overlay.querySelector('.org-panel-fl');
+    this.psContent = this.overlay.querySelector('#org-ps-content');
+    this.wsContent = this.overlay.querySelector('#org-ws-content');
+    this.flContent = this.overlay.querySelector('#org-fl-content');
+    this.psTabValue = this.overlay.querySelector('#org-ps-tab-value');
+    this.wsTabValue = this.overlay.querySelector('#org-ws-tab-value');
+    this.flTabValue = this.overlay.querySelector('#org-fl-tab-value');
+
+    // Click outside to close
     this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) this.close();
     });
 
-    this.overlay.querySelector('#org-btn-new-folder').addEventListener('click', () => {
-      const folderName = prompt('Enter a new folder name:');
-      if (folderName && folderName.trim() !== '') {
-        this.data.folders.push({ id: this.generateId(), name: folderName.trim() });
-        this.emit('change', this.data);
-        this.render();
-      }
+    // Tab clicks to expand panels
+    this.psPanel.querySelector('.org-panel-tab').addEventListener('click', () => {
+      this.expandedCard = 'personas';
+      this.render();
+    });
+    this.wsPanel.querySelector('.org-panel-tab').addEventListener('click', () => {
+      this.expandedCard = 'workspaces';
+      this.render();
+    });
+    this.flPanel.querySelector('.org-panel-tab').addEventListener('click', () => {
+      this.expandedCard = 'folders';
+      this.render();
     });
 
-    // Drag & drop via reusable DragDrop
+    // Drag & drop
     this.dnd = new DragDrop({
       container: this.overlay,
       resolveDropTarget: (e, meta) => this._resolveDropTarget(e, meta),
@@ -91,10 +155,95 @@ class SidebarOrganizer {
 
   // --- Core Rendering ---
   render() {
-    this.folderListEl.innerHTML = '';
+    this.psPanel.classList.toggle('expanded', this.expandedCard === 'personas');
+    this.wsPanel.classList.toggle('expanded', this.expandedCard === 'workspaces');
+    this.flPanel.classList.toggle('expanded', this.expandedCard === 'folders');
+
+    // Tab values show the currently selected item
+    const persona = this.currentPersona;
+    const ws = this.currentWorkspace;
+    this.psTabValue.textContent = persona ? persona.name : '—';
+    this.wsTabValue.textContent = ws ? ws.name : '—';
+    const currentNote = this.data.notes.find(n => n.id === this.currentNoteId);
+    const currentFolder = currentNote ? this.data.folders.find(f => f.id === currentNote.folderId) : null;
+    this.flTabValue.textContent = currentFolder ? currentFolder.name : '—';
+
+    this._renderPersonas();
+    this._renderWorkspaces();
+    this._renderFolders();
+  }
+
+  _createAddButton(label, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'org-add-btn';
+    btn.textContent = label;
+    btn.onclick = onClick;
+    return btn;
+  }
+
+  _renderPersonas() {
+    this.psContent.innerHTML = '';
+
+    this.psContent.appendChild(this._createAddButton('+ New Persona', () => {
+      const name = prompt('Enter a name for the new persona:');
+      if (name && name.trim() !== '') {
+        const persona = { id: this.generateId(), name: name.trim() };
+        this.data.personas.unshift(persona);
+        this.switchPersona(persona.id);
+      }
+    }));
+
+    this.data.personas.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'org-list-item' + (p.id === this.data.currentPersonaId ? ' active' : '');
+      item.textContent = p.name;
+      item.onclick = () => this.switchPersona(p.id);
+      this.psContent.appendChild(item);
+    });
+  }
+
+  _renderWorkspaces() {
+    this.wsContent.innerHTML = '';
+
+    this.wsContent.appendChild(this._createAddButton('+ New Workspace', () => {
+      const name = prompt('Enter a name for the new workspace:');
+      if (name && name.trim() !== '') {
+        const ws = { id: this.generateId(), name: name.trim(), personaId: this.data.currentPersonaId };
+        this.data.workspaces.unshift(ws);
+        this.switchWorkspace(ws.id);
+      }
+    }));
+
+    const personaWorkspaces = this.data.workspaces.filter(w => w.personaId === this.data.currentPersonaId);
+    personaWorkspaces.forEach(ws => {
+      const item = document.createElement('div');
+      item.className = 'org-list-item' + (ws.id === this.data.currentWorkspaceId ? ' active' : '');
+      item.textContent = ws.name;
+      item.onclick = () => this.switchWorkspace(ws.id);
+      this.wsContent.appendChild(item);
+    });
+  }
+
+  _renderFolders() {
+    this.flContent.innerHTML = '';
+
+    this.flContent.appendChild(this._createAddButton('+ New Folder', () => {
+      const folderName = prompt('Enter a new folder name:');
+      if (folderName && folderName.trim() !== '') {
+        this.data.folders.unshift({
+          id: this.generateId(),
+          name: folderName.trim(),
+          workspaceId: this.data.currentWorkspaceId
+        });
+        this.emit('change', this.data);
+        this.render();
+      }
+    }));
+
     const dragIcon = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="5" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="9" cy="19" r="1.5"></circle><circle cx="15" cy="5" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="15" cy="19" r="1.5"></circle></svg>`;
 
-    this.data.folders.forEach(folder => {
+    const workspaceFolders = this.data.folders.filter(f => f.workspaceId === this.data.currentWorkspaceId);
+    workspaceFolders.forEach(folder => {
       const folderDiv = document.createElement('div');
       folderDiv.className = 'folder-item';
       folderDiv.dataset.id = folder.id;
@@ -112,7 +261,6 @@ class SidebarOrganizer {
       fTitleText.className = 'folder-name-text';
       fTitleText.textContent = folder.name;
       fTitleText.title = "Click to rename folder";
-
       fTitleText.onclick = (e) => this.initInlineEdit(e, fTitleText, folder);
 
       const addNoteBtn = document.createElement('button');
@@ -167,7 +315,7 @@ class SidebarOrganizer {
 
       folderDiv.appendChild(folderHeader);
       folderDiv.appendChild(notesUl);
-      this.folderListEl.appendChild(folderDiv);
+      this.flContent.appendChild(folderDiv);
     });
   }
 
