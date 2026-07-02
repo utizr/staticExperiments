@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Converter Tests</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #1f1b1a;
+      /* Deep warm espresso */
+      color: #e8e4e1;
+      /* Warm off-white */
+      padding: 40px;
+      line-height: 1.6;
+      color-scheme: dark;
+    }
+
+    #test-runner {
+      background: #2a2422;
+      padding: 30px;
+      border: 1px solid #4a403d;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-top: 0;
+      border-bottom: 1px solid #4a403d;
+      padding-bottom: 15px;
+      color: #f5f1ee;
+    }
+
+    .suite {
+      margin-top: 24px;
+    }
+
+    .suite-name {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 8px;
+      color: #a69e9a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px;
+    }
+
+    .test {
+      margin-left: 10px;
+      padding: 8px 10px;
+      font-size: 14px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .test:hover {
+      background: #362f2d;
+    }
+
+    /* Using your warm bright orange/greenish link color for passed tests */
+    .pass {
+      color: #afc220;
+    }
+
+    /* Using your terracotta drop-target color for failed tests */
+    .fail {
+      color: #ea580c;
+    }
+
+    .error-msg {
+      color: #fdba74;
+      background: #1f1b1a;
+      border: 1px solid #3d3330;
+      font-family: 'SF Mono', monospace;
+      font-size: 13px;
+      display: block;
+      margin: 10px 0 10px 25px;
+      padding: 16px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="test-runner">
+    <h1>Converter Library Tests</h1>
+    <div id="results"></div>
+  </div>
+
+  <script src="lib/converter.js"></script>
+
+  <script>
+    const resultsContainer = document.getElementById('results');
+    let currentSuiteElement = resultsContainer;
+
+    // Groups tests together
+    function describe(name, callback) {
+      const suiteEl = document.createElement('div');
+      suiteEl.className = 'suite';
+      suiteEl.innerHTML = `<div class="suite-name">${name}</div>`;
+      resultsContainer.appendChild(suiteEl);
+
+      const previousSuite = currentSuiteElement;
+      currentSuiteElement = suiteEl;
+      callback();
+      currentSuiteElement = previousSuite; // Restore context
+    }
+
+    // Runs an individual test
+    function it(name, callback) {
+      const testEl = document.createElement('div');
+      testEl.className = 'test';
+
+      try {
+        callback();
+        testEl.classList.add('pass');
+        testEl.innerHTML = `✔️ ${name}`;
+      } catch (error) {
+        testEl.classList.add('fail');
+        testEl.innerHTML = `❌ ${name}<div class="error-msg">${error.message}</div>`;
+      }
+
+      currentSuiteElement.appendChild(testEl);
+    }
+
+    // Basic assertion tool
+    function assertEqual(actual, expected, message = "Assertion failed") {
+      // Stringify objects/arrays to easily compare their structure
+      const actualStr = typeof actual === 'object' ? JSON.stringify(actual) : actual;
+      const expectedStr = typeof expected === 'object' ? JSON.stringify(expected) : expected;
+
+      if (actualStr !== expectedStr) {
+        throw new Error(`${message}\n\nExpected:\n${expectedStr}\n\nGot:\n${actualStr}`);
+      }
+    }
+  </script>
+
+  <script>
+    window.addEventListener('load', () => {
+
+      describe('HTML to JSON AST Conversion (htmlStringToJson)', () => {
+
+        it('should convert a simple paragraph element', () => {
+          const html = '<p>Hello World</p>';
+          const expected = { t: 'p', a: [], c: ['Hello World'] };
+          const result = Converter.htmlStringToJson(html);
+          assertEqual(result, expected);
+        });
+
+        it('should convert nested elements properly', () => {
+          const html = '<div><p><b>Bold</b> text</p></div>';
+          const expected = {
+            t: 'div', a: [], c: [
+              {
+                t: 'p', a: [], c: [
+                  { t: 'b', a: [], c: ['Bold'] },
+                  ' text' // Note: domToJson preserves the space in text nodes
+                ]
+              }
+            ]
+          };
+          const result = Converter.htmlStringToJson(html);
+          assertEqual(result, expected);
+        });
+
+        it('should extract attributes correctly', () => {
+          const html = '<a href="https://test.com" class="link">Click</a>';
+          const expected = {
+            t: 'a',
+            a: [
+              { name: 'href', value: 'https://test.com' },
+              { name: 'class', value: 'link' }
+            ],
+            c: ['Click']
+          };
+          const result = Converter.htmlStringToJson(html);
+          assertEqual(result, expected);
+        });
+
+        it('should return an array for multiple root elements', () => {
+          const html = '<p>One</p><p>Two</p>';
+          const expected = [
+            { t: 'p', a: [], c: ['One'] },
+            { t: 'p', a: [], c: ['Two'] }
+          ];
+          const result = Converter.htmlStringToJson(html);
+          assertEqual(result, expected);
+        });
+
+      });
+
+      describe('JSON AST to HTML Conversion (jsonToHtmlString)', () => {
+
+        it('should reconstruct a simple paragraph', () => {
+          const json = { t: 'p', a: [], c: ['Hello World'] };
+          const expected = '<p>Hello World</p>';
+          const result = Converter.jsonToHtmlString(json);
+          assertEqual(result, expected);
+        });
+
+        it('should reconstruct a simple h3', () => {
+          const json = { t: 'h3', a: [], c: ['Great Title'] };
+          const expected = '<h3>Great Title</h3>';
+          const result = Converter.jsonToHtmlString(json);
+          assertEqual(result, expected);
+        });
+
+        it('should reconstruct elements with attributes', () => {
+          const json = {
+            t: 'img',
+            a: [{ name: 'src', value: 'img.png' }, { name: 'alt', value: 'Logo' }],
+            c: []
+          };
+          const expected = '<img src="img.png" alt="Logo">';
+          const result = Converter.jsonToHtmlString(json);
+          assertEqual(result, expected);
+        });
+
+        it('should reconstruct an array of JSON objects', () => {
+          const json = [
+            { t: 'h1', a: [], c: ['Title'] },
+            { t: 'p', a: [], c: ['Body'] }
+          ];
+          const expected = '<h1>Title</h1><p>Body</p>';
+          const result = Converter.jsonToHtmlString(json);
+          assertEqual(result, expected);
+        });
+
+      });
+
+      describe('Full Roundtrip (HTML -> JSON -> HTML)', () => {
+
+        it('should preserve complex HTML markup perfectly', () => {
+          const originalHtml = '<div class="wrapper"><h1>Title</h1><p>This is <strong>strong</strong> and <em>italic</em>.</p><ul><li>Item 1</li><li>Item 2</li></ul></div>';
+
+          // 1. HTML -> JSON
+          const jsonAst = Converter.htmlStringToJson(originalHtml);
+
+          // 2. JSON -> HTML
+          const finalHtml = Converter.jsonToHtmlString(jsonAst);
+
+          assertEqual(finalHtml, originalHtml);
+        });
+
+      });
+
+    });
+  </script>
+</body>
+
+</html>
