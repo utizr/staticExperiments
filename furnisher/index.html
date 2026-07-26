@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Layout Planner</title>
+  <style>
+    :root {
+      --bg-color: #121212;
+      --sidebar-bg: #1e1e1e;
+      --text-color: #e0e0e0;
+      --accent-color: #bb86fc;
+      --border-color: #333;
+      --room-bg: #222;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar Styling */
+    .sidebar {
+      width: 320px;
+      background-color: var(--sidebar-bg);
+      border-right: 1px solid var(--border-color);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    h2 {
+      color: var(--accent-color);
+      margin-bottom: 10px;
+      font-size: 1.1rem;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 8px;
+    }
+
+    label {
+      font-size: 0.9rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type="number"],
+    input[type="text"],
+    input[type="color"],
+    input[type="range"] {
+      background-color: #333;
+      color: white;
+      border: 1px solid #555;
+      padding: 5px;
+      border-radius: 4px;
+      width: 110px;
+    }
+
+    input[type="range"] {
+      width: 120px;
+    }
+
+    button {
+      background-color: var(--accent-color);
+      color: #000;
+      border: none;
+      padding: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: opacity 0.2s;
+      margin-top: 5px;
+    }
+
+    button:hover {
+      opacity: 0.8;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-group button {
+      flex: 1;
+      margin-top: 0;
+    }
+
+    /* Main Canvas Area */
+    .main-area {
+      flex-grow: 1;
+      display: flex;
+      overflow: hidden;
+      background-color: #1a1a1a;
+      background-image: radial-gradient(#333 1px, transparent 1px);
+      background-size: 20px 20px;
+      cursor: grab;
+    }
+
+    .main-area:active {
+      cursor: grabbing;
+    }
+
+    #workspace {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-origin: center center;
+    }
+
+    .room {
+      position: absolute;
+      background-color: var(--room-bg);
+      border: 2px dashed #555;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      cursor: grab;
+      z-index: 1;
+    }
+
+    .room:active {
+      cursor: grabbing;
+    }
+
+    .furniture {
+      position: absolute;
+      cursor: grab;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.8);
+      user-select: none;
+      text-align: center;
+      transform-origin: center center;
+    }
+
+    .furniture:active {
+      cursor: grabbing;
+    }
+
+    .selected {
+      outline: 2px solid var(--accent-color);
+      outline-offset: 2px;
+      box-shadow: 0 0 10px var(--accent-color);
+    }
+
+    /* Distance Indicators */
+    #indicators {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .dist-line {
+      position: absolute;
+      background-color: #f1c40f;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #line-top,
+    #line-bottom {
+      width: 1px;
+    }
+
+    #line-left,
+    #line-right {
+      height: 1px;
+    }
+
+    .dist-label {
+      background-color: #f1c40f;
+      color: #000;
+      font-size: 10px;
+      font-weight: bold;
+      padding: 2px 4px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="sidebar">
+    <div>
+      <h2>View</h2>
+      <div class="control-group">
+        <label>Zoom: <span id="zoom-val">100%</span></label>
+        <div class="btn-group">
+          <button onclick="changeZoom(-0.1)">-</button>
+          <button onclick="changeZoom(0.1)">+</button>
+          <button onclick="resetZoom()">Reset</button>
+        </div>
+        <p style="font-size: 0.75rem; color: #888; text-align: center; margin-top: 5px;">
+          Click and drag background to pan
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <h2>Add Room</h2>
+      <div class="control-group">
+        <label>Width: <input type="number" id="new-r-width" value="400"></label>
+        <label>Height: <input type="number" id="new-r-height" value="400"></label>
+        <label>Color: <input type="color" id="new-r-color" value="#222222"></label>
+        <button onclick="addRoomBtn()">Add New Room</button>
+      </div>
+    </div>
+
+    <div>
+      <h2>Add Furniture</h2>
+      <div class="control-group">
+        <label>Name: <input type="text" id="new-f-name" value="Sofa"></label>
+        <label>Width: <input type="number" id="new-f-width" value="200"></label>
+        <label>Height: <input type="number" id="new-f-height" value="90"></label>
+        <label>Color: <input type="color" id="new-f-color" value="#4a90e2"></label>
+        <button onclick="addFurniture()">Add Item to Room</button>
+      </div>
+    </div>
+
+    <div id="edit-panel" style="display: none;">
+      <h2 id="edit-title">Edit Item</h2>
+      <div class="control-group">
+
+        <div id="edit-dim-group" style="display: flex; flex-direction: column; gap: 8px;">
+          <label>Width: <input type="number" id="edit-w" oninput="updateSelected()"></label>
+          <label>Height: <input type="number" id="edit-h" oninput="updateSelected()"></label>
+        </div>
+
+        <label>Color: <input type="color" id="edit-color" oninput="updateSelected()"></label>
+
+        <div id="edit-furn-group" style="display: flex; flex-direction: column; gap: 8px;">
+          <label>Rotation: <input type="range" id="edit-rotation" min="0" max="360" value="0"
+              oninput="updateSelected()"></label>
+          <label>Opacity: <input type="range" id="edit-opacity" min="0.1" max="1" step="0.1" value="1"
+              oninput="updateSelected()"></label>
+          <label>Z-Index: <input type="number" id="edit-zindex" value="10" oninput="updateSelected()"></label>
+        </div>
+
+        <button onclick="deleteSelected()" style="background-color: #cf6679; color: white;">Delete Item</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-area" id="main-area">
+    <div id="workspace">
+      <div id="indicators">
+        <div id="line-top" class="dist-line"><span class="dist-label"></span></div>
+        <div id="line-bottom" class="dist-line"><span class="dist-label"></span></div>
+        <div id="line-left" class="dist-line"><span class="dist-label"></span></div>
+        <div id="line-right" class="dist-line"><span class="dist-label"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const workspace = document.getElementById('workspace');
+    const mainArea = document.getElementById('main-area');
+    const editPanel = document.getElementById('edit-panel');
+    const zoomValDisplay = document.getElementById('zoom-val');
+    const indicatorsLayer = document.getElementById('indicators');
+
+    const editColor = document.getElementById('edit-color');
+    const editRotation = document.getElementById('edit-rotation');
+    const editOpacity = document.getElementById('edit-opacity');
+    const editZIndex = document.getElementById('edit-zindex');
+    const editW = document.getElementById('edit-w');
+    const editH = document.getElementById('edit-h');
+
+    let selectedElement = null;
+    let activeRoom = null;
+
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    let currentScale = 1;
+    let panX = 0, panY = 0;
+    let isPanning = false;
+    let startPanX = 0, startPanY = 0;
+
+    window.onload = () => {
+      loadLayout();
+    };
+
+    // --- View Transform (Pan & Zoom) Logic ---
+    function changeZoom(delta) {
+      workspace.style.transition = 'transform 0.2s ease-out';
+      currentScale += delta;
+      if (currentScale < 0.2) currentScale = 0.2;
+      if (currentScale > 3) currentScale = 3;
+      applyTransform();
+    }
+
+    function resetZoom() {
+      workspace.style.transition = 'transform 0.2s ease-out';
+      currentScale = 1;
+      panX = 0;
+      panY = 0;
+      applyTransform();
+    }
+
+    function applyTransform() {
+      workspace.style.transform = `translate(${panX}px, ${panY}px) scale(${currentScale})`;
+      zoomValDisplay.innerText = Math.round(currentScale * 100) + '%';
+      mainArea.style.backgroundPosition = `${panX}px ${panY}px`;
+    }
+
+    mainArea.addEventListener('mousedown', (e) => {
+      if (e.target.id === 'main-area' || e.target.id === 'workspace') {
+        if (selectedElement) {
+          selectedElement.classList.remove('selected');
+          selectedElement = null;
+          editPanel.style.display = 'none';
+          indicatorsLayer.style.display = 'none';
+        }
+
+        workspace.style.transition = 'none';
+        isPanning = true;
+        startPanX = e.clientX - panX;
+        startPanY = e.clientY - panY;
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const dx = (e.clientX - startX) / currentScale;
+        const dy = (e.clientY - startY) / currentScale;
+
+        selectedElement.style.left = (initialLeft + dx) + 'px';
+        selectedElement.style.top = (initialTop + dy) + 'px';
+
+        updateIndicators();
+      }
+
+      if (isPanning) {
+        panX = e.clientX - startPanX;
+        panY = e.clientY - startPanY;
+        applyTransform();
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        saveLayout(); // Save when done dragging
+      }
+      isDragging = false;
+      isPanning = false;
+    });
+
+    // --- Save and Load LocalStorage ---
+    function saveLayout() {
+      const layout = [];
+      document.querySelectorAll('.room').forEach(r => {
+        const roomData = {
+          w: r.style.width,
+          h: r.style.height,
+          bg: rgb2hex(r.style.backgroundColor),
+          left: r.style.left,
+          top: r.style.top,
+          furniture: []
+        };
+
+        r.querySelectorAll('.furniture').forEach(f => {
+          roomData.furniture.push({
+            name: f.innerText,
+            w: f.style.width,
+            h: f.style.height,
+            bg: rgb2hex(f.style.backgroundColor),
+            left: f.style.left,
+            top: f.style.top,
+            rotation: f.dataset.rotation || 0,
+            opacity: f.style.opacity || 1,
+            zIndex: f.style.zIndex || 10
+          });
+        });
+
+        layout.push(roomData);
+      });
+      localStorage.setItem('roomPlannerLayout', JSON.stringify(layout));
+    }
+
+    function loadLayout() {
+      const saved = localStorage.getItem('roomPlannerLayout');
+      if (saved) {
+        const layout = JSON.parse(saved);
+        if (layout.length > 0) {
+          layout.forEach(rData => {
+            const r = document.createElement('div');
+            r.className = 'room';
+            r.style.width = rData.w;
+            r.style.height = rData.h;
+            r.style.backgroundColor = rData.bg;
+            r.style.left = rData.left;
+            r.style.top = rData.top;
+            r.addEventListener('mousedown', startDragElement);
+            workspace.appendChild(r);
+
+            rData.furniture.forEach(fData => {
+              const f = document.createElement('div');
+              f.className = 'furniture';
+              f.innerText = fData.name;
+              f.style.width = fData.w;
+              f.style.height = fData.h;
+              f.style.backgroundColor = fData.bg;
+              f.style.left = fData.left;
+              f.style.top = fData.top;
+              f.dataset.rotation = fData.rotation;
+              f.style.transform = `rotate(${fData.rotation}deg)`;
+              f.style.opacity = fData.opacity;
+              f.style.zIndex = fData.zIndex;
+
+              f.addEventListener('mousedown', startDragElement);
+              r.appendChild(f);
+            });
+          });
+          return; // Skip default initialization
+        }
+      }
+
+      // Default init if nothing is saved
+      addRoom(500, 500, '#222222');
+    }
+
+    // --- Add Room Logic ---
+    function addRoomBtn() {
+      const w = parseInt(document.getElementById('new-r-width').value) || 400;
+      const h = parseInt(document.getElementById('new-r-height').value) || 400;
+      const color = document.getElementById('new-r-color').value || '#222222';
+      addRoom(w, h, color);
+    }
+
+    function addRoom(w, h, color) {
+      const r = document.createElement('div');
+      r.className = 'room';
+      r.style.width = w + 'px';
+      r.style.height = h + 'px';
+      r.style.backgroundColor = color;
+
+      const offset = document.querySelectorAll('.room').length * 30;
+      r.style.left = (workspace.offsetWidth / 2 - w / 2 + offset) + 'px';
+      r.style.top = (workspace.offsetHeight / 2 - h / 2 + offset) + 'px';
+
+      r.addEventListener('mousedown', startDragElement);
+      workspace.appendChild(r);
+
+      selectItem({ target: r, stopPropagation: () => { } });
+      saveLayout(); // Auto-save
+    }
+
+    // --- Add Furniture Logic ---
+    function addFurniture() {
+      if (!activeRoom || !activeRoom.classList.contains('room')) {
+        alert("Please select a room to add furniture into!");
+        return;
+      }
+
+      const name = document.getElementById('new-f-name').value;
+      const w = document.getElementById('new-f-width').value;
+      const h = document.getElementById('new-f-height').value;
+      const color = document.getElementById('new-f-color').value;
+
+      const item = document.createElement('div');
+      item.className = 'furniture';
+      item.innerText = name;
+      item.style.width = w + 'px';
+      item.style.height = h + 'px';
+      item.style.backgroundColor = color;
+
+      item.dataset.rotation = 0;
+      item.style.transform = `rotate(0deg)`;
+      item.style.opacity = 1;
+      item.style.zIndex = 10;
+
+      item.style.left = (activeRoom.offsetWidth / 2 - w / 2) + 'px';
+      item.style.top = (activeRoom.offsetHeight / 2 - h / 2) + 'px';
+
+      item.addEventListener('mousedown', startDragElement);
+      activeRoom.appendChild(item);
+
+      selectItem({ target: item, stopPropagation: () => { } });
+      saveLayout(); // Auto-save
+    }
+
+    // --- Selection Logic ---
+    function selectItem(e) {
+      if (e.stopPropagation) e.stopPropagation();
+
+      if (selectedElement) {
+        selectedElement.classList.remove('selected');
+      }
+
+      selectedElement = e.target;
+      selectedElement.classList.add('selected');
+      editPanel.style.display = 'block';
+
+      const isRoom = selectedElement.classList.contains('room');
+
+      if (isRoom) {
+        activeRoom = selectedElement;
+      } else if (selectedElement.classList.contains('furniture')) {
+        activeRoom = selectedElement.parentElement;
+      }
+
+      document.getElementById('edit-dim-group').style.display = isRoom ? 'flex' : 'none';
+      document.getElementById('edit-furn-group').style.display = isRoom ? 'none' : 'flex';
+      document.getElementById('edit-title').innerText = isRoom ? 'Edit Room' : 'Edit Furniture';
+
+      editColor.value = rgb2hex(selectedElement.style.backgroundColor);
+      if (isRoom) {
+        editW.value = parseFloat(selectedElement.style.width);
+        editH.value = parseFloat(selectedElement.style.height);
+      } else {
+        editRotation.value = selectedElement.dataset.rotation || 0;
+        editOpacity.value = selectedElement.style.opacity || 1;
+        editZIndex.value = selectedElement.style.zIndex || 10;
+      }
+
+      updateIndicators();
+    }
+
+    function updateSelected() {
+      if (!selectedElement) return;
+
+      const isRoom = selectedElement.classList.contains('room');
+      selectedElement.style.backgroundColor = editColor.value;
+
+      if (isRoom) {
+        selectedElement.style.width = editW.value + 'px';
+        selectedElement.style.height = editH.value + 'px';
+      } else {
+        selectedElement.dataset.rotation = editRotation.value;
+        selectedElement.style.transform = `rotate(${editRotation.value}deg)`;
+        selectedElement.style.opacity = editOpacity.value;
+        selectedElement.style.zIndex = editZIndex.value;
+      }
+      updateIndicators();
+      saveLayout(); // Auto-save
+    }
+
+    function deleteSelected() {
+      if (selectedElement) {
+        if (selectedElement.classList.contains('room')) {
+          workspace.appendChild(indicatorsLayer);
+          if (activeRoom === selectedElement) activeRoom = null;
+        }
+        selectedElement.remove();
+        selectedElement = null;
+        editPanel.style.display = 'none';
+        indicatorsLayer.style.display = 'none';
+        saveLayout(); // Auto-save
+      }
+    }
+
+    // --- Drag Element Logic ---
+    function startDragElement(e) {
+      if (e.button !== 0) return;
+      if (e.stopPropagation) e.stopPropagation();
+
+      isDragging = true;
+      if (selectedElement !== e.target) selectItem(e);
+
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = parseFloat(selectedElement.style.left) || 0;
+      initialTop = parseFloat(selectedElement.style.top) || 0;
+    }
+
+    // --- Distance Indicators Logic ---
+    function updateIndicators() {
+      if (!selectedElement || !selectedElement.classList.contains('furniture')) {
+        indicatorsLayer.style.display = 'none';
+        return;
+      }
+
+      indicatorsLayer.style.display = 'block';
+
+      const currentRoom = selectedElement.parentElement;
+      currentRoom.appendChild(indicatorsLayer);
+
+      const w = parseFloat(selectedElement.style.width);
+      const h = parseFloat(selectedElement.style.height);
+      const left = parseFloat(selectedElement.style.left);
+      const top = parseFloat(selectedElement.style.top);
+      const angle = parseFloat(selectedElement.dataset.rotation || 0) * (Math.PI / 180);
+
+      const cx = left + w / 2;
+      const cy = top + h / 2;
+
+      const dx = w / 2;
+      const dy = h / 2;
+      const corners = [
+        { x: -dx, y: -dy }, { x: dx, y: -dy },
+        { x: dx, y: dy }, { x: -dx, y: dy }
+      ];
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      corners.forEach(c => {
+        const rx = c.x * Math.cos(angle) - c.y * Math.sin(angle);
+        const ry = c.x * Math.sin(angle) + c.y * Math.cos(angle);
+        const absX = cx + rx;
+        const absY = cy + ry;
+        if (absX < minX) minX = absX;
+        if (absX > maxX) maxX = absX;
+        if (absY < minY) minY = absY;
+        if (absY > maxY) maxY = absY;
+      });
+
+      const roomW = parseFloat(currentRoom.style.width) || currentRoom.offsetWidth;
+      const roomH = parseFloat(currentRoom.style.height) || currentRoom.offsetHeight;
+
+      const distTop = Math.round(minY);
+      const distBottom = Math.round(roomH - maxY);
+      const distLeft = Math.round(minX);
+      const distRight = Math.round(roomW - maxX);
+
+      const centerBoundsX = (minX + maxX) / 2;
+      const centerBoundsY = (minY + maxY) / 2;
+
+      const lineT = document.getElementById('line-top');
+      lineT.style.left = centerBoundsX + 'px';
+      lineT.style.top = '0px';
+      lineT.style.height = Math.max(0, minY) + 'px';
+      lineT.querySelector('.dist-label').innerText = distTop + 'cm';
+
+      const lineB = document.getElementById('line-bottom');
+      lineB.style.left = centerBoundsX + 'px';
+      lineB.style.top = maxY + 'px';
+      lineB.style.height = Math.max(0, roomH - maxY) + 'px';
+      lineB.querySelector('.dist-label').innerText = distBottom + 'cm';
+
+      const lineL = document.getElementById('line-left');
+      lineL.style.top = centerBoundsY + 'px';
+      lineL.style.left = '0px';
+      lineL.style.width = Math.max(0, minX) + 'px';
+      lineL.querySelector('.dist-label').innerText = distLeft + 'cm';
+
+      const lineR = document.getElementById('line-right');
+      lineR.style.top = centerBoundsY + 'px';
+      lineR.style.left = maxX + 'px';
+      lineR.style.width = Math.max(0, roomW - maxX) + 'px';
+      lineR.querySelector('.dist-label').innerText = distRight + 'cm';
+    }
+
+    function rgb2hex(rgb) {
+      if (!rgb) return '#222222';
+      if (rgb.search("rgb") === -1) return rgb;
+      const match = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*(\d+(?:\.\d+)?))?\)$/);
+      if (!match) return rgb;
+      function hex(x) { return ("0" + parseInt(x).toString(16)).slice(-2); }
+      return "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
+    }
+  </script>
+</body>
+
+</html>
