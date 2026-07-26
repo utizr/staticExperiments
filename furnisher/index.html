@@ -379,7 +379,7 @@
       isPanning = false;
     });
 
-    // --- Save and Load LocalStorage ---
+    // --- Save and Load ---
     function saveLayout() {
       const layout = [];
       document.querySelectorAll('.room').forEach(r => {
@@ -408,49 +408,81 @@
 
         layout.push(roomData);
       });
-      localStorage.setItem('roomPlannerLayout', JSON.stringify(layout));
+
+      const jsonStr = JSON.stringify(layout);
+
+      // 1. Save to Local Storage
+      localStorage.setItem('roomPlannerLayout', jsonStr);
+
+      // 2. Save to URL (encodeURIComponent handles special chars, btoa makes it URL safe)
+      try {
+        const encodedData = btoa(encodeURIComponent(jsonStr));
+        window.history.replaceState(null, '', '#' + encodedData);
+      } catch (e) {
+        console.warn("Could not save layout to URL", e);
+      }
     }
 
     function loadLayout() {
-      const saved = localStorage.getItem('roomPlannerLayout');
-      if (saved) {
-        const layout = JSON.parse(saved);
-        if (layout.length > 0) {
-          layout.forEach(rData => {
-            const r = document.createElement('div');
-            r.className = 'room';
-            r.style.width = rData.w;
-            r.style.height = rData.h;
-            r.style.backgroundColor = rData.bg;
-            r.style.left = rData.left;
-            r.style.top = rData.top;
-            r.addEventListener('mousedown', startDragElement);
-            workspace.appendChild(r);
+      let layoutData = null;
 
-            rData.furniture.forEach(fData => {
-              const f = document.createElement('div');
-              f.className = 'furniture';
-              f.innerText = fData.name;
-              f.style.width = fData.w;
-              f.style.height = fData.h;
-              f.style.backgroundColor = fData.bg;
-              f.style.left = fData.left;
-              f.style.top = fData.top;
-              f.dataset.rotation = fData.rotation;
-              f.style.transform = `rotate(${fData.rotation}deg)`;
-              f.style.opacity = fData.opacity;
-              f.style.zIndex = fData.zIndex;
-
-              f.addEventListener('mousedown', startDragElement);
-              r.appendChild(f);
-            });
-          });
-          return; // Skip default initialization
+      // 1. Attempt to load from URL first
+      if (window.location.hash.length > 1) {
+        try {
+          const hashData = window.location.hash.substring(1);
+          layoutData = JSON.parse(decodeURIComponent(atob(hashData)));
+        } catch (e) {
+          console.error("Failed to parse URL layout data. Falling back to local storage.", e);
         }
       }
 
-      // Default init if nothing is saved
-      addRoom(500, 500, '#222222');
+      // 2. If no valid URL data, fallback to Local Storage
+      if (!layoutData) {
+        const saved = localStorage.getItem('roomPlannerLayout');
+        if (saved) {
+          try {
+            layoutData = JSON.parse(saved);
+          } catch (e) {
+            console.error("Failed to parse Local Storage layout data.", e);
+          }
+        }
+      }
+
+      // 3. Render layout or initialize default
+      if (layoutData && layoutData.length > 0) {
+        layoutData.forEach(rData => {
+          const r = document.createElement('div');
+          r.className = 'room';
+          r.style.width = rData.w;
+          r.style.height = rData.h;
+          r.style.backgroundColor = rData.bg;
+          r.style.left = rData.left;
+          r.style.top = rData.top;
+          r.addEventListener('mousedown', startDragElement);
+          workspace.appendChild(r);
+
+          rData.furniture.forEach(fData => {
+            const f = document.createElement('div');
+            f.className = 'furniture';
+            f.innerText = fData.name;
+            f.style.width = fData.w;
+            f.style.height = fData.h;
+            f.style.backgroundColor = fData.bg;
+            f.style.left = fData.left;
+            f.style.top = fData.top;
+            f.dataset.rotation = fData.rotation;
+            f.style.transform = `rotate(${fData.rotation}deg)`;
+            f.style.opacity = fData.opacity;
+            f.style.zIndex = fData.zIndex;
+
+            f.addEventListener('mousedown', startDragElement);
+            r.appendChild(f);
+          });
+        });
+      } else {
+        // Default init if nothing is saved anywhere
+        addRoom(500, 500, '#222222');
+      }
     }
 
     // --- Add Room Logic ---
