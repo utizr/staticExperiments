@@ -254,6 +254,10 @@
       <h2 id="edit-title">Edit Item</h2>
       <div class="control-group">
 
+        <div id="edit-name-group" style="display: flex; flex-direction: column; gap: 8px;">
+          <label>Name: <input type="text" id="edit-name" oninput="updateSelected()"></label>
+        </div>
+
         <div id="edit-dim-group" style="display: flex; flex-direction: column; gap: 8px;">
           <label>Width: <input type="number" id="edit-w" oninput="updateSelected()"></label>
           <label>Height: <input type="number" id="edit-h" oninput="updateSelected()"></label>
@@ -292,6 +296,7 @@
     const zoomValDisplay = document.getElementById('zoom-val');
     const indicatorsLayer = document.getElementById('indicators');
 
+    const editName = document.getElementById('edit-name');
     const editColor = document.getElementById('edit-color');
     const editRotation = document.getElementById('edit-rotation');
     const editOpacity = document.getElementById('edit-opacity');
@@ -373,7 +378,7 @@
 
     document.addEventListener('mouseup', () => {
       if (isDragging) {
-        saveLayout(); // Save when done dragging
+        saveLayout();
       }
       isDragging = false;
       isPanning = false;
@@ -410,11 +415,8 @@
       });
 
       const jsonStr = JSON.stringify(layout);
-
-      // 1. Save to Local Storage
       localStorage.setItem('roomPlannerLayout', jsonStr);
 
-      // 2. Save to URL (encodeURIComponent handles special chars, btoa makes it URL safe)
       try {
         const encodedData = btoa(encodeURIComponent(jsonStr));
         window.history.replaceState(null, '', '#' + encodedData);
@@ -426,29 +428,20 @@
     function loadLayout() {
       let layoutData = null;
 
-      // 1. Attempt to load from URL first
       if (window.location.hash.length > 1) {
         try {
           const hashData = window.location.hash.substring(1);
           layoutData = JSON.parse(decodeURIComponent(atob(hashData)));
-        } catch (e) {
-          console.error("Failed to parse URL layout data. Falling back to local storage.", e);
-        }
+        } catch (e) { }
       }
 
-      // 2. If no valid URL data, fallback to Local Storage
       if (!layoutData) {
         const saved = localStorage.getItem('roomPlannerLayout');
         if (saved) {
-          try {
-            layoutData = JSON.parse(saved);
-          } catch (e) {
-            console.error("Failed to parse Local Storage layout data.", e);
-          }
+          try { layoutData = JSON.parse(saved); } catch (e) { }
         }
       }
 
-      // 3. Render layout or initialize default
       if (layoutData && layoutData.length > 0) {
         layoutData.forEach(rData => {
           const r = document.createElement('div');
@@ -480,7 +473,6 @@
           });
         });
       } else {
-        // Default init if nothing is saved anywhere
         addRoom(500, 500, '#222222');
       }
     }
@@ -508,7 +500,7 @@
       workspace.appendChild(r);
 
       selectItem({ target: r, stopPropagation: () => { } });
-      saveLayout(); // Auto-save
+      saveLayout();
     }
 
     // --- Add Furniture Logic ---
@@ -542,7 +534,7 @@
       activeRoom.appendChild(item);
 
       selectItem({ target: item, stopPropagation: () => { } });
-      saveLayout(); // Auto-save
+      saveLayout();
     }
 
     // --- Selection Logic ---
@@ -565,15 +557,19 @@
         activeRoom = selectedElement.parentElement;
       }
 
-      document.getElementById('edit-dim-group').style.display = isRoom ? 'flex' : 'none';
+      // Adjust field visibility
+      document.getElementById('edit-name-group').style.display = isRoom ? 'none' : 'flex';
+      document.getElementById('edit-dim-group').style.display = 'flex'; // Now visible for both!
       document.getElementById('edit-furn-group').style.display = isRoom ? 'none' : 'flex';
       document.getElementById('edit-title').innerText = isRoom ? 'Edit Room' : 'Edit Furniture';
 
+      // Load Values
       editColor.value = rgb2hex(selectedElement.style.backgroundColor);
-      if (isRoom) {
-        editW.value = parseFloat(selectedElement.style.width);
-        editH.value = parseFloat(selectedElement.style.height);
-      } else {
+      editW.value = parseFloat(selectedElement.style.width);
+      editH.value = parseFloat(selectedElement.style.height);
+
+      if (!isRoom) {
+        editName.value = selectedElement.innerText;
         editRotation.value = selectedElement.dataset.rotation || 0;
         editOpacity.value = selectedElement.style.opacity || 1;
         editZIndex.value = selectedElement.style.zIndex || 10;
@@ -586,19 +582,23 @@
       if (!selectedElement) return;
 
       const isRoom = selectedElement.classList.contains('room');
-      selectedElement.style.backgroundColor = editColor.value;
 
-      if (isRoom) {
-        selectedElement.style.width = editW.value + 'px';
-        selectedElement.style.height = editH.value + 'px';
-      } else {
+      // Common traits
+      selectedElement.style.backgroundColor = editColor.value;
+      selectedElement.style.width = editW.value + 'px';
+      selectedElement.style.height = editH.value + 'px';
+
+      // Furniture specific traits
+      if (!isRoom) {
+        selectedElement.innerText = editName.value;
         selectedElement.dataset.rotation = editRotation.value;
         selectedElement.style.transform = `rotate(${editRotation.value}deg)`;
         selectedElement.style.opacity = editOpacity.value;
         selectedElement.style.zIndex = editZIndex.value;
       }
+
       updateIndicators();
-      saveLayout(); // Auto-save
+      saveLayout();
     }
 
     function deleteSelected() {
@@ -611,7 +611,7 @@
         selectedElement = null;
         editPanel.style.display = 'none';
         indicatorsLayer.style.display = 'none';
-        saveLayout(); // Auto-save
+        saveLayout();
       }
     }
 
