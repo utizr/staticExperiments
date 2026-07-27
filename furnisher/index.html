@@ -219,8 +219,8 @@
       <div class="control-group">
         <label>Zoom: <span id="zoom-val">100%</span></label>
         <div class="btn-group">
-          <button onclick="changeZoom(-0.1)">-</button>
-          <button onclick="changeZoom(0.1)">+</button>
+          <button onclick="changeZoom(-0.5)">-</button>
+          <button onclick="changeZoom(0.5)">+</button>
           <button onclick="resetZoom()">Reset</button>
         </div>
         <p style="font-size: 0.75rem; color: #888; text-align: center; margin-top: 5px;">
@@ -324,7 +324,7 @@
       workspace.style.transition = 'transform 0.2s ease-out';
       currentScale += delta;
       if (currentScale < 0.2) currentScale = 0.2;
-      if (currentScale > 3) currentScale = 3;
+      if (currentScale > 5) currentScale = 5;
       applyTransform();
     }
 
