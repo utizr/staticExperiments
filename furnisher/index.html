@@ -641,9 +641,19 @@
       localStorage.setItem('roomPlannerLayout', jsonStr);
 
       try {
-        const encodedData = btoa(encodeURIComponent(jsonStr));
+        // 1. Convert string to a UTF-8 byte array (handles emojis perfectly)
+        const bytes = new TextEncoder().encode(jsonStr);
+        // 2. Convert bytes to a binary string
+        let binString = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binString += String.fromCharCode(bytes[i]);
+        }
+        // 3. Base64 encode the binary string
+        const encodedData = btoa(binString);
         window.history.replaceState(null, '', '#' + encodedData);
-      } catch (e) { }
+      } catch (e) {
+        console.warn("Could not save layout to URL", e);
+      }
     }
 
     function loadLayout() {
@@ -651,10 +661,20 @@
       if (window.location.hash.length > 1) {
         try {
           const hashData = window.location.hash.substring(1);
-          layoutData = JSON.parse(decodeURIComponent(atob(hashData)));
-        } catch (e) { }
+          // 1. Decode Base64 back to binary string
+          const binString = atob(hashData);
+          // 2. Convert binary string to byte array
+          const bytes = new Uint8Array(binString.length);
+          for (let i = 0; i < binString.length; i++) {
+            bytes[i] = binString.charCodeAt(i);
+          }
+          // 3. Decode UTF-8 bytes back to JSON string
+          const jsonStr = new TextDecoder().decode(bytes);
+          layoutData = JSON.parse(jsonStr);
+        } catch (e) {
+          console.error("Failed to parse URL layout data.", e);
+        }
       }
-
       if (!layoutData) {
         const saved = localStorage.getItem('roomPlannerLayout');
         if (saved) {
