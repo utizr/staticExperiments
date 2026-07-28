@@ -164,7 +164,6 @@
       height: 100%;
       position: relative;
       transform-origin: 0 0;
-      /* Crucial for pinpoint zooming */
       touch-action: none;
     }
 
@@ -775,9 +774,7 @@
       selectedElement = e.target;
       selectedElement.classList.add('selected');
 
-      if (window.innerWidth <= 768 && !sidebar.classList.contains('open')) {
-        toggleSidebar();
-      }
+      // REMOVED auto-open sidebar logic on mobile here
 
       editPanel.style.display = 'block';
       const isRoom = selectedElement.classList.contains('room');
@@ -843,7 +840,7 @@
     // --- Drag Element Logic ---
     function startDragElement(e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (!e.isPrimary) return; // Prevent drag starting if it's a multi-touch action
+      if (!e.isPrimary) return;
       if (e.stopPropagation) e.stopPropagation();
 
       isDragging = true;
