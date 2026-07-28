@@ -31,7 +31,6 @@
       position: relative;
     }
 
-    /* Hamburger Menu Button */
     #menu-btn {
       display: none;
       position: absolute;
@@ -48,7 +47,6 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
 
-    /* Sidebar Styling */
     .sidebar {
       width: 320px;
       background-color: var(--sidebar-bg);
@@ -143,7 +141,6 @@
       margin-top: 0;
     }
 
-    /* Main Canvas Area */
     .main-area {
       flex-grow: 1;
       display: flex;
@@ -169,12 +166,11 @@
 
     .room {
       position: absolute;
-      background-color: var(--room-bg);
-      border: 2px dashed #555;
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      background-color: transparent;
       cursor: grab;
       z-index: 1;
       touch-action: none;
+      overflow: visible;
     }
 
     .room:active {
@@ -204,6 +200,9 @@
     .selected {
       outline: 2px solid var(--accent-color);
       outline-offset: 2px;
+    }
+
+    .furniture.selected {
       box-shadow: 0 0 10px var(--accent-color);
     }
 
@@ -247,7 +246,38 @@
       white-space: nowrap;
     }
 
-    /* Responsive Design */
+    /* Cutout Preview UI */
+    .cut-preview {
+      position: absolute;
+      background: rgba(231, 76, 60, 0.4);
+      border: 2px dashed #e74c3c;
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    .cut-label {
+      position: absolute;
+      background: #e74c3c;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .cut-label-w {
+      top: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .cut-label-h {
+      left: -50px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
     @media (max-width: 768px) {
       #menu-btn {
         display: block;
@@ -283,8 +313,15 @@
       <button id="close-menu-btn" onclick="toggleSidebar()">✕</button>
     </div>
 
+    <div class="control-group">
+      <div class="btn-group">
+        <button id="btn-tool-move" onclick="setTool('move')" style="opacity: 1;">🖐️ Move/Edit</button>
+        <button id="btn-tool-cut" onclick="setTool('cut')" style="opacity: 0.5;">✂️ Cut Room</button>
+      </div>
+    </div>
+
     <div>
-      <h2 style="border-bottom: 1px solid #333; padding-bottom: 5px;">View</h2>
+      <h2 style="border-bottom: 1px solid #333; padding-bottom: 5px; margin-top:10px;">View</h2>
       <div class="control-group">
         <label>Zoom: <span id="zoom-val">100%</span></label>
         <div class="btn-group">
@@ -292,9 +329,6 @@
           <button onclick="changeZoom(0.5)">+</button>
           <button onclick="resetZoom()">Reset</button>
         </div>
-        <p style="font-size: 0.75rem; color: #888; text-align: center; margin-top: 5px;">
-          Pinch/scroll to zoom. Drag to pan.
-        </p>
       </div>
     </div>
 
@@ -377,57 +411,158 @@
     let selectedElement = null;
     let activeRoom = null;
 
-    // Single pointer dragging / panning
+    let currentTool = 'move';
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
-    // Viewport Math
+    let isCutting = false;
+    let activeCutRoom = null;
+    let cutPreview = null;
+    let cutStartX = 0, cutStartY = 0;
+
     let currentScale = 1;
     let panX = 0, panY = 0;
     let isPanning = false;
     let startPanX = 0, startPanY = 0;
-
-    // Multi-touch Zoom/Pan Math
     let initialPinchDistance = null;
     let initialPinchScale = null;
     let initialPinchWorkspaceX = null;
     let initialPinchWorkspaceY = null;
 
-    window.onload = () => {
-      loadLayout();
-    };
+    window.onload = () => { loadLayout(); };
 
-    // --- Sidebar Mobile Logic ---
-    function toggleSidebar() {
-      sidebar.classList.toggle('open');
+    function setTool(tool) {
+      currentTool = tool;
+      document.getElementById('btn-tool-move').style.opacity = tool === 'move' ? '1' : '0.5';
+      document.getElementById('btn-tool-cut').style.opacity = tool === 'cut' ? '1' : '0.5';
+      mainArea.style.cursor = tool === 'cut' ? 'crosshair' : 'grab';
     }
 
-    // Close sidebar if user taps the canvas
-    mainArea.addEventListener('pointerdown', (e) => {
-      if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
-        sidebar.classList.remove('open');
+    function toggleSidebar() { sidebar.classList.toggle('open'); }
+
+    // --- Geometric SVG Path Generator ---
+    function getRoomPath(w, h, cutouts) {
+      let xs = [0, w];
+      let ys = [0, h];
+
+      cutouts.forEach(c => {
+        if (c.x > 0 && c.x < w) xs.push(c.x);
+        if (c.x + c.w > 0 && c.x + c.w < w) xs.push(c.x + c.w);
+        if (c.y > 0 && c.y < h) ys.push(c.y);
+        if (c.y + c.h > 0 && c.y + c.h < h) ys.push(c.y + c.h);
+      });
+      xs = [...new Set(xs)].sort((a, b) => a - b);
+      ys = [...new Set(ys)].sort((a, b) => a - b);
+
+      let grid = Array(ys.length - 1).fill(0).map(() => Array(xs.length - 1).fill(true));
+
+      cutouts.forEach(c => {
+        let startCol = xs.indexOf(Math.max(0, c.x));
+        let endCol = xs.indexOf(Math.min(w, c.x + c.w));
+        let startRow = ys.indexOf(Math.max(0, c.y));
+        let endRow = ys.indexOf(Math.min(h, c.y + c.h));
+        if (startCol === -1 || endCol === -1 || startRow === -1 || endRow === -1) return;
+
+        for (let r = startRow; r < endRow; r++) {
+          for (let col = startCol; col < endCol; col++) {
+            grid[r][col] = false;
+          }
+        }
+      });
+
+      let segments = [];
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          if (grid[r][c]) {
+            let left = xs[c], right = xs[c + 1], top = ys[r], bottom = ys[r + 1];
+            if (r === 0 || !grid[r - 1][c]) segments.push({ x1: left, y1: top, x2: right, y2: top });
+            if (r === grid.length - 1 || !grid[r + 1][c]) segments.push({ x1: right, y1: bottom, x2: left, y2: bottom });
+            if (c === 0 || !grid[r][c - 1]) segments.push({ x1: left, y1: bottom, x2: left, y2: top });
+            if (c === grid[r].length - 1 || !grid[r][c + 1]) segments.push({ x1: right, y1: top, x2: right, y2: bottom });
+          }
+        }
       }
-    });
 
-    // --- Core Zoom Logic (Zooms into a specific Screen Coordinate) ---
+      let loops = [];
+      while (segments.length > 0) {
+        let current = segments.shift();
+        let loop = [current];
+        while (true) {
+          let tail = loop[loop.length - 1];
+          let nextIdx = segments.findIndex(s => Math.abs(s.x1 - tail.x2) < 0.1 && Math.abs(s.y1 - tail.y2) < 0.1);
+          if (nextIdx !== -1) {
+            loop.push(segments[nextIdx]);
+            segments.splice(nextIdx, 1);
+          } else break;
+        }
+        loops.push(loop);
+      }
+
+      let pathStr = "";
+      loops.forEach(loop => {
+        pathStr += `M ${loop[0].x1} ${loop[0].y1} `;
+        loop.forEach(seg => pathStr += `L ${seg.x2} ${seg.y2} `);
+        pathStr += "Z ";
+      });
+      return pathStr || `M 0 0 L ${w} 0 L ${w} ${h} L 0 ${h} Z`;
+    }
+
+    function updateRoomShape(r) {
+      const w = parseFloat(r.style.width);
+      const h = parseFloat(r.style.height);
+      const color = r.dataset.bgColor || '#222222';
+      let cutouts = [];
+      try { cutouts = JSON.parse(r.dataset.cutouts || '[]'); } catch (e) { }
+
+      const pathStr = getRoomPath(w, h, cutouts);
+
+      let svg = r.querySelector('.room-svg');
+      if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'room-svg');
+        svg.style.position = 'absolute';
+        svg.style.top = '0';
+        svg.style.left = '0';
+        svg.style.width = '100%';
+        svg.style.height = '100%';
+        svg.style.overflow = 'visible';
+        svg.style.pointerEvents = 'none';
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.style.pointerEvents = 'auto';
+        path.setAttribute('stroke', '#555');
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-dasharray', '4');
+        path.style.filter = 'drop-shadow(0px 0px 10px rgba(0,0,0,0.5))';
+
+        svg.appendChild(path);
+        r.insertBefore(svg, r.firstChild);
+      }
+      const path = svg.querySelector('path');
+      path.setAttribute('d', pathStr);
+      path.setAttribute('fill', color);
+
+      if (r.classList.contains('selected')) {
+        path.setAttribute('stroke', 'var(--accent-color)');
+        path.style.filter = 'drop-shadow(0px 0px 10px var(--accent-color))';
+      } else {
+        path.setAttribute('stroke', '#555');
+        path.style.filter = 'drop-shadow(0px 0px 10px rgba(0,0,0,0.5))';
+      }
+    }
+
+    // --- Core Zoom & Pan Logic ---
     function zoomAt(newScale, screenX, screenY, animate = false) {
-      if (animate) workspace.style.transition = 'transform 0.2s ease-out';
-      else workspace.style.transition = 'none';
-
+      workspace.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
       const rect = mainArea.getBoundingClientRect();
       const mouseX = screenX - rect.left;
       const mouseY = screenY - rect.top;
-
-      // Find out exactly what part of the unscaled workspace the pointer is hovering over
       const workspaceX = (mouseX - panX) / currentScale;
       const workspaceY = (mouseY - panY) / currentScale;
 
       currentScale = newScale;
-
-      // Adjust Pan so that specific part of the workspace stays under the pointer
       panX = mouseX - workspaceX * currentScale;
       panY = mouseY - workspaceY * currentScale;
-
       applyTransform();
     }
 
@@ -437,12 +572,8 @@
       if (newScale < 0.2) newScale = 0.2;
       if (newScale > 5) newScale = 5;
 
-      // UI Button clicks zoom right into the center of the screen
       const rect = mainArea.getBoundingClientRect();
-      const screenCenterX = rect.left + rect.width / 2;
-      const screenCenterY = rect.top + rect.height / 2;
-
-      zoomAt(newScale, screenCenterX, screenCenterY, true);
+      zoomAt(newScale, rect.left + rect.width / 2, rect.top + rect.height / 2, true);
     }
 
     function resetZoom() {
@@ -456,14 +587,11 @@
       mainArea.style.backgroundPosition = `${panX}px ${panY}px`;
     }
 
-    // --- Auto-Center Logic ---
     function centerView(animate = false) {
       const rooms = document.querySelectorAll('.room');
       if (rooms.length === 0) return;
 
-      if (animate) workspace.style.transition = 'transform 0.2s ease-out';
-      else workspace.style.transition = 'none';
-
+      workspace.style.transition = animate ? 'transform 0.2s ease-out' : 'none';
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
       rooms.forEach(r => {
@@ -480,67 +608,54 @@
 
       const contentCenterX = minX + (maxX - minX) / 2;
       const contentCenterY = minY + (maxY - minY) / 2;
-
       const rect = mainArea.getBoundingClientRect();
-      const screenCenterX = rect.width / 2;
-      const screenCenterY = rect.height / 2;
 
-      panX = screenCenterX - (contentCenterX * currentScale);
-      panY = screenCenterY - (contentCenterY * currentScale);
-
+      panX = (rect.width / 2) - (contentCenterX * currentScale);
+      panY = (rect.height / 2) - (contentCenterY * currentScale);
       applyTransform();
     }
 
-    // --- Mouse Wheel Scroll to Zoom ---
     mainArea.addEventListener('wheel', (e) => {
       e.preventDefault();
-      // 0.1 scale increments are smoother for mouse wheels
       const zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
       let newScale = currentScale + zoomDelta;
-
       newScale = Math.round(newScale * 100) / 100;
       if (newScale < 0.2) newScale = 0.2;
       if (newScale > 5) newScale = 5;
-
       zoomAt(newScale, e.clientX, e.clientY, false);
     }, { passive: false });
 
-    // --- Pinch-to-Zoom (Touch Multi-finger) ---
     mainArea.addEventListener('touchmove', (e) => {
       if (e.touches.length === 2) {
-        e.preventDefault(); // Stop mobile browser native zoom
+        e.preventDefault();
         isPanning = false;
         isDragging = false;
+        isCutting = false;
+        if (cutPreview) {
+          cutPreview.remove();
+          cutPreview = null;
+        }
 
         const p1 = e.touches[0];
         const p2 = e.touches[1];
-
-        // Calculate distance between two fingers
         const dist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
-
-        // Calculate exact center point between two fingers
         const centerX = (p1.clientX + p2.clientX) / 2;
         const centerY = (p1.clientY + p2.clientY) / 2;
 
         if (!initialPinchDistance) {
           initialPinchDistance = dist;
           initialPinchScale = currentScale;
-
           const rect = mainArea.getBoundingClientRect();
-          // Anchor the workspace coordinates so the canvas doesn't drift while zooming/panning
           initialPinchWorkspaceX = (centerX - rect.left - panX) / currentScale;
           initialPinchWorkspaceY = (centerY - rect.top - panY) / currentScale;
         } else {
           const scaleChange = dist / initialPinchDistance;
           let newScale = initialPinchScale * scaleChange;
-
           if (newScale < 0.2) newScale = 0.2;
           if (newScale > 5) newScale = 5;
-
           currentScale = newScale;
 
           const rect = mainArea.getBoundingClientRect();
-          // Update pan based on where fingers moved, combining a zoom AND a pan operation perfectly
           panX = (centerX - rect.left) - initialPinchWorkspaceX * currentScale;
           panY = (centerY - rect.top) - initialPinchWorkspaceY * currentScale;
 
@@ -551,18 +666,46 @@
     }, { passive: false });
 
     mainArea.addEventListener('touchend', (e) => {
-      if (e.touches.length < 2) {
-        initialPinchDistance = null; // Clear pinch cache so next touch starts fresh
-      }
+      if (e.touches.length < 2) initialPinchDistance = null;
     });
 
-    // --- Single Pointer Events (Dragging Elements & Panning background) ---
+    // --- Core Cutting Logic Helper ---
+    function startCut(e, roomToCut) {
+      isCutting = true;
+      activeCutRoom = roomToCut;
+
+      const rect = activeCutRoom.getBoundingClientRect();
+      cutStartX = (e.clientX - rect.left) / currentScale;
+      cutStartY = (e.clientY - rect.top) / currentScale;
+
+      cutPreview = document.createElement('div');
+      cutPreview.className = 'cut-preview';
+      cutPreview.innerHTML = `<div class="cut-label cut-label-w">0cm</div><div class="cut-label cut-label-h">0cm</div>`;
+      activeCutRoom.appendChild(cutPreview);
+    }
+
+    // --- Single Pointer Events ---
     mainArea.addEventListener('pointerdown', (e) => {
-      if (!e.isPrimary) return; // Ignore second finger for standard dragging
+      if (!e.isPrimary) return;
+
+      if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+      }
+
+      if (currentTool === 'cut') {
+        if (!activeRoom || !activeRoom.classList.contains('room')) {
+          alert("Please select a room to cut first by clicking on it.");
+          setTool('move');
+          return;
+        }
+        startCut(e, activeRoom);
+        return;
+      }
 
       if (e.target.id === 'main-area' || e.target.id === 'workspace') {
         if (selectedElement) {
           selectedElement.classList.remove('selected');
+          if (selectedElement.classList.contains('room')) updateRoomShape(selectedElement);
           selectedElement = null;
           editPanel.style.display = 'none';
           indicatorsLayer.style.display = 'none';
@@ -576,19 +719,47 @@
     });
 
     document.addEventListener('pointermove', (e) => {
-      if (!e.isPrimary) return; // Prevent drag drift when second finger comes down
+      if (!e.isPrimary) return;
 
-      if (isDragging) {
+      if (isCutting && activeCutRoom && cutPreview) {
+        const rect = activeCutRoom.getBoundingClientRect();
+        let curX = (e.clientX - rect.left) / currentScale;
+        let curY = (e.clientY - rect.top) / currentScale;
+
+        let w = Math.round(Math.abs(curX - cutStartX));
+        let h = Math.round(Math.abs(curY - cutStartY));
+        let l = Math.round(Math.min(curX, cutStartX));
+        let t = Math.round(Math.min(curY, cutStartY));
+
+        cutPreview.style.width = w + 'px';
+        cutPreview.style.height = h + 'px';
+        cutPreview.style.left = l + 'px';
+        cutPreview.style.top = t + 'px';
+
+        // NEW: Calculate the effective intersection of the cut relative to the room boundaries
+        const roomW = parseFloat(activeCutRoom.style.width) || 0;
+        const roomH = parseFloat(activeCutRoom.style.height) || 0;
+
+        const overlapL = Math.max(0, l);
+        const overlapT = Math.max(0, t);
+        const overlapR = Math.min(roomW, l + w);
+        const overlapB = Math.min(roomH, t + h);
+
+        const effW = Math.max(0, overlapR - overlapL);
+        const effH = Math.max(0, overlapB - overlapT);
+
+        // Update labels to show how much is physically being cut from the room
+        cutPreview.querySelector('.cut-label-w').innerText = Math.round(effW) + 'cm';
+        cutPreview.querySelector('.cut-label-h').innerText = Math.round(effH) + 'cm';
+      }
+      else if (isDragging && selectedElement) {
         const dx = (e.clientX - startX) / currentScale;
         const dy = (e.clientY - startY) / currentScale;
-
         selectedElement.style.left = (initialLeft + dx) + 'px';
         selectedElement.style.top = (initialTop + dy) + 'px';
-
         updateIndicators();
       }
-
-      if (isPanning) {
+      else if (isPanning) {
         panX = e.clientX - startPanX;
         panY = e.clientY - startPanY;
         applyTransform();
@@ -597,211 +768,55 @@
 
     document.addEventListener('pointerup', (e) => {
       if (!e.isPrimary) return;
-      if (isDragging) saveLayout();
-      isDragging = false;
-      isPanning = false;
-    });
 
-    document.addEventListener('pointercancel', (e) => {
-      if (isDragging) saveLayout();
-      isDragging = false;
-      isPanning = false;
-    });
+      if (isCutting) {
+        isCutting = false;
+        if (cutPreview) {
+          let w = parseInt(cutPreview.style.width) || 0;
+          let h = parseInt(cutPreview.style.height) || 0;
+          let l = parseInt(cutPreview.style.left) || 0;
+          let t = parseInt(cutPreview.style.top) || 0;
 
-    // --- Save and Load ---
-    function saveLayout() {
-      const layout = [];
-      document.querySelectorAll('.room').forEach(r => {
-        const roomData = {
-          w: r.style.width,
-          h: r.style.height,
-          bg: rgb2hex(r.style.backgroundColor),
-          left: r.style.left,
-          top: r.style.top,
-          furniture: []
-        };
-
-        r.querySelectorAll('.furniture').forEach(f => {
-          roomData.furniture.push({
-            name: f.innerText,
-            w: f.style.width,
-            h: f.style.height,
-            bg: rgb2hex(f.style.backgroundColor),
-            left: f.style.left,
-            top: f.style.top,
-            rotation: f.dataset.rotation || 0,
-            opacity: f.style.opacity || 1,
-            zIndex: f.style.zIndex || 10
-          });
-        });
-        layout.push(roomData);
-      });
-
-      const jsonStr = JSON.stringify(layout);
-      localStorage.setItem('roomPlannerLayout', jsonStr);
-
-      try {
-        // 1. Convert string to a UTF-8 byte array (handles emojis perfectly)
-        const bytes = new TextEncoder().encode(jsonStr);
-        // 2. Convert bytes to a binary string
-        let binString = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binString += String.fromCharCode(bytes[i]);
-        }
-        // 3. Base64 encode the binary string
-        const encodedData = btoa(binString);
-        window.history.replaceState(null, '', '#' + encodedData);
-      } catch (e) {
-        console.warn("Could not save layout to URL", e);
-      }
-    }
-
-    function loadLayout() {
-      let layoutData = null;
-      if (window.location.hash.length > 1) {
-        try {
-          const hashData = window.location.hash.substring(1);
-          // 1. Decode Base64 back to binary string
-          const binString = atob(hashData);
-          // 2. Convert binary string to byte array
-          const bytes = new Uint8Array(binString.length);
-          for (let i = 0; i < binString.length; i++) {
-            bytes[i] = binString.charCodeAt(i);
+          if (w > 5 && h > 5) {
+            let cutouts = [];
+            try { cutouts = JSON.parse(activeCutRoom.dataset.cutouts || '[]'); } catch (e) { }
+            cutouts.push({ x: l, y: t, w: w, h: h });
+            activeCutRoom.dataset.cutouts = JSON.stringify(cutouts);
+            updateRoomShape(activeCutRoom);
+            saveLayout();
           }
-          // 3. Decode UTF-8 bytes back to JSON string
-          const jsonStr = new TextDecoder().decode(bytes);
-          layoutData = JSON.parse(jsonStr);
-        } catch (e) {
-          console.error("Failed to parse URL layout data.", e);
+          cutPreview.remove();
+          cutPreview = null;
         }
-      }
-      if (!layoutData) {
-        const saved = localStorage.getItem('roomPlannerLayout');
-        if (saved) {
-          try { layoutData = JSON.parse(saved); } catch (e) { }
-        }
+      } else if (isDragging) {
+        saveLayout();
       }
 
-      if (layoutData && layoutData.length > 0) {
-        layoutData.forEach(rData => {
-          const r = document.createElement('div');
-          r.className = 'room';
-          r.style.width = rData.w;
-          r.style.height = rData.h;
-          r.style.backgroundColor = rData.bg;
-          r.style.left = rData.left;
-          r.style.top = rData.top;
-          r.addEventListener('pointerdown', startDragElement);
-          workspace.appendChild(r);
+      isDragging = false;
+      isPanning = false;
+    });
 
-          rData.furniture.forEach(fData => {
-            const f = document.createElement('div');
-            f.className = 'furniture';
-            f.innerText = fData.name;
-            f.style.width = fData.w;
-            f.style.height = fData.h;
-            f.style.backgroundColor = fData.bg;
-            f.style.left = fData.left;
-            f.style.top = fData.top;
-            f.dataset.rotation = fData.rotation;
-            f.style.transform = `rotate(${fData.rotation}deg)`;
-            f.style.opacity = fData.opacity;
-            f.style.zIndex = fData.zIndex;
-
-            f.addEventListener('pointerdown', startDragElement);
-            r.appendChild(f);
-          });
-        });
-      } else {
-        addRoom(500, 500, '#222222');
-      }
-
-      // A timeout ensures the DOM has fully drawn widths and heights before centering
-      setTimeout(() => {
-        centerView(false);
-      }, 50);
-    }
-
-    // --- Add Room Logic ---
-    function addRoomBtn() {
-      const w = parseInt(document.getElementById('new-r-width').value) || 400;
-      const h = parseInt(document.getElementById('new-r-height').value) || 400;
-      const color = document.getElementById('new-r-color').value || '#222222';
-      addRoom(w, h, color);
-    }
-
-    function addRoom(w, h, color) {
-      const r = document.createElement('div');
-      r.className = 'room';
-      r.style.width = w + 'px';
-      r.style.height = h + 'px';
-      r.style.backgroundColor = color;
-
-      const offset = document.querySelectorAll('.room').length * 30;
-      r.style.left = (workspace.offsetWidth / 2 - w / 2 + offset) + 'px';
-      r.style.top = (workspace.offsetHeight / 2 - h / 2 + offset) + 'px';
-
-      r.addEventListener('pointerdown', startDragElement);
-      workspace.appendChild(r);
-
-      selectItem({ target: r, stopPropagation: () => { } });
-      saveLayout();
-    }
-
-    // --- Add Furniture Logic ---
-    function addFurniture() {
-      if (!activeRoom || !activeRoom.classList.contains('room')) {
-        alert("Please select a room to add furniture into!");
-        if (window.innerWidth <= 768) toggleSidebar();
-        return;
-      }
-
-      const name = document.getElementById('new-f-name').value;
-      const w = document.getElementById('new-f-width').value;
-      const h = document.getElementById('new-f-height').value;
-      const color = document.getElementById('new-f-color').value;
-
-      const item = document.createElement('div');
-      item.className = 'furniture';
-      item.innerText = name;
-      item.style.width = w + 'px';
-      item.style.height = h + 'px';
-      item.style.backgroundColor = color;
-
-      item.dataset.rotation = 0;
-      item.style.transform = `rotate(0deg)`;
-      item.style.opacity = 1;
-      item.style.zIndex = 10;
-
-      item.style.left = (activeRoom.offsetWidth / 2 - w / 2) + 'px';
-      item.style.top = (activeRoom.offsetHeight / 2 - h / 2) + 'px';
-
-      item.addEventListener('pointerdown', startDragElement);
-      activeRoom.appendChild(item);
-
-      selectItem({ target: item, stopPropagation: () => { } });
-      saveLayout();
-    }
-
-    // --- Selection Logic ---
     function selectItem(e) {
       if (e.stopPropagation) e.stopPropagation();
 
+      let targetElem = e.target.closest('.furniture') || e.target.closest('.room');
+      if (!targetElem) return;
+
       if (selectedElement) {
         selectedElement.classList.remove('selected');
+        if (selectedElement.classList.contains('room')) updateRoomShape(selectedElement);
       }
 
-      selectedElement = e.target;
+      selectedElement = targetElem;
       selectedElement.classList.add('selected');
-
-      // REMOVED auto-open sidebar logic on mobile here
 
       editPanel.style.display = 'block';
       const isRoom = selectedElement.classList.contains('room');
 
       if (isRoom) {
         activeRoom = selectedElement;
-      } else if (selectedElement.classList.contains('furniture')) {
+        updateRoomShape(activeRoom);
+      } else {
         activeRoom = selectedElement.parentElement;
       }
 
@@ -810,7 +825,7 @@
       document.getElementById('edit-furn-group').style.display = isRoom ? 'none' : 'flex';
       document.getElementById('edit-title').innerText = isRoom ? 'Edit Room' : 'Edit Furniture';
 
-      editColor.value = rgb2hex(selectedElement.style.backgroundColor);
+      editColor.value = isRoom ? (selectedElement.dataset.bgColor || '#222222') : rgb2hex(selectedElement.style.backgroundColor);
       editW.value = parseFloat(selectedElement.style.width);
       editH.value = parseFloat(selectedElement.style.height);
 
@@ -828,11 +843,14 @@
       if (!selectedElement) return;
       const isRoom = selectedElement.classList.contains('room');
 
-      selectedElement.style.backgroundColor = editColor.value;
       selectedElement.style.width = editW.value + 'px';
       selectedElement.style.height = editH.value + 'px';
 
-      if (!isRoom) {
+      if (isRoom) {
+        selectedElement.dataset.bgColor = editColor.value;
+        updateRoomShape(selectedElement);
+      } else {
+        selectedElement.style.backgroundColor = editColor.value;
         selectedElement.innerText = editName.value;
         selectedElement.dataset.rotation = editRotation.value;
         selectedElement.style.transform = `rotate(${editRotation.value}deg)`;
@@ -857,14 +875,27 @@
       }
     }
 
-    // --- Drag Element Logic ---
     function startDragElement(e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (!e.isPrimary) return;
-      if (e.stopPropagation) e.stopPropagation();
 
+      let targetElem = e.target.closest('.furniture') || e.target.closest('.room');
+      if (!targetElem) return;
+
+      if (currentTool === 'cut') {
+        if (targetElem.classList.contains('room')) {
+          if (e.stopPropagation) e.stopPropagation();
+          if (selectedElement !== targetElem) {
+            selectItem({ ...e, target: targetElem, stopPropagation: () => { } });
+          }
+          startCut(e, targetElem);
+        }
+        return;
+      }
+
+      if (e.stopPropagation) e.stopPropagation();
       isDragging = true;
-      if (selectedElement !== e.target) selectItem(e);
+      if (selectedElement !== targetElem) selectItem({ ...e, target: targetElem, stopPropagation: () => { } });
 
       startX = e.clientX;
       startY = e.clientY;
@@ -872,7 +903,6 @@
       initialTop = parseFloat(selectedElement.style.top) || 0;
     }
 
-    // --- Distance Indicators Logic ---
     function updateIndicators() {
       if (!selectedElement || !selectedElement.classList.contains('furniture')) {
         indicatorsLayer.style.display = 'none';
@@ -944,6 +974,165 @@
       lineR.style.left = maxX + 'px';
       lineR.style.width = Math.max(0, roomW - maxX) + 'px';
       lineR.querySelector('.dist-label').innerText = distRight + 'cm';
+    }
+
+    function saveLayout() {
+      const layout = [];
+      document.querySelectorAll('.room').forEach(r => {
+        const roomData = {
+          w: r.style.width,
+          h: r.style.height,
+          bg: r.dataset.bgColor || '#222222',
+          left: r.style.left,
+          top: r.style.top,
+          cutouts: JSON.parse(r.dataset.cutouts || '[]'),
+          furniture: []
+        };
+
+        r.querySelectorAll('.furniture').forEach(f => {
+          roomData.furniture.push({
+            name: f.innerText,
+            w: f.style.width,
+            h: f.style.height,
+            bg: rgb2hex(f.style.backgroundColor),
+            left: f.style.left,
+            top: f.style.top,
+            rotation: f.dataset.rotation || 0,
+            opacity: f.style.opacity || 1,
+            zIndex: f.style.zIndex || 10
+          });
+        });
+        layout.push(roomData);
+      });
+
+      const jsonStr = JSON.stringify(layout);
+      localStorage.setItem('roomPlannerLayout', jsonStr);
+
+      try {
+        const bytes = new TextEncoder().encode(jsonStr);
+        let binString = '';
+        for (let i = 0; i < bytes.byteLength; i++) binString += String.fromCharCode(bytes[i]);
+        window.history.replaceState(null, '', '#' + btoa(binString));
+      } catch (e) { }
+    }
+
+    function loadLayout() {
+      let layoutData = null;
+      if (window.location.hash.length > 1) {
+        try {
+          const binString = atob(window.location.hash.substring(1));
+          const bytes = new Uint8Array(binString.length);
+          for (let i = 0; i < binString.length; i++) bytes[i] = binString.charCodeAt(i);
+          layoutData = JSON.parse(new TextDecoder().decode(bytes));
+        } catch (e) { }
+      }
+
+      if (!layoutData) {
+        const saved = localStorage.getItem('roomPlannerLayout');
+        if (saved) {
+          try { layoutData = JSON.parse(saved); } catch (e) { }
+        }
+      }
+
+      if (layoutData && layoutData.length > 0) {
+        layoutData.forEach(rData => {
+          const r = document.createElement('div');
+          r.className = 'room';
+          r.style.width = rData.w;
+          r.style.height = rData.h;
+          r.dataset.bgColor = rData.bg;
+          r.style.left = rData.left;
+          r.style.top = rData.top;
+          r.dataset.cutouts = JSON.stringify(rData.cutouts || []);
+
+          updateRoomShape(r);
+          r.addEventListener('pointerdown', startDragElement);
+          workspace.appendChild(r);
+
+          rData.furniture.forEach(fData => {
+            const f = document.createElement('div');
+            f.className = 'furniture';
+            f.innerText = fData.name;
+            f.style.width = fData.w;
+            f.style.height = fData.h;
+            f.style.backgroundColor = fData.bg;
+            f.style.left = fData.left;
+            f.style.top = fData.top;
+            f.dataset.rotation = fData.rotation;
+            f.style.transform = `rotate(${fData.rotation}deg)`;
+            f.style.opacity = fData.opacity;
+            f.style.zIndex = fData.zIndex;
+
+            f.addEventListener('pointerdown', startDragElement);
+            r.appendChild(f);
+          });
+        });
+      } else {
+        addRoom(500, 500, '#222222');
+      }
+
+      setTimeout(() => { centerView(false); }, 50);
+    }
+
+    function addRoomBtn() {
+      const w = parseInt(document.getElementById('new-r-width').value) || 400;
+      const h = parseInt(document.getElementById('new-r-height').value) || 400;
+      const color = document.getElementById('new-r-color').value || '#222222';
+      addRoom(w, h, color);
+    }
+
+    function addRoom(w, h, color) {
+      const r = document.createElement('div');
+      r.className = 'room';
+      r.style.width = w + 'px';
+      r.style.height = h + 'px';
+      r.dataset.bgColor = color;
+      r.dataset.cutouts = '[]';
+
+      const offset = document.querySelectorAll('.room').length * 30;
+      r.style.left = (workspace.offsetWidth / 2 - w / 2 + offset) + 'px';
+      r.style.top = (workspace.offsetHeight / 2 - h / 2 + offset) + 'px';
+
+      updateRoomShape(r);
+      r.addEventListener('pointerdown', startDragElement);
+      workspace.appendChild(r);
+
+      selectItem({ target: r, stopPropagation: () => { } });
+      saveLayout();
+    }
+
+    function addFurniture() {
+      if (!activeRoom || !activeRoom.classList.contains('room')) {
+        alert("Please select a room to add furniture into!");
+        if (window.innerWidth <= 768) toggleSidebar();
+        return;
+      }
+
+      const name = document.getElementById('new-f-name').value;
+      const w = document.getElementById('new-f-width').value;
+      const h = document.getElementById('new-f-height').value;
+      const color = document.getElementById('new-f-color').value;
+
+      const item = document.createElement('div');
+      item.className = 'furniture';
+      item.innerText = name;
+      item.style.width = w + 'px';
+      item.style.height = h + 'px';
+      item.style.backgroundColor = color;
+
+      item.dataset.rotation = 0;
+      item.style.transform = `rotate(0deg)`;
+      item.style.opacity = 1;
+      item.style.zIndex = 10;
+
+      item.style.left = (activeRoom.offsetWidth / 2 - w / 2) + 'px';
+      item.style.top = (activeRoom.offsetHeight / 2 - h / 2) + 'px';
+
+      item.addEventListener('pointerdown', startDragElement);
+      activeRoom.appendChild(item);
+
+      selectItem({ target: item, stopPropagation: () => { } });
+      saveLayout();
     }
 
     function rgb2hex(rgb) {
