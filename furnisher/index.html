@@ -665,6 +665,15 @@
           cutPreview = null;
         }
 
+        // Dropping selection when user initiates multi-touch pinch to pan/zoom
+        if (selectedElement) {
+          selectedElement.classList.remove('selected');
+          if (selectedElement.classList.contains('room')) updateRoomShape(selectedElement);
+          selectedElement = null;
+          editPanel.style.display = 'none';
+          indicatorsLayer.style.display = 'none';
+        }
+
         const p1 = e.touches[0];
         const p2 = e.touches[1];
         const dist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
@@ -723,6 +732,15 @@
 
       // Route 1: Pan Tool Always Pans
       if (currentTool === 'pan') {
+        // Drop any active selection when panning
+        if (selectedElement) {
+          selectedElement.classList.remove('selected');
+          if (selectedElement.classList.contains('room')) updateRoomShape(selectedElement);
+          selectedElement = null;
+          editPanel.style.display = 'none';
+          indicatorsLayer.style.display = 'none';
+        }
+
         workspace.style.transition = 'none';
         isPanning = true;
         startPanX = e.clientX - panX;
