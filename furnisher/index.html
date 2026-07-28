@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Room Layout Planner</title>
   <style>
     :root {
@@ -28,6 +28,24 @@
       display: flex;
       height: 100vh;
       overflow: hidden;
+      position: relative;
+    }
+
+    /* Hamburger Menu Button */
+    #menu-btn {
+      display: none;
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 1000;
+      background-color: var(--sidebar-bg);
+      color: var(--accent-color);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
 
     /* Sidebar Styling */
@@ -40,15 +58,31 @@
       flex-direction: column;
       gap: 20px;
       overflow-y: auto;
-      z-index: 100;
+      z-index: 1001;
+      transition: transform 0.3s ease;
+    }
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+      margin-bottom: 10px;
     }
 
     h2 {
       color: var(--accent-color);
-      margin-bottom: 10px;
       font-size: 1.1rem;
-      border-bottom: 1px solid #333;
-      padding-bottom: 5px;
+    }
+
+    #close-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.5rem;
+      cursor: pointer;
     }
 
     .control-group {
@@ -118,6 +152,7 @@
       background-image: radial-gradient(#333 1px, transparent 1px);
       background-size: 20px 20px;
       cursor: grab;
+      touch-action: none;
     }
 
     .main-area:active {
@@ -128,7 +163,9 @@
       width: 100%;
       height: 100%;
       position: relative;
-      transform-origin: center center;
+      transform-origin: 0 0;
+      /* Crucial for pinpoint zooming */
+      touch-action: none;
     }
 
     .room {
@@ -138,6 +175,7 @@
       box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
       cursor: grab;
       z-index: 1;
+      touch-action: none;
     }
 
     .room:active {
@@ -157,6 +195,7 @@
       user-select: none;
       text-align: center;
       transform-origin: center center;
+      touch-action: none;
     }
 
     .furniture:active {
@@ -208,14 +247,45 @@
       border-radius: 4px;
       white-space: nowrap;
     }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      #menu-btn {
+        display: block;
+      }
+
+      .sidebar {
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        transform: translateX(-100%);
+        box-shadow: 5px 0 15px rgba(0, 0, 0, 0.5);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      #close-menu-btn {
+        display: block;
+      }
+    }
   </style>
 </head>
 
 <body>
 
-  <div class="sidebar">
+  <button id="menu-btn" onclick="toggleSidebar()">☰ Menu</button>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2 style="border:none; margin:0; padding:0;">Planner Controls</h2>
+      <button id="close-menu-btn" onclick="toggleSidebar()">✕</button>
+    </div>
+
     <div>
-      <h2>View</h2>
+      <h2 style="border-bottom: 1px solid #333; padding-bottom: 5px;">View</h2>
       <div class="control-group">
         <label>Zoom: <span id="zoom-val">100%</span></label>
         <div class="btn-group">
@@ -224,7 +294,7 @@
           <button onclick="resetZoom()">Reset</button>
         </div>
         <p style="font-size: 0.75rem; color: #888; text-align: center; margin-top: 5px;">
-          Click and drag background to pan
+          Pinch/scroll to zoom. Drag to pan.
         </p>
       </div>
     </div>
@@ -290,6 +360,7 @@
   </div>
 
   <script>
+    const sidebar = document.getElementById('sidebar');
     const workspace = document.getElementById('workspace');
     const mainArea = document.getElementById('main-area');
     const editPanel = document.getElementById('edit-panel');
@@ -307,33 +378,77 @@
     let selectedElement = null;
     let activeRoom = null;
 
+    // Single pointer dragging / panning
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
+    // Viewport Math
     let currentScale = 1;
     let panX = 0, panY = 0;
     let isPanning = false;
     let startPanX = 0, startPanY = 0;
 
+    // Multi-touch Zoom/Pan Math
+    let initialPinchDistance = null;
+    let initialPinchScale = null;
+    let initialPinchWorkspaceX = null;
+    let initialPinchWorkspaceY = null;
+
     window.onload = () => {
       loadLayout();
     };
 
-    // --- View Transform (Pan & Zoom) Logic ---
-    function changeZoom(delta) {
-      workspace.style.transition = 'transform 0.2s ease-out';
-      currentScale += delta;
-      if (currentScale < 0.2) currentScale = 0.2;
-      if (currentScale > 5) currentScale = 5;
+    // --- Sidebar Mobile Logic ---
+    function toggleSidebar() {
+      sidebar.classList.toggle('open');
+    }
+
+    // Close sidebar if user taps the canvas
+    mainArea.addEventListener('pointerdown', (e) => {
+      if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+      }
+    });
+
+    // --- Core Zoom Logic (Zooms into a specific Screen Coordinate) ---
+    function zoomAt(newScale, screenX, screenY, animate = false) {
+      if (animate) workspace.style.transition = 'transform 0.2s ease-out';
+      else workspace.style.transition = 'none';
+
+      const rect = mainArea.getBoundingClientRect();
+      const mouseX = screenX - rect.left;
+      const mouseY = screenY - rect.top;
+
+      // Find out exactly what part of the unscaled workspace the pointer is hovering over
+      const workspaceX = (mouseX - panX) / currentScale;
+      const workspaceY = (mouseY - panY) / currentScale;
+
+      currentScale = newScale;
+
+      // Adjust Pan so that specific part of the workspace stays under the pointer
+      panX = mouseX - workspaceX * currentScale;
+      panY = mouseY - workspaceY * currentScale;
+
       applyTransform();
     }
 
+    function changeZoom(delta) {
+      let newScale = currentScale + delta;
+      newScale = Math.round(newScale * 10) / 10;
+      if (newScale < 0.2) newScale = 0.2;
+      if (newScale > 5) newScale = 5;
+
+      // UI Button clicks zoom right into the center of the screen
+      const rect = mainArea.getBoundingClientRect();
+      const screenCenterX = rect.left + rect.width / 2;
+      const screenCenterY = rect.top + rect.height / 2;
+
+      zoomAt(newScale, screenCenterX, screenCenterY, true);
+    }
+
     function resetZoom() {
-      workspace.style.transition = 'transform 0.2s ease-out';
       currentScale = 1;
-      panX = 0;
-      panY = 0;
-      applyTransform();
+      centerView(true);
     }
 
     function applyTransform() {
@@ -342,7 +457,110 @@
       mainArea.style.backgroundPosition = `${panX}px ${panY}px`;
     }
 
-    mainArea.addEventListener('mousedown', (e) => {
+    // --- Auto-Center Logic ---
+    function centerView(animate = false) {
+      const rooms = document.querySelectorAll('.room');
+      if (rooms.length === 0) return;
+
+      if (animate) workspace.style.transition = 'transform 0.2s ease-out';
+      else workspace.style.transition = 'none';
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+      rooms.forEach(r => {
+        const left = parseFloat(r.style.left) || 0;
+        const top = parseFloat(r.style.top) || 0;
+        const w = parseFloat(r.style.width) || 0;
+        const h = parseFloat(r.style.height) || 0;
+
+        if (left < minX) minX = left;
+        if (left + w > maxX) maxX = left + w;
+        if (top < minY) minY = top;
+        if (top + h > maxY) maxY = top + h;
+      });
+
+      const contentCenterX = minX + (maxX - minX) / 2;
+      const contentCenterY = minY + (maxY - minY) / 2;
+
+      const rect = mainArea.getBoundingClientRect();
+      const screenCenterX = rect.width / 2;
+      const screenCenterY = rect.height / 2;
+
+      panX = screenCenterX - (contentCenterX * currentScale);
+      panY = screenCenterY - (contentCenterY * currentScale);
+
+      applyTransform();
+    }
+
+    // --- Mouse Wheel Scroll to Zoom ---
+    mainArea.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      // 0.1 scale increments are smoother for mouse wheels
+      const zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
+      let newScale = currentScale + zoomDelta;
+
+      newScale = Math.round(newScale * 100) / 100;
+      if (newScale < 0.2) newScale = 0.2;
+      if (newScale > 5) newScale = 5;
+
+      zoomAt(newScale, e.clientX, e.clientY, false);
+    }, { passive: false });
+
+    // --- Pinch-to-Zoom (Touch Multi-finger) ---
+    mainArea.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault(); // Stop mobile browser native zoom
+        isPanning = false;
+        isDragging = false;
+
+        const p1 = e.touches[0];
+        const p2 = e.touches[1];
+
+        // Calculate distance between two fingers
+        const dist = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+
+        // Calculate exact center point between two fingers
+        const centerX = (p1.clientX + p2.clientX) / 2;
+        const centerY = (p1.clientY + p2.clientY) / 2;
+
+        if (!initialPinchDistance) {
+          initialPinchDistance = dist;
+          initialPinchScale = currentScale;
+
+          const rect = mainArea.getBoundingClientRect();
+          // Anchor the workspace coordinates so the canvas doesn't drift while zooming/panning
+          initialPinchWorkspaceX = (centerX - rect.left - panX) / currentScale;
+          initialPinchWorkspaceY = (centerY - rect.top - panY) / currentScale;
+        } else {
+          const scaleChange = dist / initialPinchDistance;
+          let newScale = initialPinchScale * scaleChange;
+
+          if (newScale < 0.2) newScale = 0.2;
+          if (newScale > 5) newScale = 5;
+
+          currentScale = newScale;
+
+          const rect = mainArea.getBoundingClientRect();
+          // Update pan based on where fingers moved, combining a zoom AND a pan operation perfectly
+          panX = (centerX - rect.left) - initialPinchWorkspaceX * currentScale;
+          panY = (centerY - rect.top) - initialPinchWorkspaceY * currentScale;
+
+          workspace.style.transition = 'none';
+          applyTransform();
+        }
+      }
+    }, { passive: false });
+
+    mainArea.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = null; // Clear pinch cache so next touch starts fresh
+      }
+    });
+
+    // --- Single Pointer Events (Dragging Elements & Panning background) ---
+    mainArea.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) return; // Ignore second finger for standard dragging
+
       if (e.target.id === 'main-area' || e.target.id === 'workspace') {
         if (selectedElement) {
           selectedElement.classList.remove('selected');
@@ -358,7 +576,9 @@
       }
     });
 
-    document.addEventListener('mousemove', (e) => {
+    document.addEventListener('pointermove', (e) => {
+      if (!e.isPrimary) return; // Prevent drag drift when second finger comes down
+
       if (isDragging) {
         const dx = (e.clientX - startX) / currentScale;
         const dy = (e.clientY - startY) / currentScale;
@@ -376,10 +596,15 @@
       }
     });
 
-    document.addEventListener('mouseup', () => {
-      if (isDragging) {
-        saveLayout();
-      }
+    document.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      if (isDragging) saveLayout();
+      isDragging = false;
+      isPanning = false;
+    });
+
+    document.addEventListener('pointercancel', (e) => {
+      if (isDragging) saveLayout();
       isDragging = false;
       isPanning = false;
     });
@@ -410,7 +635,6 @@
             zIndex: f.style.zIndex || 10
           });
         });
-
         layout.push(roomData);
       });
 
@@ -420,14 +644,11 @@
       try {
         const encodedData = btoa(encodeURIComponent(jsonStr));
         window.history.replaceState(null, '', '#' + encodedData);
-      } catch (e) {
-        console.warn("Could not save layout to URL", e);
-      }
+      } catch (e) { }
     }
 
     function loadLayout() {
       let layoutData = null;
-
       if (window.location.hash.length > 1) {
         try {
           const hashData = window.location.hash.substring(1);
@@ -451,7 +672,7 @@
           r.style.backgroundColor = rData.bg;
           r.style.left = rData.left;
           r.style.top = rData.top;
-          r.addEventListener('mousedown', startDragElement);
+          r.addEventListener('pointerdown', startDragElement);
           workspace.appendChild(r);
 
           rData.furniture.forEach(fData => {
@@ -468,13 +689,18 @@
             f.style.opacity = fData.opacity;
             f.style.zIndex = fData.zIndex;
 
-            f.addEventListener('mousedown', startDragElement);
+            f.addEventListener('pointerdown', startDragElement);
             r.appendChild(f);
           });
         });
       } else {
         addRoom(500, 500, '#222222');
       }
+
+      // A timeout ensures the DOM has fully drawn widths and heights before centering
+      setTimeout(() => {
+        centerView(false);
+      }, 50);
     }
 
     // --- Add Room Logic ---
@@ -496,7 +722,7 @@
       r.style.left = (workspace.offsetWidth / 2 - w / 2 + offset) + 'px';
       r.style.top = (workspace.offsetHeight / 2 - h / 2 + offset) + 'px';
 
-      r.addEventListener('mousedown', startDragElement);
+      r.addEventListener('pointerdown', startDragElement);
       workspace.appendChild(r);
 
       selectItem({ target: r, stopPropagation: () => { } });
@@ -507,6 +733,7 @@
     function addFurniture() {
       if (!activeRoom || !activeRoom.classList.contains('room')) {
         alert("Please select a room to add furniture into!");
+        if (window.innerWidth <= 768) toggleSidebar();
         return;
       }
 
@@ -530,7 +757,7 @@
       item.style.left = (activeRoom.offsetWidth / 2 - w / 2) + 'px';
       item.style.top = (activeRoom.offsetHeight / 2 - h / 2) + 'px';
 
-      item.addEventListener('mousedown', startDragElement);
+      item.addEventListener('pointerdown', startDragElement);
       activeRoom.appendChild(item);
 
       selectItem({ target: item, stopPropagation: () => { } });
@@ -547,8 +774,12 @@
 
       selectedElement = e.target;
       selectedElement.classList.add('selected');
-      editPanel.style.display = 'block';
 
+      if (window.innerWidth <= 768 && !sidebar.classList.contains('open')) {
+        toggleSidebar();
+      }
+
+      editPanel.style.display = 'block';
       const isRoom = selectedElement.classList.contains('room');
 
       if (isRoom) {
@@ -557,13 +788,11 @@
         activeRoom = selectedElement.parentElement;
       }
 
-      // Adjust field visibility
       document.getElementById('edit-name-group').style.display = isRoom ? 'none' : 'flex';
-      document.getElementById('edit-dim-group').style.display = 'flex'; // Now visible for both!
+      document.getElementById('edit-dim-group').style.display = 'flex';
       document.getElementById('edit-furn-group').style.display = isRoom ? 'none' : 'flex';
       document.getElementById('edit-title').innerText = isRoom ? 'Edit Room' : 'Edit Furniture';
 
-      // Load Values
       editColor.value = rgb2hex(selectedElement.style.backgroundColor);
       editW.value = parseFloat(selectedElement.style.width);
       editH.value = parseFloat(selectedElement.style.height);
@@ -580,15 +809,12 @@
 
     function updateSelected() {
       if (!selectedElement) return;
-
       const isRoom = selectedElement.classList.contains('room');
 
-      // Common traits
       selectedElement.style.backgroundColor = editColor.value;
       selectedElement.style.width = editW.value + 'px';
       selectedElement.style.height = editH.value + 'px';
 
-      // Furniture specific traits
       if (!isRoom) {
         selectedElement.innerText = editName.value;
         selectedElement.dataset.rotation = editRotation.value;
@@ -596,7 +822,6 @@
         selectedElement.style.opacity = editOpacity.value;
         selectedElement.style.zIndex = editZIndex.value;
       }
-
       updateIndicators();
       saveLayout();
     }
@@ -617,7 +842,8 @@
 
     // --- Drag Element Logic ---
     function startDragElement(e) {
-      if (e.button !== 0) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (!e.isPrimary) return; // Prevent drag starting if it's a multi-touch action
       if (e.stopPropagation) e.stopPropagation();
 
       isDragging = true;
@@ -635,7 +861,6 @@
         indicatorsLayer.style.display = 'none';
         return;
       }
-
       indicatorsLayer.style.display = 'block';
 
       const currentRoom = selectedElement.parentElement;
@@ -649,7 +874,6 @@
 
       const cx = left + w / 2;
       const cy = top + h / 2;
-
       const dx = w / 2;
       const dy = h / 2;
       const corners = [
