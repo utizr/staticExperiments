@@ -133,12 +133,14 @@
 
     .btn-group {
       display: flex;
-      gap: 10px;
+      gap: 5px;
     }
 
     .btn-group button {
       flex: 1;
       margin-top: 0;
+      font-size: 0.85rem;
+      padding: 10px 5px;
     }
 
     .main-area {
@@ -148,12 +150,7 @@
       background-color: #1a1a1a;
       background-image: radial-gradient(#333 1px, transparent 1px);
       background-size: 20px 20px;
-      cursor: grab;
       touch-action: none;
-    }
-
-    .main-area:active {
-      cursor: grabbing;
     }
 
     #workspace {
@@ -167,19 +164,13 @@
     .room {
       position: absolute;
       background-color: transparent;
-      cursor: grab;
       z-index: 1;
       touch-action: none;
       overflow: visible;
     }
 
-    .room:active {
-      cursor: grabbing;
-    }
-
     .furniture {
       position: absolute;
-      cursor: grab;
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
       display: flex;
@@ -193,8 +184,41 @@
       touch-action: none;
     }
 
-    .furniture:active {
+    /* Dynamic Tool Cursors */
+    .main-area[data-tool="pan"],
+    .main-area[data-tool="pan"] .room,
+    .main-area[data-tool="pan"] .furniture {
+      cursor: grab !important;
+    }
+
+    .main-area[data-tool="pan"]:active,
+    .main-area[data-tool="pan"]:active .room,
+    .main-area[data-tool="pan"]:active .furniture {
+      cursor: grabbing !important;
+    }
+
+    .main-area[data-tool="move"] {
+      cursor: grab;
+    }
+
+    .main-area[data-tool="move"]:active {
       cursor: grabbing;
+    }
+
+    .main-area[data-tool="move"] .room,
+    .main-area[data-tool="move"] .furniture {
+      cursor: grab !important;
+    }
+
+    .main-area[data-tool="move"] .room:active,
+    .main-area[data-tool="move"] .furniture:active {
+      cursor: grabbing !important;
+    }
+
+    .main-area[data-tool="cut"],
+    .main-area[data-tool="cut"] .room,
+    .main-area[data-tool="cut"] .furniture {
+      cursor: crosshair !important;
     }
 
     .selected {
@@ -315,8 +339,9 @@
 
     <div class="control-group">
       <div class="btn-group">
-        <button id="btn-tool-move" onclick="setTool('move')" style="opacity: 1;">🖐️ Move/Edit</button>
-        <button id="btn-tool-cut" onclick="setTool('cut')" style="opacity: 0.5;">✂️ Cut Room</button>
+        <button id="btn-tool-pan" onclick="setTool('pan')" style="opacity: 1;">✋ Pan</button>
+        <button id="btn-tool-move" onclick="setTool('move')" style="opacity: 0.5;">🖐️ Move</button>
+        <button id="btn-tool-cut" onclick="setTool('cut')" style="opacity: 0.5;">✂️ Cut</button>
       </div>
     </div>
 
@@ -381,7 +406,7 @@
     </div>
   </div>
 
-  <div class="main-area" id="main-area">
+  <div class="main-area" id="main-area" data-tool="pan">
     <div id="workspace">
       <div id="indicators">
         <div id="line-top" class="dist-line"><span class="dist-label"></span></div>
@@ -411,7 +436,7 @@
     let selectedElement = null;
     let activeRoom = null;
 
-    let currentTool = 'move';
+    let currentTool = 'pan'; // Default tool is now Pan
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
@@ -429,13 +454,17 @@
     let initialPinchWorkspaceX = null;
     let initialPinchWorkspaceY = null;
 
-    window.onload = () => { loadLayout(); };
+    window.onload = () => {
+      setTool('pan');
+      loadLayout();
+    };
 
     function setTool(tool) {
       currentTool = tool;
+      document.getElementById('btn-tool-pan').style.opacity = tool === 'pan' ? '1' : '0.5';
       document.getElementById('btn-tool-move').style.opacity = tool === 'move' ? '1' : '0.5';
       document.getElementById('btn-tool-cut').style.opacity = tool === 'cut' ? '1' : '0.5';
-      mainArea.style.cursor = tool === 'cut' ? 'crosshair' : 'grab';
+      mainArea.dataset.tool = tool; // CSS handles cursor updates via this attribute
     }
 
     function toggleSidebar() { sidebar.classList.toggle('open'); }
@@ -692,6 +721,16 @@
         sidebar.classList.remove('open');
       }
 
+      // Route 1: Pan Tool Always Pans
+      if (currentTool === 'pan') {
+        workspace.style.transition = 'none';
+        isPanning = true;
+        startPanX = e.clientX - panX;
+        startPanY = e.clientY - panY;
+        return;
+      }
+
+      // Route 2: Cut Tool on Background
       if (currentTool === 'cut') {
         if (!activeRoom || !activeRoom.classList.contains('room')) {
           alert("Please select a room to cut first by clicking on it.");
@@ -702,6 +741,7 @@
         return;
       }
 
+      // Route 3: Move Tool on Background -> Deselect and Pan
       if (e.target.id === 'main-area' || e.target.id === 'workspace') {
         if (selectedElement) {
           selectedElement.classList.remove('selected');
@@ -736,7 +776,6 @@
         cutPreview.style.left = l + 'px';
         cutPreview.style.top = t + 'px';
 
-        // NEW: Calculate the effective intersection of the cut relative to the room boundaries
         const roomW = parseFloat(activeCutRoom.style.width) || 0;
         const roomH = parseFloat(activeCutRoom.style.height) || 0;
 
@@ -748,11 +787,10 @@
         const effW = Math.max(0, overlapR - overlapL);
         const effH = Math.max(0, overlapB - overlapT);
 
-        // Update labels to show how much is physically being cut from the room
         cutPreview.querySelector('.cut-label-w').innerText = Math.round(effW) + 'cm';
         cutPreview.querySelector('.cut-label-h').innerText = Math.round(effH) + 'cm';
       }
-      else if (isDragging && selectedElement) {
+      else if (isDragging && selectedElement && currentTool === 'move') {
         const dx = (e.clientX - startX) / currentScale;
         const dy = (e.clientY - startY) / currentScale;
         selectedElement.style.left = (initialLeft + dx) + 'px';
@@ -881,6 +919,11 @@
 
       let targetElem = e.target.closest('.furniture') || e.target.closest('.room');
       if (!targetElem) return;
+
+      // If Pan Tool is active, bubble up to mainArea for global panning
+      if (currentTool === 'pan') {
+        return;
+      }
 
       if (currentTool === 'cut') {
         if (targetElem.classList.contains('room')) {
@@ -1099,6 +1142,8 @@
 
       selectItem({ target: r, stopPropagation: () => { } });
       saveLayout();
+
+      if (currentTool !== 'move') setTool('move');
     }
 
     function addFurniture() {
@@ -1133,6 +1178,8 @@
 
       selectItem({ target: item, stopPropagation: () => { } });
       saveLayout();
+
+      if (currentTool !== 'move') setTool('move');
     }
 
     function rgb2hex(rgb) {
