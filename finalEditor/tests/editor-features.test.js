@@ -107,12 +107,28 @@ const { launchEditor, check, report } = require('./helpers');
   h = await html();
   check('"clear" resets the editor to an empty paragraph', h === '<p><br></p>', h);
 
-  // ── 9. Autosave: content is persisted to localStorage after the debounce ──
+  // ── 9. Autosave: content is persisted through the store after the debounce ──
   await resetEditor();
   await page.keyboard.type('persist me');
   await new Promise(r => setTimeout(r, 1500)); // save debounce is 1s
   const stored = await page.evaluate(() => localStorage.getItem('textEditor_app_data') || '');
   check('typed content is saved to localStorage', stored.includes('persist me'), stored.slice(0, 300));
+
+  // ── 10. Store: mock API backend round-trips data ──
+  const apiResult = await page.evaluate(async () => {
+    const store = Store.createStore({ backend: 'api', baseUrl: '/api', latencyMs: 10 });
+    await store.save({ hello: 'server' });
+    const loaded = await store.load();
+    return {
+      roundTrip: JSON.stringify(loaded),
+      mockStored: localStorage.getItem('textEditor_mock_api_data') || '',
+      localUntouched: !(localStorage.getItem('textEditor_app_data') || '').includes('server'),
+    };
+  });
+  check('mock API backend round-trips saved data',
+    apiResult.roundTrip === '{"hello":"server"}', apiResult.roundTrip);
+  check('mock API backend keeps its data separate from the local backend',
+    apiResult.mockStored.includes('server') && apiResult.localUntouched, apiResult.mockStored.slice(0, 300));
 
   await browser.close();
   report();

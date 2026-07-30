@@ -30,6 +30,8 @@ editor with actual keystrokes and synthetic clipboard events (via
 - Format modal: heading conversion (`h2`), bold on a selection (`b`),
   link insertion via the `l` sub-form, and `clear`
 - Autosave: typed content lands in localStorage after the 1s debounce
+- Store (`lib/store.js`): the mock API backend round-trips data and keeps it
+  separate from the local backend's storage
 
 A real browser is required because much of what these tests guard against —
 caret-affinity quirks, `execCommand` behavior, clipboard handling — does not
