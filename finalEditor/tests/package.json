@@ -1,0 +1,11 @@
+{
+  "name": "finalwriter-tests",
+  "private": true,
+  "description": "End-to-end tests for the finalWriter editor, run against real Chrome",
+  "scripts": {
+    "test": "node inline-code.test.js && node editor-features.test.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.4.0"
+  }
+}

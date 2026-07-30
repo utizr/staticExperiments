@@ -80,6 +80,24 @@ const SimpleEditor = (() => {
       const plainText = e.clipboardData.getData('text/plain').trim();
       const selection = window.getSelection();
 
+      // ── Paste inside <code>: insert as plain text ──
+      // insertHTML wraps plain text in block-level <p> tags, which cannot
+      // live inside a <code> element — the browser would hoist the pasted
+      // content out and drop it *after* the code element. Insert bare text
+      // instead (newlines collapsed to spaces for inline code, preserved
+      // inside <pre> blocks).
+      if (selection.rangeCount > 0) {
+        let node = selection.getRangeAt(0).startContainer;
+        if (node.nodeType === 3) node = node.parentNode;
+        const codeEl = node.closest('code');
+        if (codeEl && element.contains(codeEl)) {
+          const text = codeEl.closest('pre') ? plainText : plainText.replace(/\s*\n\s*/g, ' ');
+          document.execCommand('insertText', false, text);
+          notifyChange();
+          return;
+        }
+      }
+
       // ── URL-over-selection: wrap selected text in a link ──
       // If the user has text selected and pastes a URL, turn the selection
       // into an anchor instead of replacing it with the URL text.
@@ -402,8 +420,9 @@ const SimpleEditor = (() => {
     //
     // A lightweight modal that accepts single-key commands:
     //   b = bold,  i = italic,  u = underline,  l = link,
-    //   h1–h6 = convert block to heading,  e = exit/remove formatting,
-    //   clear = wipe entire editor content.
+    //   c = code (inline for selections/non-empty blocks, else code block),
+    //   h1–h6 = convert block to heading,
+    //   e = exit/remove formatting,  clear = wipe entire editor content.
     //
     // The modal restores the user's original selection on close so that
     // formatting commands apply to the right text.
@@ -512,11 +531,11 @@ const SimpleEditor = (() => {
       // ── Command menu UI ────────────────────────
 
       const label = document.createElement('label');
-      label.textContent = 'b = bold, i = italic, u = underline, l = link, h1\u2013h6 = heading, e = exit formatting, clear = clear all';
+      label.textContent = 'b = bold, i = italic, u = underline, l = link, c = code block, h1\u2013h6 = heading, e = exit formatting, clear = clear all';
 
       const input = document.createElement('input');
       input.type = 'text';
-      input.placeholder = 'b / i / u / l / h1-h6 / e';
+      input.placeholder = 'b / i / u / l / c / h1-h6 / e';
 
       modal.appendChild(label);
       modal.appendChild(input);
@@ -529,6 +548,13 @@ const SimpleEditor = (() => {
         // "l" → switch to the link form.
         if (val === 'l') {
           showLinkForm(null);
+          return;
+        }
+
+        // "c" → inline code (selection / non-empty block) or a new code block.
+        if (val === 'c') {
+          close();
+          insertCode();
           return;
         }
 
@@ -589,9 +615,126 @@ const SimpleEditor = (() => {
       }
 
       /**
-       * Removes all inline formatting (bold/italic/underline) from the
+       * Guarantees there is a text node starting with a zero-width space
+       * immediately after an inline element, and returns it. Placing the
+       * caret after that ZWSP (offset 1) is the only reliable way to type
+       * *outside* the element in Chrome: with an empty or ZWSP-less text
+       * node, Chrome anchors the caret to the preceding inline element and
+       * everything typed keeps extending it.
+       */
+      function ensureExitPoint(inlineEl) {
+        let landing = inlineEl.nextSibling;
+        if (!(landing && landing.nodeType === 3 && landing.textContent.startsWith('\u200B'))) {
+          landing = document.createTextNode('\u200B');
+          inlineEl.after(landing);
+        }
+        return landing;
+      }
+
+      /**
+       * Inserts code formatting at the cursor position:
+       *   - Text selected → wrap the selection in an inline <code>.
+       *   - Cursor in a non-empty <p>/<li> → insert an empty inline <code>
+       *     (seeded with a zero-width space) and place the cursor inside.
+       *   - Otherwise → insert a <pre><code> block. An empty paragraph is
+       *     replaced by the block, and a trailing paragraph is ensured so
+       *     the user can always escape the code block.
+       */
+      function insertCode() {
+        const sel = window.getSelection();
+
+        // Find the top-level block containing the cursor (direct child of
+        // the editor root), falling back to appending at the end.
+        let block = null;
+        if (sel.rangeCount) {
+          const range = sel.getRangeAt(0);
+          let node = range.startContainer;
+          if (node.nodeType === 3) node = node.parentNode;
+
+          if (element.contains(node) && node !== element) {
+            // Already inside inline code — nothing to do.
+            if (node.closest('code')) return;
+
+            // ── Inline: wrap the selected text in <code> ──
+            if (!range.collapsed) {
+              const code = document.createElement('code');
+              code.appendChild(range.extractContents());
+              range.insertNode(code);
+              ensureExitPoint(code);
+
+              element.focus();
+              const newRange = document.createRange();
+              newRange.selectNodeContents(code);
+              newRange.collapse(false);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              notifyChange();
+              return;
+            }
+
+            // ── Inline: collapsed cursor in a non-empty <p>/<li> ──
+            const host = node.closest('p, li');
+            if (host && host.textContent.replace(/\u200B/g, '').trim() !== '') {
+              const code = document.createElement('code');
+              const zwsp = document.createTextNode('\u200B');
+              code.appendChild(zwsp);
+              range.insertNode(code);
+              ensureExitPoint(code);
+
+              element.focus();
+              const newRange = document.createRange();
+              newRange.setStart(zwsp, 1);
+              newRange.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(newRange);
+              notifyChange();
+              return;
+            }
+
+            while (node.parentNode !== element) node = node.parentNode;
+            block = node;
+          }
+        }
+
+        // ── Block: insert a <pre><code> ──
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.innerHTML = '<br>';
+        pre.appendChild(code);
+
+        if (block && block.tagName === 'P' && block.textContent.trim() === '') {
+          // Empty paragraph → replace it with the code block.
+          block.replaceWith(pre);
+        } else if (block) {
+          block.after(pre);
+        } else {
+          element.appendChild(pre);
+        }
+
+        // Ensure a paragraph follows the code block so the user can
+        // click/arrow below it to continue writing normal text.
+        if (!pre.nextElementSibling) {
+          const p = document.createElement('p');
+          p.innerHTML = '<br>';
+          pre.after(p);
+        }
+
+        element.focus();
+        const newRange = document.createRange();
+        newRange.setStart(code, 0);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+
+        notifyChange();
+      }
+
+      /**
+       * Removes all inline formatting (bold/italic/underline/code) from the
        * current selection or, if the cursor is collapsed, toggles off any
-       * formatting inherited from ancestor elements.
+       * formatting inherited from ancestor elements. A collapsed cursor
+       * inside inline <code> steps out of the element instead (the code
+       * formatting is kept, since "exit" there means "stop writing code").
        *
        * execCommand is a toggle with no "remove only" mode.  When a
        * selection is *partially* formatted (e.g. "hello <b>world</b> foo"),
@@ -611,12 +754,14 @@ const SimpleEditor = (() => {
           const root = range.commonAncestorContainer;
           const rootEl = root.nodeType === 3 ? root.parentNode : root;
           const cmdsToRemove = new Set();
+          const codeToUnwrap = new Set();
 
           // Check ancestors of the selection root.
           let ancestor = rootEl;
           while (ancestor && ancestor !== element) {
             const tag = ancestor.tagName && ancestor.tagName.toLowerCase();
             if (FORMATTING_TAGS[tag]) cmdsToRemove.add(FORMATTING_TAGS[tag]);
+            if (tag === 'code' && !ancestor.closest('pre')) codeToUnwrap.add(ancestor);
             ancestor = ancestor.parentNode;
           }
 
@@ -627,6 +772,15 @@ const SimpleEditor = (() => {
                 cmdsToRemove.add(FORMATTING_TAGS[el.tagName.toLowerCase()]);
               }
             });
+            rootEl.querySelectorAll('code').forEach(el => {
+              if (range.intersectsNode(el) && !el.closest('pre')) codeToUnwrap.add(el);
+            });
+          }
+
+          // Inline <code> has no execCommand — unwrap it manually.
+          for (const codeEl of codeToUnwrap) {
+            while (codeEl.firstChild) codeEl.parentNode.insertBefore(codeEl.firstChild, codeEl);
+            codeEl.remove();
           }
 
           // Double-toggle trick: normalize then remove.
@@ -639,6 +793,22 @@ const SimpleEditor = (() => {
           // and toggle each one off.
           let node = sel.getRangeAt(0).startContainer;
           if (node.nodeType === 3) node = node.parentNode;
+
+          // Inside inline <code> → step out of it: move the caret to a
+          // text node right after the code element. An empty code element
+          // (just the zero-width-space seed) is removed entirely.
+          const codeEl = node.closest('code');
+          if (codeEl && !codeEl.closest('pre')) {
+            const landing = ensureExitPoint(codeEl);
+            if (codeEl.textContent.replace(/\u200B/g, '').trim() === '') codeEl.remove();
+
+            const newRange = document.createRange();
+            newRange.setStart(landing, 1);
+            newRange.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+            return;
+          }
 
           const activeCommands = new Set();
           while (node && node !== element) {
