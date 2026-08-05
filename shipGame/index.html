@@ -139,12 +139,12 @@
 
     // --- Map Generation ---
     const map = new Map();
-    const MAP_RADIUS = 60;
+    const MAP_RADIUS = 30;
     const cities = [];
 
     function generateMap() {
       const islands = [];
-      const numIslands = 90;
+      const numIslands = 28;
 
       for (let i = 0; i < numIslands; i++) {
         const q = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
