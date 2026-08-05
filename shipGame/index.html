@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hex Ocean Trader Prototype - Coastal Cities</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #1a1a1a;
+      touch-action: none;
+      user-select: none;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #ui {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      color: white;
+      font-family: sans-serif;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    #ui h3 {
+      margin: 0 0 5px 0;
+      font-size: 18px;
+      color: #f1c40f;
+    }
+
+    #ui p {
+      margin: 4px 0;
+      font-size: 14px;
+      color: #ddd;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ui">
+    <h3>Ocean Trader</h3>
+    <p>🗺️ <b>Click & Drag</b> to pan the camera.</p>
+    <p>🔍 <b>Scroll Wheel</b> to zoom in and out.</p>
+    <p>⚓ <b>Click</b> an ocean tile or a <b>City</b> to set sail.</p>
+  </div>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const HEX_SIZE = 25;
+    const SQRT_3 = Math.sqrt(3);
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function getHexKey(q, r) {
+      return `${Math.round(q)},${Math.round(r)}`;
+    }
+
+    function hexToPixel(q, r) {
+      const x = HEX_SIZE * SQRT_3 * (q + r / 2);
+      const y = HEX_SIZE * 3 / 2 * r;
+      return { x, y };
+    }
+
+    function pixelToHex(x, y) {
+      const q = (SQRT_3 / 3 * x - 1 / 3 * y) / HEX_SIZE;
+      const r = (2 / 3 * y) / HEX_SIZE;
+      return hexRound(q, r, -q - r);
+    }
+
+    function hexRound(q, r, s) {
+      let rq = Math.round(q);
+      let rr = Math.round(r);
+      let rs = Math.round(s);
+
+      const qDiff = Math.abs(rq - q);
+      const rDiff = Math.abs(rr - r);
+      const sDiff = Math.abs(rs - s);
+
+      if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
+      else if (rDiff > sDiff) rr = -rq - rs;
+      else rs = -rq - rr;
+
+      return { q: rq, r: rr, s: rs };
+    }
+
+    function hexDistance(a, b) {
+      return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
+    }
+
+    // --- Camera System ---
+    let camera = { x: 0, y: 0, zoom: 1.0 };
+    let isDragging = false;
+    let hasDragged = false;
+    let dragStart = { x: 0, y: 0 };
+    let cameraStart = { x: 0, y: 0 };
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomSensitivity = 0.1;
+      if (e.deltaY < 0) {
+        camera.zoom = Math.min(3.0, camera.zoom + zoomSensitivity);
+      } else {
+        camera.zoom = Math.max(0.15, camera.zoom - zoomSensitivity);
+      }
+    }, { passive: false });
+
+    // --- Helper: Get All Neighbors (Ignoring Terrain Type) ---
+    function getAllNeighbors(hex) {
+      const directions = [
+        { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+        { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 }
+      ];
+      const neighbors = [];
+      for (let dir of directions) {
+        const neighbor = map.get(getHexKey(hex.q + dir.q, hex.r + dir.r));
+        if (neighbor) neighbors.push(neighbor);
+      }
+      return neighbors;
+    }
+
+    // --- Map Generation ---
+    const map = new Map();
+    const MAP_RADIUS = 60;
+    const cities = [];
+
+    function generateMap() {
+      const islands = [];
+      const numIslands = 90;
+
+      for (let i = 0; i < numIslands; i++) {
+        const q = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
+        const r = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
+        const radius = Math.floor(Math.random() * 6) + 2;
+        islands.push({ q, r, radius });
+      }
+
+      for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
+        const r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
+        const r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+        for (let r = r1; r <= r2; r++) {
+          const s = -q - r;
+          let type = 'ocean';
+          let maxInfluence = -100;
+
+          for (let isle of islands) {
+            const dist = hexDistance({ q, r, s }, { q: isle.q, r: isle.r, s: -isle.q - isle.r });
+            const influence = isle.radius - dist;
+            if (influence > maxInfluence) maxInfluence = influence;
+          }
+
+          if (maxInfluence > 0) type = 'land';
+          else if (maxInfluence === 0) type = 'beach';
+
+          map.set(getHexKey(q, r), { q, r, s, type, hasCity: false });
+        }
+      }
+
+      // --- City Generation ---
+      for (let [key, hex] of map) {
+        if (hex.type === 'land' || hex.type === 'beach') {
+          const neighbors = getAllNeighbors(hex);
+          const bordersOcean = neighbors.some(n => n.type === 'ocean');
+
+          if (bordersOcean) {
+            // 3% chance for a coastal tile to become a city
+            if (Math.random() < 0.03 && cities.length < 40) {
+              // Ensure cities don't spawn right next to each other
+              const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
+              if (!cityTooClose) {
+                hex.hasCity = true;
+                cities.push(hex);
+              }
+            }
+          }
+        }
+      }
+    }
+    generateMap();
+
+    // --- Off-Screen Caching (The Performance Magic) ---
+    const bgCanvas = document.createElement('canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+
+    const mapPixelWidth = 8500;
+    const mapPixelHeight = 8500;
+    bgCanvas.width = mapPixelWidth;
+    bgCanvas.height = mapPixelHeight;
+
+    const mapOffsetX = mapPixelWidth / 2;
+    const mapOffsetY = mapPixelHeight / 2;
+
+    function prerenderMap() {
+      bgCtx.fillStyle = '#1a1a1a';
+      bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+      bgCtx.save();
+      bgCtx.translate(mapOffsetX, mapOffsetY);
+
+      const batches = {
+        ocean: { color: '#2980b9', positions: [] },
+        land: { color: '#27ae60', positions: [] },
+        beach: { color: '#f39c12', positions: [] }
+      };
+
+      for (let [key, hex] of map) {
+        batches[hex.type].positions.push(hexToPixel(hex.q, hex.r));
+      }
+
+      bgCtx.lineWidth = 1;
+      bgCtx.strokeStyle = 'rgba(0,0,0,0.15)';
+
+      for (const [type, batch] of Object.entries(batches)) {
+        if (batch.positions.length === 0) continue;
+
+        bgCtx.beginPath();
+        bgCtx.fillStyle = batch.color;
+
+        for (let pos of batch.positions) {
+          for (let i = 0; i < 6; i++) {
+            const angle = 2 * Math.PI / 6 * (i - 0.5);
+            const hx = pos.x + HEX_SIZE * Math.cos(angle);
+            const hy = pos.y + HEX_SIZE * Math.sin(angle);
+            if (i === 0) bgCtx.moveTo(hx, hy);
+            else bgCtx.lineTo(hx, hy);
+          }
+          bgCtx.closePath();
+        }
+
+        bgCtx.fill();
+        bgCtx.stroke();
+      }
+
+      // Draw Cities
+      for (let city of cities) {
+        const pos = hexToPixel(city.q, city.r);
+
+        // House base (Scaled up further)
+        bgCtx.fillStyle = '#ecf0f1';
+        bgCtx.fillRect(pos.x - 15, pos.y - 5, 30, 20);
+
+        // Red Roof (Scaled up further)
+        bgCtx.fillStyle = '#c0392b';
+        bgCtx.beginPath();
+        bgCtx.moveTo(pos.x - 20, pos.y - 5);
+        bgCtx.lineTo(pos.x, pos.y - 22);
+        bgCtx.lineTo(pos.x + 20, pos.y - 5);
+        bgCtx.closePath();
+        bgCtx.fill();
+
+        // Door (Scaled up further)
+        bgCtx.fillStyle = '#8e44ad';
+        bgCtx.fillRect(pos.x - 4, pos.y + 5, 8, 10);
+      }
+      bgCtx.restore();
+    }
+    prerenderMap();
+
+    // Find Spawn Point
+    let spawnQ = 0;
+    let spawnR = 0;
+    for (let [key, hex] of map) {
+      if (hex.type === 'ocean') {
+        spawnQ = hex.q;
+        spawnR = hex.r;
+        break;
+      }
+    }
+
+    // --- Ship Setup ---
+    const ship = {
+      q: spawnQ,
+      r: spawnR,
+      x: 0,
+      y: 0,
+      speed: 150.0,
+      path: [],
+      moving: false,
+      targetTile: null
+    };
+
+    const startPos = hexToPixel(ship.q, ship.r);
+    ship.x = startPos.x;
+    ship.y = startPos.y;
+
+    camera.x = -ship.x;
+    camera.y = -ship.y;
+
+    let clickIndicator = null;
+
+    // --- Pathfinding ---
+    function getOceanNeighbors(hex) {
+      const neighbors = getAllNeighbors(hex);
+      return neighbors.filter(n => n.type === 'ocean');
+    }
+
+    function findPath(start, goal) {
+      if (start.q === goal.q && start.r === goal.r) return [];
+
+      const openSet = [start];
+      const cameFrom = new Map();
+      const gScore = new Map();
+      const fScore = new Map();
+
+      const startKey = getHexKey(start.q, start.r);
+      gScore.set(startKey, 0);
+      fScore.set(startKey, hexDistance(start, goal));
+
+      let safetyLimit = 0;
+
+      while (openSet.length > 0 && safetyLimit < 15000) {
+        safetyLimit++;
+
+        openSet.sort((a, b) => {
+          const scoreA = fScore.get(getHexKey(a.q, a.r)) ?? Infinity;
+          const scoreB = fScore.get(getHexKey(b.q, b.r)) ?? Infinity;
+          return scoreA - scoreB;
+        });
+
+        const current = openSet.shift();
+        const currentKey = getHexKey(current.q, current.r);
+
+        if (current.q === goal.q && current.r === goal.r) {
+          const path = [];
+          let curr = current;
+          let currKey = getHexKey(curr.q, curr.r);
+
+          while (cameFrom.has(currKey)) {
+            path.unshift(curr);
+            curr = cameFrom.get(currKey);
+            currKey = getHexKey(curr.q, curr.r);
+          }
+          return path;
+        }
+
+        for (let neighbor of getOceanNeighbors(current)) {
+          const neighborKey = getHexKey(neighbor.q, neighbor.r);
+          const tentative_gScore = (gScore.get(currentKey) ?? Infinity) + 1;
+
+          if (tentative_gScore < (gScore.get(neighborKey) ?? Infinity)) {
+            cameFrom.set(neighborKey, current);
+            gScore.set(neighborKey, tentative_gScore);
+            fScore.set(neighborKey, tentative_gScore + hexDistance(neighbor, goal));
+
+            if (!openSet.some(n => n.q === neighbor.q && n.r === neighbor.r)) {
+              openSet.push(neighbor);
+            }
+          }
+        }
+      }
+      return [];
+    }
+
+    // --- Interaction & Input Handling ---
+    canvas.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      hasDragged = false;
+      dragStart.x = e.clientX;
+      dragStart.y = e.clientY;
+      cameraStart.x = camera.x;
+      cameraStart.y = camera.y;
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (isDragging) {
+        const dx = (e.clientX - dragStart.x) / camera.zoom;
+        const dy = (e.clientY - dragStart.y) / camera.zoom;
+
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          hasDragged = true;
+        }
+
+        camera.x = cameraStart.x + dx;
+        camera.y = cameraStart.y + dy;
+      }
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      isDragging = false;
+      if (!hasDragged) {
+        handleMapClick(e.clientX, e.clientY);
+      }
+    });
+
+    function handleMapClick(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      let clickX = (clientX - rect.left) - (canvas.width / 2);
+      let clickY = (clientY - rect.top) - (canvas.height / 2);
+
+      clickX /= camera.zoom;
+      clickY /= camera.zoom;
+      clickX -= camera.x;
+      clickY -= camera.y;
+
+      const clickedHex = pixelToHex(clickX, clickY);
+      let targetTile = map.get(getHexKey(clickedHex.q, clickedHex.r));
+
+      if (targetTile) {
+        const pos = hexToPixel(clickedHex.q, clickedHex.r);
+        clickIndicator = { x: pos.x, y: pos.y, radius: HEX_SIZE, alpha: 1.0 };
+      }
+
+      // City Logic: If we click a city, find the best adjacent ocean port for the ship
+      if (targetTile && targetTile.hasCity) {
+        const oceanNeighbors = getOceanNeighbors(targetTile);
+        if (oceanNeighbors.length > 0) {
+          // Calculate the ship's full hex coordinates to fix the distance math
+          const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+
+          // Sort by closest to the ship
+          oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
+          targetTile = oceanNeighbors[0]; // Set the target to the nearest coastal water
+        }
+      }
+
+      if (targetTile && targetTile.type === 'ocean') {
+        let startTile;
+        if (ship.moving) {
+          const currentHex = pixelToHex(ship.x, ship.y);
+          startTile = map.get(getHexKey(currentHex.q, currentHex.r));
+        }
+
+        if (!startTile) {
+          startTile = map.get(getHexKey(ship.q, ship.r));
+        }
+
+        if (startTile) {
+          const calculatedPath = findPath(startTile, targetTile);
+          if (calculatedPath.length > 0) {
+            ship.path = calculatedPath;
+            ship.moving = true;
+            ship.targetTile = targetTile;
+          }
+        }
+      }
+    }
+
+    // --- Rendering Components ---
+    function drawShip() {
+      ctx.save();
+      ctx.translate(ship.x, ship.y);
+      ctx.lineWidth = 1 / camera.zoom;
+
+      // Hull (Scaled up 1.5x)
+      ctx.fillStyle = '#8B4513';
+      ctx.beginPath();
+      ctx.moveTo(-27, -9);
+      ctx.lineTo(27, -9);
+      ctx.lineTo(18, 9);
+      ctx.lineTo(-18, 9);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Mast (Scaled up 1.5x)
+      ctx.fillStyle = '#5c2a07';
+      ctx.fillRect(-3, -30, 6, 30);
+
+      // Sail (Scaled up 1.5x)
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.moveTo(3, -6);
+      ctx.lineTo(3, -27);
+      ctx.lineTo(24, -6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawPath() {
+      if (!ship.moving || ship.path.length === 0) return;
+
+      ctx.beginPath();
+      ctx.moveTo(ship.x, ship.y);
+      for (let node of ship.path) {
+        const pos = hexToPixel(node.q, node.r);
+        ctx.lineTo(pos.x, pos.y);
+      }
+
+      ctx.strokeStyle = '#e74c3c';
+      ctx.lineWidth = 4 / camera.zoom;
+      ctx.setLineDash([8 / camera.zoom, 6 / camera.zoom]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawClickIndicator() {
+      if (!clickIndicator) return;
+
+      ctx.beginPath();
+      ctx.arc(clickIndicator.x, clickIndicator.y, clickIndicator.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${clickIndicator.alpha})`;
+      ctx.lineWidth = 4 / camera.zoom;
+      ctx.stroke();
+
+      clickIndicator.radius += 2 / camera.zoom;
+      clickIndicator.alpha -= 0.04;
+      if (clickIndicator.alpha <= 0) clickIndicator = null;
+    }
+
+    // --- Game Loop ---
+    function update(dt) {
+      if (ship.moving && ship.path.length > 0) {
+        const targetNode = ship.path[0];
+        const targetPos = hexToPixel(targetNode.q, targetNode.r);
+
+        const dx = targetPos.x - ship.x;
+        const dy = targetPos.y - ship.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const step = ship.speed * dt;
+
+        if (distance < step) {
+          ship.x = targetPos.x;
+          ship.y = targetPos.y;
+          ship.q = targetNode.q;
+          ship.r = targetNode.r;
+          ship.path.shift();
+
+          if (ship.path.length === 0) {
+            ship.moving = false;
+            ship.targetTile = null;
+          }
+        } else {
+          ship.x += (dx / distance) * step;
+          ship.y += (dy / distance) * step;
+        }
+      }
+    }
+
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.scale(camera.zoom, camera.zoom);
+      ctx.translate(camera.x, camera.y);
+
+      // Draw the massive, pre-rendered map instantly
+      ctx.drawImage(bgCanvas, -mapOffsetX, -mapOffsetY);
+
+      // Draw pulsing target hex dynamically on top
+      if (ship.moving && ship.targetTile) {
+        const pulse = Math.sin(Date.now() / 150) > 0;
+        if (pulse) {
+          const pos = hexToPixel(ship.targetTile.q, ship.targetTile.r);
+          ctx.beginPath();
+          ctx.fillStyle = '#5dade2';
+          for (let i = 0; i < 6; i++) {
+            const angle = 2 * Math.PI / 6 * (i - 0.5);
+            const hx = pos.x + HEX_SIZE * Math.cos(angle);
+            const hy = pos.y + HEX_SIZE * Math.sin(angle);
+            if (i === 0) ctx.moveTo(hx, hy);
+            else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+          ctx.lineWidth = 1 / camera.zoom;
+          ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      drawPath();
+      drawClickIndicator();
+      drawShip();
+
+      ctx.restore();
+    }
+
+    let lastTime = 0;
+    function loop(timestamp) {
+      if (!lastTime) lastTime = timestamp;
+      const dt = (timestamp - lastTime) / 1000;
+      lastTime = timestamp;
+
+      const safeDt = Math.min(dt, 0.1);
+
+      update(safeDt);
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    requestAnimationFrame(loop);
+  </script>
+</body>
+
+</html>
