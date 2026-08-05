@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - Draggable Multi-Windows</title>
+  <title>Hex Ocean Trader Prototype - Dynamic Economy</title>
   <style>
     body {
       margin: 0;
@@ -68,7 +68,6 @@
       padding-bottom: 10px;
       margin-bottom: 15px;
       cursor: grab;
-      /* Shows it can be dragged */
     }
 
     .trade-header:active {
@@ -160,6 +159,21 @@
       margin-bottom: 15px;
       font-size: 16px;
       font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      color: white;
+    }
+
+    .sail-btn:hover {
+      filter: brightness(1.1);
+    }
+
+    .prod-arrow {
+      color: #2ecc71;
+      font-weight: bold;
+      display: inline-block;
+      width: 15px;
     }
   </style>
 </head>
@@ -253,6 +267,28 @@
       document.getElementById('uiGold').innerText = player.gold;
     }
 
+    // --- Economy Simulation ---
+    function simulateEconomy() {
+      for (let city of cities) {
+        GOODS.forEach(g => {
+          // 1. Consumption: Small chance to consume 1 unit of ANY good (if they have stock)
+          if (city.inventory[g.id] > 0 && Math.random() < 0.20) {
+            city.inventory[g.id] -= 1;
+          }
+
+          // 2. Production: Higher chance to produce 1 unit of goods this city specializes in
+          if (city.producedGoods.includes(g.id)) {
+            // Max out production stockpiles naturally around 120 so prices bottom out
+            if (city.inventory[g.id] < 120 && Math.random() < 0.40) {
+              city.inventory[g.id] += 1;
+            }
+          }
+        });
+      }
+      // Update windows if open to reflect new prices/stock
+      refreshAllTradeWindows();
+    }
+
     // --- Map Generation ---
     function getAllNeighbors(hex) {
       const directions = [
@@ -317,6 +353,12 @@
             if (!cityTooClose) {
               hex.hasCity = true;
               hex.inventory = {};
+
+              // Assign 2 to 5 random production goods
+              const numGoodsProduced = Math.floor(Math.random() * 4) + 2;
+              const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
+              hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
+
               GOODS.forEach(g => {
                 hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
               });
@@ -399,8 +441,8 @@
     // ==========================================
     // --- Dynamic Window & Trading System ---
     // ==========================================
-    const openWindows = {}; // Store all currently open windows
-    let zIndexCounter = 100; // Keep track of the active window layer
+    const openWindows = {};
+    let zIndexCounter = 100;
 
     function getPrices(good, cityAmount) {
       const scarcity = Math.max(0, 120 - cityAmount) / 120;
@@ -409,14 +451,13 @@
       return { buyPrice, sellPrice };
     }
 
-    // Drag and drop function
     function makeDraggable(element, header) {
       let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
       header.onpointerdown = dragMouseDown;
 
       function dragMouseDown(e) {
         e.preventDefault();
-        element.style.zIndex = ++zIndexCounter; // Bring to front
+        element.style.zIndex = ++zIndexCounter;
         pos3 = e.clientX;
         pos4 = e.clientY;
         document.onpointerup = closeDragElement;
@@ -439,33 +480,46 @@
       }
     }
 
+    function updateTradeDistances() {
+      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+      for (const key in openWindows) {
+        const { city, element } = openWindows[key];
+        const safeId = key.replace(',', '_');
+        const dist = hexDistance(shipHex, city);
+        const titleEl = element.querySelector(`#title-${safeId}`);
+        if (titleEl) {
+          titleEl.innerText = `Coastal Port (Distance: ${dist})`;
+        }
+      }
+    }
+
     function openTradeWindow(cityHex) {
       const cityKey = getHexKey(cityHex.q, cityHex.r);
-      const safeId = cityKey.replace(',', '_'); // Create a CSS-safe ID without commas
+      const safeId = cityKey.replace(',', '_');
 
-      // If it's already open, just bring it to the front
       if (openWindows[cityKey]) {
         openWindows[cityKey].element.style.zIndex = ++zIndexCounter;
         return;
       }
 
-      // Create new window DOM element
       const win = document.createElement('div');
       win.className = 'tradeWindow';
       win.id = 'window-' + safeId;
       win.style.zIndex = ++zIndexCounter;
 
-      // Offset slightly based on how many windows are open so they don't stack perfectly
       const offset = Object.keys(openWindows).length * 30;
       win.style.left = (window.innerWidth / 2 - 225 + offset) + 'px';
       win.style.top = (window.innerHeight / 2 - 200 + offset) + 'px';
 
+      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+      const dist = hexDistance(shipHex, cityHex);
+
       win.innerHTML = `
                 <div class="trade-header" id="header-${safeId}">
-                    <h2>Coastal Port (${cityHex.q}, ${cityHex.r})</h2>
+                    <h2 id="title-${safeId}">Coastal Port (Distance: ${dist})</h2>
                     <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
                 </div>
-                <button id="sailBtn-${safeId}" class="trade-btn sail-btn" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
+                <button id="sailBtn-${safeId}" class="sail-btn" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
                 <p id="warning-${safeId}" class="trade-warning">You must dock your ship at this city to trade!</p>
                 <table>
                     <thead>
@@ -483,17 +537,9 @@
             `;
 
       document.body.appendChild(win);
+      openWindows[cityKey] = { element: win, city: cityHex };
 
-      // Store reference
-      openWindows[cityKey] = {
-        element: win,
-        city: cityHex
-      };
-
-      // Initialize drag and drop using the safe ID
       makeDraggable(win, win.querySelector(`#header-${safeId}`));
-
-      // Click anywhere on window brings it to front
       win.addEventListener('pointerdown', () => win.style.zIndex = ++zIndexCounter);
 
       refreshAllTradeWindows();
@@ -511,9 +557,8 @@
 
       for (const key in openWindows) {
         const { city, element } = openWindows[key];
-        const safeId = key.replace(',', '_'); // Match the CSS-safe ID 
+        const safeId = key.replace(',', '_');
 
-        // Check if ship is docked near THIS specific city
         const dist = hexDistance(shipHex, city);
         const canTrade = (dist <= 1 && !ship.moving);
 
@@ -535,21 +580,24 @@
           const playerStock = player.inventory[good.id];
           const { buyPrice, sellPrice } = getPrices(good, cityStock);
 
+          const isProduced = city.producedGoods.includes(good.id);
+          const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
+
           const canBuy = canTrade && cityStock > 0 && player.gold >= buyPrice;
           const canSell = canTrade && playerStock > 0;
 
           html += `
-                <tr>
-                    <td class="item-name">${good.name}</td>
-                    <td>${cityStock}</td>
-                    <td>${buyPrice}g</td>
-                    <td>${sellPrice}g</td>
-                    <td style="color:#f39c12; font-weight:bold;">${playerStock}</td>
-                    <td>
-                        <button class="trade-btn" onclick="buyGood('${good.id}', '${key}')" ${!canBuy ? 'disabled' : ''}>Buy</button>
-                        <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}')" ${!canSell ? 'disabled' : ''}>Sell</button>
-                    </td>
-                </tr>
+                        <tr>
+                            <td class="item-name">${prodMarker} ${good.name}</td>
+                            <td>${cityStock}</td>
+                            <td>${buyPrice}g</td>
+                            <td>${sellPrice}g</td>
+                            <td style="color:#f39c12; font-weight:bold;">${playerStock}</td>
+                            <td>
+                                <button class="trade-btn" onclick="buyGood('${good.id}', '${key}')" ${!canBuy ? 'disabled' : ''}>Buy</button>
+                                <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}')" ${!canSell ? 'disabled' : ''}>Sell</button>
+                            </td>
+                        </tr>
                     `;
         });
         tbody.innerHTML = html;
@@ -558,6 +606,10 @@
 
     window.buyGood = function (goodId, cityKey) {
       const city = openWindows[cityKey].city;
+      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+
+      if (hexDistance(shipHex, city) > 1 || ship.moving) return;
+
       const good = GOODS.find(g => g.id === goodId);
       const cityStock = city.inventory[goodId];
       const { buyPrice } = getPrices(good, cityStock);
@@ -573,6 +625,10 @@
 
     window.sellGood = function (goodId, cityKey) {
       const city = openWindows[cityKey].city;
+      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+
+      if (hexDistance(shipHex, city) > 1 || ship.moving) return;
+
       const good = GOODS.find(g => g.id === goodId);
       const cityStock = city.inventory[goodId];
       const { sellPrice } = getPrices(good, cityStock);
@@ -606,6 +662,7 @@
           ship.path = calculatedPath;
           ship.moving = true;
           ship.targetTile = targetTile;
+          refreshAllTradeWindows();
         }
       }
     };
@@ -715,6 +772,7 @@
             ship.path = calculatedPath;
             ship.moving = true;
             ship.targetTile = targetTile;
+
             refreshAllTradeWindows();
           }
         }
@@ -792,11 +850,14 @@
           ship.r = targetNode.r;
           ship.path.shift();
 
+          // Trigger the economy tick as the ship passes through a tile
+          simulateEconomy();
+
+          updateTradeDistances();
+
           if (ship.path.length === 0) {
             ship.moving = false;
             ship.targetTile = null;
-
-            // Arrived! Tell all open windows to enable trade buttons if applicable
             refreshAllTradeWindows();
           }
         } else {
