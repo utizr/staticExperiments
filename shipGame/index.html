@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - Coastal Cities</title>
+  <title>Hex Ocean Trader Prototype - Draggable Multi-Windows</title>
   <style>
     body {
       margin: 0;
@@ -19,6 +19,7 @@
       display: block;
     }
 
+    /* Main UI */
     #ui {
       position: absolute;
       top: 15px;
@@ -31,6 +32,7 @@
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      z-index: 10;
     }
 
     #ui h3 {
@@ -44,16 +46,134 @@
       font-size: 14px;
       color: #ddd;
     }
+
+    /* Dynamic Trading Windows */
+    .tradeWindow {
+      position: absolute;
+      background: #2c3e50;
+      color: white;
+      font-family: sans-serif;
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid #f1c40f;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+      min-width: 450px;
+    }
+
+    .trade-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #7f8c8d;
+      padding-bottom: 10px;
+      margin-bottom: 15px;
+      cursor: grab;
+      /* Shows it can be dragged */
+    }
+
+    .trade-header:active {
+      cursor: grabbing;
+    }
+
+    .trade-header h2 {
+      margin: 0;
+      color: #f1c40f;
+      pointer-events: none;
+    }
+
+    .close-btn {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .close-btn:hover {
+      background: #c0392b;
+    }
+
+    .trade-warning {
+      color: #e74c3c;
+      font-size: 13px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 8px;
+      text-align: center;
+      border-bottom: 1px solid #34495e;
+    }
+
+    th {
+      color: #bdc3c7;
+      font-size: 14px;
+    }
+
+    td {
+      font-size: 15px;
+    }
+
+    .item-name {
+      text-align: left;
+      font-weight: bold;
+    }
+
+    .trade-btn {
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+
+    .trade-btn.sell {
+      background: #2980b9;
+    }
+
+    .trade-btn:hover:not(:disabled) {
+      filter: brightness(1.2);
+    }
+
+    .trade-btn:disabled {
+      background: #7f8c8d;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .sail-btn {
+      background: #3498db;
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      font-size: 16px;
+      font-weight: bold;
+    }
   </style>
 </head>
 
 <body>
   <div id="ui">
     <h3>Ocean Trader</h3>
-    <p>🗺️ <b>Click & Drag</b> to pan the camera.</p>
-    <p>🔍 <b>Scroll Wheel</b> to zoom in and out.</p>
-    <p>⚓ <b>Click</b> an ocean tile or a <b>City</b> to set sail.</p>
+    <p>🗺️ <b>Drag</b> to pan | 🔍 <b>Scroll</b> to zoom</p>
+    <p>⚓ <b>Click</b> an ocean tile to sail.</p>
+    <p>🏙️ <b>Click</b> a city to view the market.</p>
+    <hr style="border-color: #444; margin: 10px 0;">
+    <p>💰 Gold: <b id="uiGold" style="color:#f1c40f;">1000</b></p>
   </div>
+
   <canvas id="gameCanvas"></canvas>
 
   <script>
@@ -70,38 +190,29 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    function getHexKey(q, r) {
-      return `${Math.round(q)},${Math.round(r)}`;
-    }
-
+    function getHexKey(q, r) { return `${Math.round(q)},${Math.round(r)}`; }
     function hexToPixel(q, r) {
       const x = HEX_SIZE * SQRT_3 * (q + r / 2);
       const y = HEX_SIZE * 3 / 2 * r;
       return { x, y };
     }
-
     function pixelToHex(x, y) {
       const q = (SQRT_3 / 3 * x - 1 / 3 * y) / HEX_SIZE;
       const r = (2 / 3 * y) / HEX_SIZE;
       return hexRound(q, r, -q - r);
     }
-
     function hexRound(q, r, s) {
       let rq = Math.round(q);
       let rr = Math.round(r);
       let rs = Math.round(s);
-
       const qDiff = Math.abs(rq - q);
       const rDiff = Math.abs(rr - r);
       const sDiff = Math.abs(rs - s);
-
       if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
       else if (rDiff > sDiff) rr = -rq - rs;
       else rs = -rq - rr;
-
       return { q: rq, r: rr, s: rs };
     }
-
     function hexDistance(a, b) {
       return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
     }
@@ -116,14 +227,33 @@
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomSensitivity = 0.1;
-      if (e.deltaY < 0) {
-        camera.zoom = Math.min(3.0, camera.zoom + zoomSensitivity);
-      } else {
-        camera.zoom = Math.max(0.15, camera.zoom - zoomSensitivity);
-      }
+      if (e.deltaY < 0) camera.zoom = Math.min(3.0, camera.zoom + zoomSensitivity);
+      else camera.zoom = Math.max(0.15, camera.zoom - zoomSensitivity);
     }, { passive: false });
 
-    // --- Helper: Get All Neighbors (Ignoring Terrain Type) ---
+    // --- Game Economy Data ---
+    const GOODS = [
+      { id: 'grain', name: 'Grain', basePrice: 15 },
+      { id: 'wood', name: 'Wood', basePrice: 20 },
+      { id: 'brick', name: 'Brick', basePrice: 30 },
+      { id: 'sugar', name: 'Sugar', basePrice: 45 },
+      { id: 'cloth', name: 'Cloth', basePrice: 60 },
+      { id: 'tobacco', name: 'Tobacco', basePrice: 80 },
+      { id: 'coffee', name: 'Coffee', basePrice: 100 },
+      { id: 'rum', name: 'Rum', basePrice: 150 }
+    ];
+
+    let player = {
+      gold: 1000,
+      inventory: {}
+    };
+    GOODS.forEach(g => player.inventory[g.id] = 0);
+
+    function updateUIGold() {
+      document.getElementById('uiGold').innerText = player.gold;
+    }
+
+    // --- Map Generation ---
     function getAllNeighbors(hex) {
       const directions = [
         { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
@@ -137,20 +267,25 @@
       return neighbors;
     }
 
-    // --- Map Generation ---
     const map = new Map();
-    const MAP_RADIUS = 30;
+    const MAP_RADIUS = 60;
     const cities = [];
 
     function generateMap() {
       const islands = [];
-      const numIslands = 28;
-
-      for (let i = 0; i < numIslands; i++) {
+      for (let i = 0; i < 150; i++) {
         const q = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
         const r = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
         const radius = Math.floor(Math.random() * 6) + 2;
         islands.push({ q, r, radius });
+      }
+
+      function getRandomColor(type) {
+        const variance = Math.random() * 2 - 1;
+        if (type === 'ocean') return `hsl(204, 64%, ${44 + variance}%)`;
+        if (type === 'land') return `hsl(145, 63%, ${42 + variance}%)`;
+        if (type === 'beach') return `hsl(37, 90%, ${51 + variance}%)`;
+        return 'black';
       }
 
       for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
@@ -170,25 +305,22 @@
           if (maxInfluence > 0) type = 'land';
           else if (maxInfluence === 0) type = 'beach';
 
-          map.set(getHexKey(q, r), { q, r, s, type, hasCity: false });
+          map.set(getHexKey(q, r), { q, r, s, type, color: getRandomColor(type), hasCity: false });
         }
       }
 
-      // --- City Generation ---
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
-          const neighbors = getAllNeighbors(hex);
-          const bordersOcean = neighbors.some(n => n.type === 'ocean');
-
-          if (bordersOcean) {
-            // 3% chance for a coastal tile to become a city
-            if (Math.random() < 0.03 && cities.length < 40) {
-              // Ensure cities don't spawn right next to each other
-              const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
-              if (!cityTooClose) {
-                hex.hasCity = true;
-                cities.push(hex);
-              }
+          const bordersOcean = getAllNeighbors(hex).some(n => n.type === 'ocean');
+          if (bordersOcean && Math.random() < 0.03 && cities.length < 40) {
+            const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
+            if (!cityTooClose) {
+              hex.hasCity = true;
+              hex.inventory = {};
+              GOODS.forEach(g => {
+                hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
+              });
+              cities.push(hex);
             }
           }
         }
@@ -196,68 +328,44 @@
     }
     generateMap();
 
-    // --- Off-Screen Caching (The Performance Magic) ---
+    // --- Off-Screen Caching ---
     const bgCanvas = document.createElement('canvas');
     const bgCtx = bgCanvas.getContext('2d');
-
     const mapPixelWidth = 8500;
     const mapPixelHeight = 8500;
     bgCanvas.width = mapPixelWidth;
     bgCanvas.height = mapPixelHeight;
-
     const mapOffsetX = mapPixelWidth / 2;
     const mapOffsetY = mapPixelHeight / 2;
 
     function prerenderMap() {
       bgCtx.fillStyle = '#1a1a1a';
       bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-
       bgCtx.save();
       bgCtx.translate(mapOffsetX, mapOffsetY);
-
-      const batches = {
-        ocean: { color: '#2980b9', positions: [] },
-        land: { color: '#27ae60', positions: [] },
-        beach: { color: '#f39c12', positions: [] }
-      };
-
-      for (let [key, hex] of map) {
-        batches[hex.type].positions.push(hexToPixel(hex.q, hex.r));
-      }
-
       bgCtx.lineWidth = 1;
       bgCtx.strokeStyle = 'rgba(0,0,0,0.15)';
 
-      for (const [type, batch] of Object.entries(batches)) {
-        if (batch.positions.length === 0) continue;
-
+      for (let [key, hex] of map) {
+        const pos = hexToPixel(hex.q, hex.r);
         bgCtx.beginPath();
-        bgCtx.fillStyle = batch.color;
-
-        for (let pos of batch.positions) {
-          for (let i = 0; i < 6; i++) {
-            const angle = 2 * Math.PI / 6 * (i - 0.5);
-            const hx = pos.x + HEX_SIZE * Math.cos(angle);
-            const hy = pos.y + HEX_SIZE * Math.sin(angle);
-            if (i === 0) bgCtx.moveTo(hx, hy);
-            else bgCtx.lineTo(hx, hy);
-          }
-          bgCtx.closePath();
+        bgCtx.fillStyle = hex.color;
+        for (let i = 0; i < 6; i++) {
+          const angle = 2 * Math.PI / 6 * (i - 0.5);
+          const hx = pos.x + HEX_SIZE * Math.cos(angle);
+          const hy = pos.y + HEX_SIZE * Math.sin(angle);
+          if (i === 0) bgCtx.moveTo(hx, hy);
+          else bgCtx.lineTo(hx, hy);
         }
-
+        bgCtx.closePath();
         bgCtx.fill();
         bgCtx.stroke();
       }
 
-      // Draw Cities
       for (let city of cities) {
         const pos = hexToPixel(city.q, city.r);
-
-        // House base (Scaled up further)
         bgCtx.fillStyle = '#ecf0f1';
         bgCtx.fillRect(pos.x - 15, pos.y - 5, 30, 20);
-
-        // Red Roof (Scaled up further)
         bgCtx.fillStyle = '#c0392b';
         bgCtx.beginPath();
         bgCtx.moveTo(pos.x - 20, pos.y - 5);
@@ -265,8 +373,6 @@
         bgCtx.lineTo(pos.x + 20, pos.y - 5);
         bgCtx.closePath();
         bgCtx.fill();
-
-        // Door (Scaled up further)
         bgCtx.fillStyle = '#8e44ad';
         bgCtx.fillRect(pos.x - 4, pos.y + 5, 8, 10);
       }
@@ -274,47 +380,243 @@
     }
     prerenderMap();
 
-    // Find Spawn Point
-    let spawnQ = 0;
-    let spawnR = 0;
+    // --- Ship Setup ---
+    let spawnQ = 0, spawnR = 0;
     for (let [key, hex] of map) {
-      if (hex.type === 'ocean') {
-        spawnQ = hex.q;
-        spawnR = hex.r;
-        break;
+      if (hex.type === 'ocean') { spawnQ = hex.q; spawnR = hex.r; break; }
+    }
+
+    const ship = {
+      q: spawnQ, r: spawnR, x: 0, y: 0,
+      speed: 150.0, path: [], moving: false, targetTile: null
+    };
+    const startPos = hexToPixel(ship.q, ship.r);
+    ship.x = startPos.x; ship.y = startPos.y;
+    camera.x = -ship.x; camera.y = -ship.y;
+    let clickIndicator = null;
+
+
+    // ==========================================
+    // --- Dynamic Window & Trading System ---
+    // ==========================================
+    const openWindows = {}; // Store all currently open windows
+    let zIndexCounter = 100; // Keep track of the active window layer
+
+    function getPrices(good, cityAmount) {
+      const scarcity = Math.max(0, 120 - cityAmount) / 120;
+      const buyPrice = Math.max(1, Math.floor(good.basePrice * (1 + scarcity * 2.0)));
+      const sellPrice = Math.max(1, Math.floor(buyPrice * 0.75));
+      return { buyPrice, sellPrice };
+    }
+
+    // Drag and drop function
+    function makeDraggable(element, header) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      header.onpointerdown = dragMouseDown;
+
+      function dragMouseDown(e) {
+        e.preventDefault();
+        element.style.zIndex = ++zIndexCounter; // Bring to front
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onpointerup = closeDragElement;
+        document.onpointermove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+      }
+
+      function closeDragElement() {
+        document.onpointerup = null;
+        document.onpointermove = null;
       }
     }
 
-    // --- Ship Setup ---
-    const ship = {
-      q: spawnQ,
-      r: spawnR,
-      x: 0,
-      y: 0,
-      speed: 150.0,
-      path: [],
-      moving: false,
-      targetTile: null
+    function openTradeWindow(cityHex) {
+      const cityKey = getHexKey(cityHex.q, cityHex.r);
+      const safeId = cityKey.replace(',', '_'); // Create a CSS-safe ID without commas
+
+      // If it's already open, just bring it to the front
+      if (openWindows[cityKey]) {
+        openWindows[cityKey].element.style.zIndex = ++zIndexCounter;
+        return;
+      }
+
+      // Create new window DOM element
+      const win = document.createElement('div');
+      win.className = 'tradeWindow';
+      win.id = 'window-' + safeId;
+      win.style.zIndex = ++zIndexCounter;
+
+      // Offset slightly based on how many windows are open so they don't stack perfectly
+      const offset = Object.keys(openWindows).length * 30;
+      win.style.left = (window.innerWidth / 2 - 225 + offset) + 'px';
+      win.style.top = (window.innerHeight / 2 - 200 + offset) + 'px';
+
+      win.innerHTML = `
+                <div class="trade-header" id="header-${safeId}">
+                    <h2>Coastal Port (${cityHex.q}, ${cityHex.r})</h2>
+                    <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
+                </div>
+                <button id="sailBtn-${safeId}" class="trade-btn sail-btn" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
+                <p id="warning-${safeId}" class="trade-warning">You must dock your ship at this city to trade!</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Good</th>
+                            <th>Stock</th>
+                            <th>Buy</th>
+                            <th>Sell</th>
+                            <th>Cargo</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-${safeId}"></tbody>
+                </table>
+            `;
+
+      document.body.appendChild(win);
+
+      // Store reference
+      openWindows[cityKey] = {
+        element: win,
+        city: cityHex
+      };
+
+      // Initialize drag and drop using the safe ID
+      makeDraggable(win, win.querySelector(`#header-${safeId}`));
+
+      // Click anywhere on window brings it to front
+      win.addEventListener('pointerdown', () => win.style.zIndex = ++zIndexCounter);
+
+      refreshAllTradeWindows();
+    }
+
+    window.closeTradeWindow = function (cityKey) {
+      if (openWindows[cityKey]) {
+        document.body.removeChild(openWindows[cityKey].element);
+        delete openWindows[cityKey];
+      }
     };
 
-    const startPos = hexToPixel(ship.q, ship.r);
-    ship.x = startPos.x;
-    ship.y = startPos.y;
+    function refreshAllTradeWindows() {
+      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
 
-    camera.x = -ship.x;
-    camera.y = -ship.y;
+      for (const key in openWindows) {
+        const { city, element } = openWindows[key];
+        const safeId = key.replace(',', '_'); // Match the CSS-safe ID 
 
-    let clickIndicator = null;
+        // Check if ship is docked near THIS specific city
+        const dist = hexDistance(shipHex, city);
+        const canTrade = (dist <= 1 && !ship.moving);
+
+        const warningEl = element.querySelector(`#warning-${safeId}`);
+        const sailBtn = element.querySelector(`#sailBtn-${safeId}`);
+        const tbody = element.querySelector(`#tbody-${safeId}`);
+
+        if (canTrade) {
+          warningEl.style.display = 'none';
+          sailBtn.style.display = 'none';
+        } else {
+          warningEl.style.display = 'block';
+          sailBtn.style.display = 'block';
+        }
+
+        let html = '';
+        GOODS.forEach(good => {
+          const cityStock = city.inventory[good.id];
+          const playerStock = player.inventory[good.id];
+          const { buyPrice, sellPrice } = getPrices(good, cityStock);
+
+          const canBuy = canTrade && cityStock > 0 && player.gold >= buyPrice;
+          const canSell = canTrade && playerStock > 0;
+
+          html += `
+                <tr>
+                    <td class="item-name">${good.name}</td>
+                    <td>${cityStock}</td>
+                    <td>${buyPrice}g</td>
+                    <td>${sellPrice}g</td>
+                    <td style="color:#f39c12; font-weight:bold;">${playerStock}</td>
+                    <td>
+                        <button class="trade-btn" onclick="buyGood('${good.id}', '${key}')" ${!canBuy ? 'disabled' : ''}>Buy</button>
+                        <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}')" ${!canSell ? 'disabled' : ''}>Sell</button>
+                    </td>
+                </tr>
+                    `;
+        });
+        tbody.innerHTML = html;
+      }
+    }
+
+    window.buyGood = function (goodId, cityKey) {
+      const city = openWindows[cityKey].city;
+      const good = GOODS.find(g => g.id === goodId);
+      const cityStock = city.inventory[goodId];
+      const { buyPrice } = getPrices(good, cityStock);
+
+      if (cityStock > 0 && player.gold >= buyPrice) {
+        player.gold -= buyPrice;
+        city.inventory[goodId]--;
+        player.inventory[goodId]++;
+        updateUIGold();
+        refreshAllTradeWindows();
+      }
+    };
+
+    window.sellGood = function (goodId, cityKey) {
+      const city = openWindows[cityKey].city;
+      const good = GOODS.find(g => g.id === goodId);
+      const cityStock = city.inventory[goodId];
+      const { sellPrice } = getPrices(good, cityStock);
+
+      if (player.inventory[goodId] > 0) {
+        player.gold += sellPrice;
+        city.inventory[goodId]++;
+        player.inventory[goodId]--;
+        updateUIGold();
+        refreshAllTradeWindows();
+      }
+    };
+
+    window.sailToCity = function (cityKey) {
+      const city = openWindows[cityKey].city;
+      let targetTile = city;
+
+      const oceanNeighbors = getOceanNeighbors(targetTile);
+      if (oceanNeighbors.length > 0) {
+        const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+        oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
+        targetTile = oceanNeighbors[0];
+      }
+
+      let startTile = map.get(getHexKey(ship.moving ? pixelToHex(ship.x, ship.y).q : ship.q, ship.moving ? pixelToHex(ship.x, ship.y).r : ship.r));
+      if (!startTile) startTile = map.get(getHexKey(ship.q, ship.r));
+
+      if (startTile && targetTile && targetTile.type === 'ocean') {
+        const calculatedPath = findPath(startTile, targetTile);
+        if (calculatedPath.length > 0) {
+          ship.path = calculatedPath;
+          ship.moving = true;
+          ship.targetTile = targetTile;
+        }
+      }
+    };
 
     // --- Pathfinding ---
     function getOceanNeighbors(hex) {
-      const neighbors = getAllNeighbors(hex);
-      return neighbors.filter(n => n.type === 'ocean');
+      return getAllNeighbors(hex).filter(n => n.type === 'ocean');
     }
 
     function findPath(start, goal) {
       if (start.q === goal.q && start.r === goal.r) return [];
-
       const openSet = [start];
       const cameFrom = new Map();
       const gScore = new Map();
@@ -325,15 +627,9 @@
       fScore.set(startKey, hexDistance(start, goal));
 
       let safetyLimit = 0;
-
       while (openSet.length > 0 && safetyLimit < 15000) {
         safetyLimit++;
-
-        openSet.sort((a, b) => {
-          const scoreA = fScore.get(getHexKey(a.q, a.r)) ?? Infinity;
-          const scoreB = fScore.get(getHexKey(b.q, b.r)) ?? Infinity;
-          return scoreA - scoreB;
-        });
+        openSet.sort((a, b) => (fScore.get(getHexKey(a.q, a.r)) ?? Infinity) - (fScore.get(getHexKey(b.q, b.r)) ?? Infinity));
 
         const current = openSet.shift();
         const currentKey = getHexKey(current.q, current.r);
@@ -342,7 +638,6 @@
           const path = [];
           let curr = current;
           let currKey = getHexKey(curr.q, curr.r);
-
           while (cameFrom.has(currKey)) {
             path.unshift(curr);
             curr = cameFrom.get(currKey);
@@ -354,22 +649,18 @@
         for (let neighbor of getOceanNeighbors(current)) {
           const neighborKey = getHexKey(neighbor.q, neighbor.r);
           const tentative_gScore = (gScore.get(currentKey) ?? Infinity) + 1;
-
           if (tentative_gScore < (gScore.get(neighborKey) ?? Infinity)) {
             cameFrom.set(neighborKey, current);
             gScore.set(neighborKey, tentative_gScore);
             fScore.set(neighborKey, tentative_gScore + hexDistance(neighbor, goal));
-
-            if (!openSet.some(n => n.q === neighbor.q && n.r === neighbor.r)) {
-              openSet.push(neighbor);
-            }
+            if (!openSet.some(n => n.q === neighbor.q && n.r === neighbor.r)) openSet.push(neighbor);
           }
         }
       }
       return [];
     }
 
-    // --- Interaction & Input Handling ---
+    // --- Input Handling ---
     canvas.addEventListener('pointerdown', (e) => {
       isDragging = true;
       hasDragged = false;
@@ -383,11 +674,7 @@
       if (isDragging) {
         const dx = (e.clientX - dragStart.x) / camera.zoom;
         const dy = (e.clientY - dragStart.y) / camera.zoom;
-
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-          hasDragged = true;
-        }
-
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
         camera.x = cameraStart.x + dx;
         camera.y = cameraStart.y + dy;
       }
@@ -404,43 +691,23 @@
       const rect = canvas.getBoundingClientRect();
       let clickX = (clientX - rect.left) - (canvas.width / 2);
       let clickY = (clientY - rect.top) - (canvas.height / 2);
-
-      clickX /= camera.zoom;
-      clickY /= camera.zoom;
-      clickX -= camera.x;
-      clickY -= camera.y;
+      clickX /= camera.zoom; clickY /= camera.zoom;
+      clickX -= camera.x; clickY -= camera.y;
 
       const clickedHex = pixelToHex(clickX, clickY);
-      let targetTile = map.get(getHexKey(clickedHex.q, clickedHex.r));
+      const hexKey = getHexKey(clickedHex.q, clickedHex.r);
+      let targetTile = map.get(hexKey);
 
       if (targetTile) {
         const pos = hexToPixel(clickedHex.q, clickedHex.r);
         clickIndicator = { x: pos.x, y: pos.y, radius: HEX_SIZE, alpha: 1.0 };
       }
 
-      // City Logic: If we click a city, find the best adjacent ocean port for the ship
       if (targetTile && targetTile.hasCity) {
-        const oceanNeighbors = getOceanNeighbors(targetTile);
-        if (oceanNeighbors.length > 0) {
-          // Calculate the ship's full hex coordinates to fix the distance math
-          const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
-
-          // Sort by closest to the ship
-          oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
-          targetTile = oceanNeighbors[0]; // Set the target to the nearest coastal water
-        }
-      }
-
-      if (targetTile && targetTile.type === 'ocean') {
-        let startTile;
-        if (ship.moving) {
-          const currentHex = pixelToHex(ship.x, ship.y);
-          startTile = map.get(getHexKey(currentHex.q, currentHex.r));
-        }
-
-        if (!startTile) {
-          startTile = map.get(getHexKey(ship.q, ship.r));
-        }
+        openTradeWindow(targetTile);
+      } else if (targetTile && targetTile.type === 'ocean') {
+        let startTile = map.get(getHexKey(ship.moving ? pixelToHex(ship.x, ship.y).q : ship.q, ship.moving ? pixelToHex(ship.x, ship.y).r : ship.r));
+        if (!startTile) startTile = map.get(getHexKey(ship.q, ship.r));
 
         if (startTile) {
           const calculatedPath = findPath(startTile, targetTile);
@@ -448,6 +715,7 @@
             ship.path = calculatedPath;
             ship.moving = true;
             ship.targetTile = targetTile;
+            refreshAllTradeWindows();
           }
         }
       }
@@ -458,8 +726,6 @@
       ctx.save();
       ctx.translate(ship.x, ship.y);
       ctx.lineWidth = 1 / camera.zoom;
-
-      // Hull (Scaled up 1.5x)
       ctx.fillStyle = '#8B4513';
       ctx.beginPath();
       ctx.moveTo(-27, -9);
@@ -469,12 +735,8 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-
-      // Mast (Scaled up 1.5x)
       ctx.fillStyle = '#5c2a07';
       ctx.fillRect(-3, -30, 6, 30);
-
-      // Sail (Scaled up 1.5x)
       ctx.fillStyle = 'white';
       ctx.beginPath();
       ctx.moveTo(3, -6);
@@ -483,20 +745,17 @@
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-
       ctx.restore();
     }
 
     function drawPath() {
       if (!ship.moving || ship.path.length === 0) return;
-
       ctx.beginPath();
       ctx.moveTo(ship.x, ship.y);
       for (let node of ship.path) {
         const pos = hexToPixel(node.q, node.r);
         ctx.lineTo(pos.x, pos.y);
       }
-
       ctx.strokeStyle = '#e74c3c';
       ctx.lineWidth = 4 / camera.zoom;
       ctx.setLineDash([8 / camera.zoom, 6 / camera.zoom]);
@@ -506,13 +765,11 @@
 
     function drawClickIndicator() {
       if (!clickIndicator) return;
-
       ctx.beginPath();
       ctx.arc(clickIndicator.x, clickIndicator.y, clickIndicator.radius, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(255, 255, 255, ${clickIndicator.alpha})`;
       ctx.lineWidth = 4 / camera.zoom;
       ctx.stroke();
-
       clickIndicator.radius += 2 / camera.zoom;
       clickIndicator.alpha -= 0.04;
       if (clickIndicator.alpha <= 0) clickIndicator = null;
@@ -523,7 +780,6 @@
       if (ship.moving && ship.path.length > 0) {
         const targetNode = ship.path[0];
         const targetPos = hexToPixel(targetNode.q, targetNode.r);
-
         const dx = targetPos.x - ship.x;
         const dy = targetPos.y - ship.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
@@ -539,6 +795,9 @@
           if (ship.path.length === 0) {
             ship.moving = false;
             ship.targetTile = null;
+
+            // Arrived! Tell all open windows to enable trade buttons if applicable
+            refreshAllTradeWindows();
           }
         } else {
           ship.x += (dx / distance) * step;
@@ -549,19 +808,15 @@
 
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       ctx.scale(camera.zoom, camera.zoom);
       ctx.translate(camera.x, camera.y);
 
-      // Draw the massive, pre-rendered map instantly
       ctx.drawImage(bgCanvas, -mapOffsetX, -mapOffsetY);
 
-      // Draw pulsing target hex dynamically on top
       if (ship.moving && ship.targetTile) {
-        const pulse = Math.sin(Date.now() / 150) > 0;
-        if (pulse) {
+        if (Math.sin(Date.now() / 150) > 0) {
           const pos = hexToPixel(ship.targetTile.q, ship.targetTile.r);
           ctx.beginPath();
           ctx.fillStyle = '#5dade2';
@@ -592,7 +847,6 @@
       if (!lastTime) lastTime = timestamp;
       const dt = (timestamp - lastTime) / 1000;
       lastTime = timestamp;
-
       const safeDt = Math.min(dt, 0.1);
 
       update(safeDt);
