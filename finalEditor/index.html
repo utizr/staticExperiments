@@ -561,21 +561,30 @@
 
   <script src="lib/dragndrop.js"></script>
   <script src="lib/converter.js"></script>
+  <script src="lib/store.js"></script>
   <script src="lib/editor.js"></script>
   <script src="lib/organizer.js"></script>
   <script>
+    (async () => {
+
     // --- App State & Bootstrapping ---
-    const STORAGE_KEY = 'textEditor_app_data';
     let appData = { personas: [], workspaces: [], folders: [], notes: [], currentPersonaId: null, currentWorkspaceId: null };
     let currentNoteId = null;
 
     const generateId = () => Math.random().toString(36).substring(2, 9);
-    const saveData = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+
+    // All persistence goes through the Store abstraction (lib/store.js).
+    // To save to the server instead, switch to:
+    //   Store.createStore({ backend: 'api', baseUrl: '/api' })
+    const store = Store.createStore({ backend: 'local', storageKey: 'textEditor_app_data' });
+    const saveData = () => {
+      store.save(appData).catch(err => console.error('Failed to save app data:', err));
+    };
 
     // Initial Load (with migration from older formats)
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = await store.load();
     if (saved) {
-      appData = JSON.parse(saved);
+      appData = saved;
 
       // Migrate v1: no workspaces
       if (!appData.workspaces) {
@@ -712,6 +721,8 @@
 
     // Final Init
     if (currentNoteId) loadNoteIntoEditor(currentNoteId);
+
+    })();
   </script>
 
 </body>
