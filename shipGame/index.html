@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - Cargo Capacity</title>
+  <title>Hex Ocean Trader Prototype - True Distance</title>
   <style>
     body {
       margin: 0;
@@ -19,20 +19,18 @@
       display: block;
     }
 
-    /* UI Container for stacking panels on the left */
+    /* UI Container */
     #ui-container {
       position: absolute;
       top: 15px;
       left: 15px;
       z-index: 10;
       pointer-events: none;
-      /* Lets clicks pass through to the canvas */
       display: flex;
       flex-direction: column;
       gap: 15px;
     }
 
-    /* Main UI & Cargo UI Shared Styles */
     .ui-panel {
       color: white;
       font-family: sans-serif;
@@ -57,8 +55,7 @@
       color: #ddd;
     }
 
-    /* Cargo specific styles */
-    #cargoUi h3 {
+    #cargoUiTitle {
       color: #3498db;
     }
 
@@ -85,7 +82,6 @@
       transition: width 0.3s, background-color 0.3s;
     }
 
-    /* Dynamic Trading Windows */
     .tradeWindow {
       position: absolute;
       background: #2c3e50;
@@ -96,6 +92,28 @@
       border: 2px solid #f1c40f;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
       min-width: 540px;
+    }
+
+    /* Animation for highlighting an already open window */
+    @keyframes windowPulse {
+      0% {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+        border-color: #f1c40f;
+      }
+
+      50% {
+        box-shadow: 0 0 40px 15px rgba(241, 196, 15, 1);
+        border-color: #fff;
+      }
+
+      100% {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+        border-color: #f1c40f;
+      }
+    }
+
+    .pulse-anim {
+      animation: windowPulse 0.5s ease-out;
     }
 
     .trade-header {
@@ -234,7 +252,6 @@
 <body>
 
   <div id="ui-container">
-    <!-- Main UI -->
     <div id="ui" class="ui-panel">
       <h3>Ocean Trader</h3>
       <p>🗺️ <b>Drag</b> to pan | 🔍 <b>Scroll</b> to zoom</p>
@@ -244,12 +261,9 @@
       <p>💰 Gold: <b id="uiGold" style="color:#f1c40f;">1000</b></p>
     </div>
 
-    <!-- Ship Cargo UI -->
     <div id="cargoUi" class="ui-panel">
-      <h3>Ship Cargo</h3>
-      <div id="cargoList">
-        <!-- Populated by JS -->
-      </div>
+      <h3 id="cargoUiTitle">⚓ Ship Cargo</h3>
+      <div id="cargoList"></div>
       <div class="cargo-meter-bg">
         <div id="cargoMeterFill" class="cargo-meter-fill"></div>
       </div>
@@ -262,6 +276,32 @@
   <canvas id="gameCanvas"></canvas>
 
   <script>
+    // ==========================================
+    // --- GAME CONFIGURATION ---
+    // ==========================================
+    const GAME_CONFIG = {
+      MAP_RADIUS: 36,
+      ISLAND_COUNT: 30,
+      CITY_SPAWN_CHANCE: 0.05,
+      MAX_CITIES: 40,
+
+      AI_TRADE_MIN_TURNS: 18,
+      AI_TRADE_MAX_TURNS: 30,
+
+      AI_BUY_HIGH_STOCK: 100,
+      AI_BUY_MED_STOCK: 40,
+      AI_SELL_LOW_STOCK: 10,
+      AI_SELL_MED_STOCK: 50,
+
+      AI_TRADE_AMT_HIGH_MIN: 3,
+      AI_TRADE_AMT_HIGH_MAX: 12,
+      AI_TRADE_AMT_LOW_MIN: 1,
+      AI_TRADE_AMT_LOW_MAX: 5,
+
+      STARTING_GOLD: 1000,
+      STARTING_CARGO: 80
+    };
+
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
@@ -287,12 +327,8 @@
       return hexRound(q, r, -q - r);
     }
     function hexRound(q, r, s) {
-      let rq = Math.round(q);
-      let rr = Math.round(r);
-      let rs = Math.round(s);
-      const qDiff = Math.abs(rq - q);
-      const rDiff = Math.abs(rr - r);
-      const sDiff = Math.abs(rs - s);
+      let rq = Math.round(q); let rr = Math.round(r); let rs = Math.round(s);
+      const qDiff = Math.abs(rq - q); const rDiff = Math.abs(rr - r); const sDiff = Math.abs(rs - s);
       if (qDiff > rDiff && qDiff > sDiff) rq = -rr - rs;
       else if (rDiff > sDiff) rr = -rq - rs;
       else rs = -rq - rr;
@@ -302,12 +338,9 @@
       return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
     }
 
-    // --- Camera System ---
     let camera = { x: 0, y: 0, zoom: 1.0 };
-    let isDragging = false;
-    let hasDragged = false;
-    let dragStart = { x: 0, y: 0 };
-    let cameraStart = { x: 0, y: 0 };
+    let isDragging = false, hasDragged = false;
+    let dragStart = { x: 0, y: 0 }, cameraStart = { x: 0, y: 0 };
 
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -316,7 +349,6 @@
       else camera.zoom = Math.max(0.15, camera.zoom - zoomSensitivity);
     }, { passive: false });
 
-    // --- Game Economy Data ---
     const GOODS = [
       { id: 'grain', name: 'Grain', basePrice: 15 },
       { id: 'wood', name: 'Wood', basePrice: 20 },
@@ -329,8 +361,8 @@
     ];
 
     let player = {
-      gold: 1000,
-      maxCargo: 80,
+      gold: GAME_CONFIG.STARTING_GOLD,
+      maxCargo: GAME_CONFIG.STARTING_CARGO,
       inventory: {}
     };
     GOODS.forEach(g => player.inventory[g.id] = { count: 0, avgPrice: 0 });
@@ -339,12 +371,9 @@
       document.getElementById('uiGold').innerText = player.gold;
     }
 
-    // --- Cargo Management ---
     function getCurrentCargoSpace() {
       let total = 0;
-      for (let id in player.inventory) {
-        total += player.inventory[id].count;
-      }
+      for (let id in player.inventory) { total += player.inventory[id].count; }
       return total;
     }
 
@@ -356,36 +385,29 @@
       GOODS.forEach(g => {
         const inv = player.inventory[g.id];
         if (inv.count > 0) {
-          html += `
-                        <div class="cargo-item">
-                            <span>${g.name} <b>x${inv.count}</b></span>
-                            <span style="color:#aaa;">avg: ${Math.round(inv.avgPrice)}g</span>
-                        </div>
-                    `;
+          html += `<div class="cargo-item"><span>${g.name} <b>x${inv.count}</b></span><span style="color:#aaa;">avg: ${Math.round(inv.avgPrice)}g</span></div>`;
         }
       });
 
-      if (currentCargo === 0) {
-        html = '<div style="color:#aaa; font-size:13px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
-      }
+      if (currentCargo === 0) html = '<div style="color:#aaa; font-size:13px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
 
       cargoList.innerHTML = html;
-
-      // Update meter
       document.getElementById('cargoText').innerText = `${currentCargo} / ${player.maxCargo}`;
+
       const fill = document.getElementById('cargoMeterFill');
       const pct = (currentCargo / player.maxCargo) * 100;
       fill.style.width = `${pct}%`;
 
-      // Color code the meter based on how full it is
-      if (pct >= 100) fill.style.background = '#e74c3c'; // Red
-      else if (pct >= 75) fill.style.background = '#f39c12'; // Orange
-      else fill.style.background = '#27ae60'; // Green
+      if (pct >= 100) fill.style.background = '#e74c3c';
+      else if (pct >= 75) fill.style.background = '#f39c12';
+      else fill.style.background = '#27ae60';
     }
 
-    // Call once to initialize empty cargo UI
+    function updateShipStatus() {
+      const title = document.getElementById('cargoUiTitle');
+      if (title) title.innerText = ship.moving ? '🧭 Sailing...' : '⚓ Docked';
+    }
     updateCargoUI();
-
 
     // --- Economy Simulation ---
     function simulateEconomy() {
@@ -400,8 +422,42 @@
             }
           }
         });
+
+        city.turnsUntilNextAITrade--;
+        if (city.turnsUntilNextAITrade <= 0) {
+          simulateAITrader(city);
+          city.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
+        }
       }
       refreshAllTradeWindows();
+    }
+
+    function simulateAITrader(city) {
+      GOODS.forEach(g => {
+        if (Math.random() < 0.5) {
+          const isProduced = city.producedGoods.includes(g.id);
+          let stock = city.inventory[g.id];
+
+          const highTradeAmt = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_AMT_HIGH_MAX - GAME_CONFIG.AI_TRADE_AMT_HIGH_MIN + 1)) + GAME_CONFIG.AI_TRADE_AMT_HIGH_MIN;
+          const lowTradeAmt = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_AMT_LOW_MAX - GAME_CONFIG.AI_TRADE_AMT_LOW_MIN + 1)) + GAME_CONFIG.AI_TRADE_AMT_LOW_MIN;
+
+          if (isProduced) {
+            if (stock > GAME_CONFIG.AI_BUY_HIGH_STOCK) {
+              stock -= highTradeAmt;
+            } else if (stock > GAME_CONFIG.AI_BUY_MED_STOCK) {
+              stock -= lowTradeAmt;
+            }
+            city.inventory[g.id] = Math.max(0, stock);
+          } else {
+            if (stock < GAME_CONFIG.AI_SELL_LOW_STOCK) {
+              stock += highTradeAmt;
+            } else if (stock < GAME_CONFIG.AI_SELL_MED_STOCK) {
+              stock += lowTradeAmt;
+            }
+            city.inventory[g.id] = Math.min(120, stock);
+          }
+        }
+      });
     }
 
     // --- Map Generation ---
@@ -419,14 +475,13 @@
     }
 
     const map = new Map();
-    const MAP_RADIUS = 60;
     const cities = [];
 
     function generateMap() {
       const islands = [];
-      for (let i = 0; i < 150; i++) {
-        const q = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
-        const r = Math.floor(Math.random() * (MAP_RADIUS * 2)) - MAP_RADIUS;
+      for (let i = 0; i < GAME_CONFIG.ISLAND_COUNT; i++) {
+        const q = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
+        const r = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
         const radius = Math.floor(Math.random() * 6) + 2;
         islands.push({ q, r, radius });
       }
@@ -439,9 +494,9 @@
         return 'black';
       }
 
-      for (let q = -MAP_RADIUS; q <= MAP_RADIUS; q++) {
-        const r1 = Math.max(-MAP_RADIUS, -q - MAP_RADIUS);
-        const r2 = Math.min(MAP_RADIUS, -q + MAP_RADIUS);
+      for (let q = -GAME_CONFIG.MAP_RADIUS; q <= GAME_CONFIG.MAP_RADIUS; q++) {
+        const r1 = Math.max(-GAME_CONFIG.MAP_RADIUS, -q - GAME_CONFIG.MAP_RADIUS);
+        const r2 = Math.min(GAME_CONFIG.MAP_RADIUS, -q + GAME_CONFIG.MAP_RADIUS);
         for (let r = r1; r <= r2; r++) {
           const s = -q - r;
           let type = 'ocean';
@@ -463,11 +518,13 @@
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
           const bordersOcean = getAllNeighbors(hex).some(n => n.type === 'ocean');
-          if (bordersOcean && Math.random() < 0.03 && cities.length < 40) {
+          if (bordersOcean && Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
             const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
             if (!cityTooClose) {
               hex.hasCity = true;
               hex.inventory = {};
+
+              hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
               const numGoodsProduced = Math.floor(Math.random() * 4) + 2;
               const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
@@ -550,7 +607,7 @@
     ship.x = startPos.x; ship.y = startPos.y;
     camera.x = -ship.x; camera.y = -ship.y;
     let clickIndicator = null;
-
+    updateShipStatus();
 
     // ==========================================
     // --- Dynamic Window & Trading System ---
@@ -594,15 +651,42 @@
       }
     }
 
-    function updateTradeDistances() {
-      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+    // True Pathfinding Distance Helper
+    function getTrueDistance(cityHex) {
+      let targetTile = cityHex;
+      const oceanNeighbors = getOceanNeighbors(targetTile);
+
+      if (oceanNeighbors.length > 0) {
+        const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+        // If we are already sitting on the port's neighbor
+        if (oceanNeighbors.some(n => n.q === ship.q && n.r === ship.r)) return 0;
+
+        oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
+        targetTile = oceanNeighbors[0];
+      }
+
+      let startTile = map.get(getHexKey(ship.q, ship.r));
+      if (!startTile) return -1;
+
+      if (startTile.q === targetTile.q && startTile.r === targetTile.r) return 0;
+
+      const path = findPath(startTile, targetTile);
+      return path.length > 0 ? path.length : -1;
+    }
+
+    function updateTradeDistances(isMoving) {
       for (const key in openWindows) {
         const { city, element } = openWindows[key];
         const safeId = key.replace(',', '_');
-        const dist = hexDistance(shipHex, city);
         const titleEl = element.querySelector(`#title-${safeId}`);
         if (titleEl) {
-          titleEl.innerText = `Coastal Port (Distance: ${dist})`;
+          if (isMoving) {
+            titleEl.innerText = `Coastal Port (Sailing...)`;
+          } else {
+            const trueDist = getTrueDistance(city);
+            const distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
+            titleEl.innerText = `Coastal Port (${distText})`;
+          }
         }
       }
     }
@@ -612,7 +696,11 @@
       const safeId = cityKey.replace(',', '_');
 
       if (openWindows[cityKey]) {
-        openWindows[cityKey].element.style.zIndex = ++zIndexCounter;
+        const win = openWindows[cityKey].element;
+        win.style.zIndex = ++zIndexCounter;
+        win.classList.remove('pulse-anim');
+        void win.offsetWidth;
+        win.classList.add('pulse-anim');
         return;
       }
 
@@ -625,12 +713,15 @@
       win.style.left = (window.innerWidth / 2 - 270 + offset) + 'px';
       win.style.top = (window.innerHeight / 2 - 200 + offset) + 'px';
 
-      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
-      const dist = hexDistance(shipHex, cityHex);
+      let distText = "Sailing...";
+      if (!ship.moving) {
+        const trueDist = getTrueDistance(cityHex);
+        distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
+      }
 
       win.innerHTML = `
                 <div class="trade-header" id="header-${safeId}">
-                    <h2 id="title-${safeId}">Coastal Port (Distance: ${dist})</h2>
+                    <h2 id="title-${safeId}">Coastal Port (${distText})</h2>
                     <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
                 </div>
                 <button id="sailBtn-${safeId}" class="sail-btn" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
@@ -699,15 +790,14 @@
           const isProduced = city.producedGoods.includes(good.id);
           const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
 
-          // Check space and money for enabling buttons
           const spaceLeft = player.maxCargo - currentCargoSpace;
           const canBuy1 = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
-          // For Buy 10, we check if they have 10 space (button will click even if not enough gold for all 10, but will stop when gold runs out)
           const canBuy10 = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 10;
 
           const canSell1 = canTrade && playerStock >= 1;
-          const canSell10 = canTrade && playerStock >= 10;
+          const canSell10 = canTrade && playerStock >= 1;
 
+          const sell10Text = (playerStock > 0 && playerStock < 10) ? `Sell ${playerStock}` : 'Sell 10';
           const rowBg = cityStock < 10 ? 'background-color: rgba(231, 76, 60, 0.25);' : '';
           const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
 
@@ -726,7 +816,7 @@
                                     <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', 1)" ${!canBuy1 ? 'disabled' : ''}>Buy 1</button>
                                     <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', 10)" ${!canBuy10 ? 'disabled' : ''}>Buy 10</button>
                                     <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', 1)" ${!canSell1 ? 'disabled' : ''}>Sell 1</button>
-                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', 10)" ${!canSell10 ? 'disabled' : ''}>Sell 10</button>
+                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', 10)" ${!canSell10 ? 'disabled' : ''}>${sell10Text}</button>
                                 </div>
                             </td>
                         </tr>
@@ -781,6 +871,8 @@
       const actualQuantityToSell = Math.min(quantity, player.inventory[goodId].count);
 
       for (let i = 0; i < actualQuantityToSell; i++) {
+        if (player.inventory[goodId].count <= 0) break;
+
         const good = GOODS.find(g => g.id === goodId);
         const cityStock = city.inventory[goodId];
         const { sellPrice } = getPrices(good, cityStock);
@@ -822,6 +914,9 @@
           ship.path = calculatedPath;
           ship.moving = true;
           ship.targetTile = targetTile;
+
+          updateShipStatus();
+          updateTradeDistances(true);
           refreshAllTradeWindows();
         }
       }
@@ -933,6 +1028,8 @@
             ship.moving = true;
             ship.targetTile = targetTile;
 
+            updateShipStatus();
+            updateTradeDistances(true);
             refreshAllTradeWindows();
           }
         }
@@ -1011,11 +1108,13 @@
           ship.path.shift();
 
           simulateEconomy();
-          updateTradeDistances();
 
           if (ship.path.length === 0) {
             ship.moving = false;
             ship.targetTile = null;
+
+            updateShipStatus();
+            updateTradeDistances(false);
             refreshAllTradeWindows();
           }
         } else {
