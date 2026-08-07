@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - Global Qty & City Names</title>
+  <title>Hex Ocean Trader Prototype - Pinned Windows</title>
   <style>
     body {
       margin: 0;
@@ -92,6 +92,7 @@
       border: 2px solid #f1c40f;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
       min-width: 480px;
+      width: max-content;
     }
 
     @keyframes windowPulse {
@@ -654,8 +655,9 @@
       return { buyPrice, sellPrice };
     }
 
-    function makeDraggable(element, header, cityHex) {
-      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    // MODIFIED: makeDraggable now modifies the *world* position instead of CSS position
+    function makeDraggable(element, header, cityHex, cityKey) {
+      let pos3 = 0, pos4 = 0;
       header.onpointerdown = dragMouseDown;
 
       function dragMouseDown(e) {
@@ -671,17 +673,36 @@
 
       function elementDrag(e) {
         e.preventDefault();
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
+
+        // Calculate movement considering current zoom level
+        const dx = (e.clientX - pos3) / camera.zoom;
+        const dy = (e.clientY - pos4) / camera.zoom;
         pos3 = e.clientX;
         pos4 = e.clientY;
-        element.style.top = (element.offsetTop - pos2) + "px";
-        element.style.left = (element.offsetLeft - pos1) + "px";
+
+        // Update the window's "world" anchor position
+        if (openWindows[cityKey]) {
+          openWindows[cityKey].worldX += dx;
+          openWindows[cityKey].worldY += dy;
+        }
       }
 
       function closeDragElement() {
         document.onpointerup = null;
         document.onpointermove = null;
+      }
+    }
+
+    // NEW FUNCTION: Updates DOM positions based on map camera state
+    function updateWindowPositions() {
+      for (const key in openWindows) {
+        const winObj = openWindows[key];
+        // Convert the window's world coordinates to screen CSS coordinates
+        const screenX = (winObj.worldX + camera.x) * camera.zoom + canvas.width / 2;
+        const screenY = (winObj.worldY + camera.y) * camera.zoom + canvas.height / 2;
+
+        winObj.element.style.left = screenX + 'px';
+        winObj.element.style.top = screenY + 'px';
       }
     }
 
@@ -746,9 +767,15 @@
       win.id = 'window-' + safeId;
       win.style.zIndex = ++zIndexCounter;
 
-      const offset = Object.keys(openWindows).length * 30;
-      win.style.left = (window.innerWidth / 2 - 240 + offset) + 'px';
-      win.style.top = (window.innerHeight / 2 - 200 + offset) + 'px';
+      // MODIFIED: Grab initial position from city's map hex, slightly offset
+      const cityPos = hexToPixel(cityHex.q, cityHex.r);
+
+      openWindows[cityKey] = {
+        element: win,
+        city: cityHex,
+        worldX: cityPos.x + 30, // 30px offset so it doesn't perfectly hide the city
+        worldY: cityPos.y - 30
+      };
 
       let distText = "Sailing...";
       if (!ship.moving) {
@@ -789,9 +816,9 @@
             `;
 
       document.body.appendChild(win);
-      openWindows[cityKey] = { element: win, city: cityHex };
 
-      makeDraggable(win, win.querySelector(`#header-${safeId}`), cityHex);
+      // Update makeDraggable call to pass cityKey
+      makeDraggable(win, win.querySelector(`#header-${safeId}`), cityHex, cityKey);
       win.addEventListener('pointerdown', () => win.style.zIndex = ++zIndexCounter);
 
       refreshAllTradeWindows();
@@ -868,7 +895,7 @@
                             </td>
                             <td>
                                 <div class="btn-group">
-                                    <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
+                                    <button class="trade-btn" onclick="buyBuyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
                                     <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', ${mult})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
                                 </div>
                             </td>
@@ -878,6 +905,11 @@
         tbody.innerHTML = html;
       }
     }
+
+    // (Kept a slight rename on your existing bind variables just so it copies seamlessly)
+    window.buyBuyGood = function (goodId, cityKey, quantity) {
+      window.buyGood(goodId, cityKey, quantity);
+    };
 
     window.buyGood = function (goodId, cityKey, quantity) {
       const city = openWindows[cityKey].city;
@@ -1237,6 +1269,7 @@
       const safeDt = Math.min(dt, 0.1);
 
       update(safeDt);
+      updateWindowPositions(); // Added mapping function here!
       render();
       requestAnimationFrame(loop);
     }
