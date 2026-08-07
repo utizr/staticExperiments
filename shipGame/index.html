@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - True Distance</title>
+  <title>Hex Ocean Trader Prototype - Global Qty & City Names</title>
   <style>
     body {
       margin: 0;
@@ -39,19 +39,19 @@
       border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      width: 240px;
+      width: 260px;
       box-sizing: border-box;
     }
 
     .ui-panel h3 {
       margin: 0 0 10px 0;
-      font-size: 18px;
+      font-size: 20px;
       color: #f1c40f;
     }
 
     .ui-panel p {
       margin: 4px 0;
-      font-size: 14px;
+      font-size: 15px;
       color: #ddd;
     }
 
@@ -62,15 +62,15 @@
     .cargo-item {
       display: flex;
       justify-content: space-between;
-      font-size: 14px;
-      margin-bottom: 5px;
+      font-size: 16px;
+      margin-bottom: 6px;
     }
 
     .cargo-meter-bg {
       width: 100%;
-      height: 12px;
+      height: 14px;
       background: #333;
-      border-radius: 6px;
+      border-radius: 7px;
       margin-top: 15px;
       overflow: hidden;
     }
@@ -91,10 +91,9 @@
       border-radius: 10px;
       border: 2px solid #f1c40f;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
-      min-width: 540px;
+      min-width: 480px;
     }
 
-    /* Animation for highlighting an already open window */
     @keyframes windowPulse {
       0% {
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
@@ -132,6 +131,7 @@
 
     .trade-header h2 {
       margin: 0;
+      font-size: 20px;
       color: #f1c40f;
       pointer-events: none;
     }
@@ -141,7 +141,8 @@
       color: white;
       border: none;
       border-radius: 5px;
-      padding: 5px 10px;
+      padding: 6px 12px;
+      font-size: 16px;
       cursor: pointer;
       font-weight: bold;
     }
@@ -152,7 +153,7 @@
 
     .trade-warning {
       color: #e74c3c;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: bold;
       margin-bottom: 10px;
       text-align: center;
@@ -166,18 +167,18 @@
 
     th,
     td {
-      padding: 8px;
+      padding: 10px 8px;
       text-align: center;
       border-bottom: 1px solid #34495e;
     }
 
     th {
       color: #bdc3c7;
-      font-size: 14px;
+      font-size: 16px;
     }
 
     td {
-      font-size: 15px;
+      font-size: 17px;
     }
 
     .item-name {
@@ -187,7 +188,7 @@
 
     .btn-group {
       display: flex;
-      gap: 4px;
+      gap: 6px;
       justify-content: center;
     }
 
@@ -196,9 +197,11 @@
       color: white;
       border: none;
       border-radius: 4px;
-      padding: 4px 8px;
+      padding: 6px 14px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 15px;
+      font-weight: bold;
+      min-width: 70px;
     }
 
     .trade-btn.sell {
@@ -217,9 +220,7 @@
 
     .sail-btn {
       background: #3498db;
-      width: 100%;
       padding: 12px;
-      margin-bottom: 15px;
       font-size: 16px;
       font-weight: bold;
       cursor: pointer;
@@ -240,7 +241,7 @@
     }
 
     .avg-price {
-      font-size: 11px;
+      font-size: 12px;
       color: #aaa;
       display: block;
       margin-top: 2px;
@@ -267,7 +268,7 @@
       <div class="cargo-meter-bg">
         <div id="cargoMeterFill" class="cargo-meter-fill"></div>
       </div>
-      <p style="text-align:center; font-size:12px; margin-top:5px; color:#aaa;">
+      <p style="text-align:center; font-size:13px; margin-top:5px; color:#aaa;">
         <span id="cargoText">0 / 80</span> Space Used
       </p>
     </div>
@@ -301,6 +302,20 @@
       STARTING_GOLD: 1000,
       STARTING_CARGO: 80
     };
+
+    const CARIBBEAN_CITY_NAMES = [
+      "Port Royal", "Tortuga", "Havana", "Nassau", "Santiago",
+      "San Juan", "Cartagena", "Veracruz", "Santo Domingo", "Maracaibo",
+      "Bridgetown", "Kingston", "Willemstad", "Campeche", "Portobelo",
+      "Trinidad", "Port of Spain", "St. John's", "Basse-Terre", "Fort-de-France",
+      "Roseau", "Castries", "Kingstown", "St. George's", "Puerto Cabello",
+      "Santa Marta", "Cumana", "Coro", "Margarita", "Guadeloupe",
+      "Martinique", "Antigua", "Barbados", "Curacao", "St. Thomas",
+      "St. Croix", "St. Kitts", "Nevis", "Montserrat", "Anguilla",
+      "Grand Turk", "Bonaire", "Aruba", "Roatan", "San Andres"
+    ];
+
+    let globalTradeMultiplier = 1;
 
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -389,7 +404,7 @@
         }
       });
 
-      if (currentCargo === 0) html = '<div style="color:#aaa; font-size:13px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
+      if (currentCargo === 0) html = '<div style="color:#aaa; font-size:14px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
 
       cargoList.innerHTML = html;
       document.getElementById('cargoText').innerText = `${currentCargo} / ${player.maxCargo}`;
@@ -515,6 +530,8 @@
         }
       }
 
+      let availableNames = [...CARIBBEAN_CITY_NAMES];
+
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
           const bordersOcean = getAllNeighbors(hex).some(n => n.type === 'ocean');
@@ -523,6 +540,14 @@
             if (!cityTooClose) {
               hex.hasCity = true;
               hex.inventory = {};
+
+              // Assign City Name
+              if (availableNames.length > 0) {
+                const nameIndex = Math.floor(Math.random() * availableNames.length);
+                hex.name = availableNames.splice(nameIndex, 1)[0];
+              } else {
+                hex.name = "Unknown Port";
+              }
 
               hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
@@ -607,6 +632,13 @@
     ship.x = startPos.x; ship.y = startPos.y;
     camera.x = -ship.x; camera.y = -ship.y;
     let clickIndicator = null;
+
+    let cityRipples = [];
+
+    function addCityRipple(cityHex) {
+      cityRipples.push({ cityHex: cityHex, radius: HEX_SIZE, alpha: 1.0 });
+    }
+
     updateShipStatus();
 
     // ==========================================
@@ -622,7 +654,7 @@
       return { buyPrice, sellPrice };
     }
 
-    function makeDraggable(element, header) {
+    function makeDraggable(element, header, cityHex) {
       let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
       header.onpointerdown = dragMouseDown;
 
@@ -633,6 +665,8 @@
         pos4 = e.clientY;
         document.onpointerup = closeDragElement;
         document.onpointermove = elementDrag;
+
+        addCityRipple(cityHex);
       }
 
       function elementDrag(e) {
@@ -651,23 +685,19 @@
       }
     }
 
-    // True Pathfinding Distance Helper
     function getTrueDistance(cityHex) {
       let targetTile = cityHex;
       const oceanNeighbors = getOceanNeighbors(targetTile);
 
       if (oceanNeighbors.length > 0) {
         const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
-        // If we are already sitting on the port's neighbor
         if (oceanNeighbors.some(n => n.q === ship.q && n.r === ship.r)) return 0;
-
         oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
         targetTile = oceanNeighbors[0];
       }
 
       let startTile = map.get(getHexKey(ship.q, ship.r));
       if (!startTile) return -1;
-
       if (startTile.q === targetTile.q && startTile.r === targetTile.r) return 0;
 
       const path = findPath(startTile, targetTile);
@@ -681,15 +711,20 @@
         const titleEl = element.querySelector(`#title-${safeId}`);
         if (titleEl) {
           if (isMoving) {
-            titleEl.innerText = `Coastal Port (Sailing...)`;
+            titleEl.innerText = `${city.name} (Sailing...)`;
           } else {
             const trueDist = getTrueDistance(city);
             const distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
-            titleEl.innerText = `Coastal Port (${distText})`;
+            titleEl.innerText = `${city.name} (${distText})`;
           }
         }
       }
     }
+
+    window.setTradeMultiplier = function (val) {
+      globalTradeMultiplier = val;
+      refreshAllTradeWindows();
+    };
 
     function openTradeWindow(cityHex) {
       const cityKey = getHexKey(cityHex.q, cityHex.r);
@@ -701,6 +736,8 @@
         win.classList.remove('pulse-anim');
         void win.offsetWidth;
         win.classList.add('pulse-anim');
+
+        addCityRipple(cityHex);
         return;
       }
 
@@ -710,7 +747,7 @@
       win.style.zIndex = ++zIndexCounter;
 
       const offset = Object.keys(openWindows).length * 30;
-      win.style.left = (window.innerWidth / 2 - 270 + offset) + 'px';
+      win.style.left = (window.innerWidth / 2 - 240 + offset) + 'px';
       win.style.top = (window.innerHeight / 2 - 200 + offset) + 'px';
 
       let distText = "Sailing...";
@@ -721,10 +758,20 @@
 
       win.innerHTML = `
                 <div class="trade-header" id="header-${safeId}">
-                    <h2 id="title-${safeId}">Coastal Port (${distText})</h2>
+                    <h2 id="title-${safeId}">${cityHex.name} (${distText})</h2>
                     <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
                 </div>
-                <button id="sailBtn-${safeId}" class="sail-btn" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:10px;">
+                    <button id="sailBtn-${safeId}" class="sail-btn" style="margin-bottom:0; flex-grow:1;" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
+                    
+                    <div style="background: #34495e; padding: 4px; border-radius: 5px; display:flex; gap:4px; align-items:center;">
+                        <span style="font-size:14px; color:#bdc3c7; padding:0 6px;">Qty:</span>
+                        <button id="btn-qty1-${safeId}" style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:#f39c12;" onclick="setTradeMultiplier(1)">x1</button>
+                        <button id="btn-qty10-${safeId}" style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:#7f8c8d;" onclick="setTradeMultiplier(10)">x10</button>
+                    </div>
+                </div>
+
                 <p id="warning-${safeId}" class="trade-warning">You must dock your ship at this city to trade!</p>
                 <table>
                     <thead>
@@ -744,7 +791,7 @@
       document.body.appendChild(win);
       openWindows[cityKey] = { element: win, city: cityHex };
 
-      makeDraggable(win, win.querySelector(`#header-${safeId}`));
+      makeDraggable(win, win.querySelector(`#header-${safeId}`), cityHex);
       win.addEventListener('pointerdown', () => win.style.zIndex = ++zIndexCounter);
 
       refreshAllTradeWindows();
@@ -764,6 +811,7 @@
       for (const key in openWindows) {
         const { city, element } = openWindows[key];
         const safeId = key.replace(',', '_');
+        const mult = globalTradeMultiplier;
 
         const dist = hexDistance(shipHex, city);
         const canTrade = (dist <= 1 && !ship.moving);
@@ -771,6 +819,13 @@
         const warningEl = element.querySelector(`#warning-${safeId}`);
         const sailBtn = element.querySelector(`#sailBtn-${safeId}`);
         const tbody = element.querySelector(`#tbody-${safeId}`);
+
+        const btn1 = element.querySelector(`#btn-qty1-${safeId}`);
+        const btn10 = element.querySelector(`#btn-qty10-${safeId}`);
+        if (btn1 && btn10) {
+          btn1.style.background = mult === 1 ? '#f39c12' : '#7f8c8d';
+          btn10.style.background = mult === 10 ? '#f39c12' : '#7f8c8d';
+        }
 
         if (canTrade) {
           warningEl.style.display = 'none';
@@ -791,13 +846,13 @@
           const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
 
           const spaceLeft = player.maxCargo - currentCargoSpace;
-          const canBuy1 = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
-          const canBuy10 = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 10;
 
-          const canSell1 = canTrade && playerStock >= 1;
-          const canSell10 = canTrade && playerStock >= 1;
+          const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
+          const canSell = canTrade && playerStock >= 1;
 
-          const sell10Text = (playerStock > 0 && playerStock < 10) ? `Sell ${playerStock}` : 'Sell 10';
+          const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
+          const buyText = `Buy ${mult}`;
+
           const rowBg = cityStock < 10 ? 'background-color: rgba(231, 76, 60, 0.25);' : '';
           const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
 
@@ -813,10 +868,8 @@
                             </td>
                             <td>
                                 <div class="btn-group">
-                                    <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', 1)" ${!canBuy1 ? 'disabled' : ''}>Buy 1</button>
-                                    <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', 10)" ${!canBuy10 ? 'disabled' : ''}>Buy 10</button>
-                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', 1)" ${!canSell1 ? 'disabled' : ''}>Sell 1</button>
-                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', 10)" ${!canSell10 ? 'disabled' : ''}>${sell10Text}</button>
+                                    <button class="trade-btn" onclick="buyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
+                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', ${mult})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
                                 </div>
                             </td>
                         </tr>
@@ -1037,6 +1090,21 @@
     }
 
     // --- Rendering Components ---
+    function drawCityRipples() {
+      for (let i = cityRipples.length - 1; i >= 0; i--) {
+        let r = cityRipples[i];
+        const pos = hexToPixel(r.cityHex.q, r.cityHex.r);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, r.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(241, 196, 15, ${r.alpha})`;
+        ctx.lineWidth = 6 / camera.zoom;
+        ctx.stroke();
+        r.radius += 3 / camera.zoom;
+        r.alpha -= 0.03;
+        if (r.alpha <= 0) cityRipples.splice(i, 1);
+      }
+    }
+
     function drawShip() {
       ctx.save();
       ctx.translate(ship.x, ship.y);
@@ -1155,6 +1223,7 @@
 
       drawPath();
       drawClickIndicator();
+      drawCityRipples();
       drawShip();
 
       ctx.restore();
