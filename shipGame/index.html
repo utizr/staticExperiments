@@ -19,10 +19,114 @@
       display: block;
     }
 
+    /* --- TOP TASKBAR & MENU --- */
+    #top-taskbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 44px;
+      background: rgba(44, 62, 80, 0.95);
+      border-bottom: 2px solid #f1c40f;
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      padding: 0 15px;
+      box-sizing: border-box;
+      color: white;
+      font-family: sans-serif;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+
+    #hamburger-btn {
+      background: none;
+      border: none;
+      color: #ecf0f1;
+      font-size: 24px;
+      cursor: pointer;
+      padding: 0 15px 0 0;
+    }
+
+    #hamburger-btn:hover {
+      color: #f1c40f;
+    }
+
+    #play-pause-btn {
+      background: #27ae60;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-right: 15px;
+      min-width: 90px;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    #play-pause-btn:disabled {
+      background: #7f8c8d !important;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    #play-pause-btn:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    .taskbar-gold {
+      font-size: 18px;
+      font-weight: bold;
+      margin-left: 10px;
+      border-left: 1px solid #7f8c8d;
+      padding-left: 15px;
+    }
+
+    #dropdown-menu {
+      display: none;
+      position: absolute;
+      top: 44px;
+      left: 0;
+      background: #34495e;
+      border: 1px solid #7f8c8d;
+      border-top: none;
+      border-radius: 0 0 5px 0;
+      flex-direction: column;
+      width: 250px;
+      box-shadow: 2px 5px 15px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+
+    .menu-item {
+      padding: 12px 15px;
+      cursor: pointer;
+      font-size: 16px;
+      border-bottom: 1px solid #2c3e50;
+      transition: background 0.2s;
+    }
+
+    .menu-item:hover {
+      background: #2c3e50;
+    }
+
+    #info-content {
+      display: none;
+      padding: 10px 15px;
+      font-size: 14px;
+      background: #2c3e50;
+      line-height: 1.5;
+      border-bottom: 1px solid #1a252f;
+    }
+
+    #info-content p {
+      margin: 5px 0;
+    }
+
     /* UI Container */
     #ui-container {
       position: absolute;
-      top: 15px;
+      top: 60px;
       left: 15px;
       z-index: 10;
       pointer-events: none;
@@ -93,23 +197,17 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
       min-width: 480px;
       width: max-content;
+      transition: min-width 0.2s;
+    }
+    
+    .tradeWindow.compact-window {
+      min-width: 280px;
     }
 
     @keyframes windowPulse {
-      0% {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
-        border-color: #f1c40f;
-      }
-
-      50% {
-        box-shadow: 0 0 40px 15px rgba(241, 196, 15, 1);
-        border-color: #fff;
-      }
-
-      100% {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
-        border-color: #f1c40f;
-      }
+      0% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7); border-color: #f1c40f; }
+      50% { box-shadow: 0 0 40px 15px rgba(241, 196, 15, 1); border-color: #fff; }
+      100% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7); border-color: #f1c40f; }
     }
 
     .pulse-anim {
@@ -122,7 +220,6 @@
       align-items: center;
       border-bottom: 1px solid #7f8c8d;
       padding-bottom: 10px;
-      margin-bottom: 15px;
       cursor: grab;
     }
 
@@ -146,6 +243,7 @@
       font-size: 16px;
       cursor: pointer;
       font-weight: bold;
+      margin-left: 15px;
     }
 
     .close-btn:hover {
@@ -166,8 +264,7 @@
       border-collapse: collapse;
     }
 
-    th,
-    td {
+    th, td {
       padding: 3px 2px;
       text-align: center;
       border-bottom: 1px solid #34495e;
@@ -233,6 +330,13 @@
     .sail-btn:hover {
       filter: brightness(1.1);
     }
+    
+    .sail-btn.compact-sail {
+      width: 100%;
+      padding: 6px;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
 
     .prod-arrow {
       color: #2ecc71;
@@ -253,18 +357,29 @@
 
 <body>
 
-  <div id="ui-container">
-    <div id="ui" class="ui-panel">
-      <h3>Ocean Trader</h3>
-      <p>🗺️ <b>Drag</b> to pan | 🔍 <b>Scroll</b> to zoom</p>
-      <p>⚓ <b>Click</b> an ocean tile to sail.</p>
-      <p>🏙️ <b>Click</b> a city to view the market.</p>
-      <hr style="border-color: #444; margin: 10px 0;">
-      <p>💰 Gold: <b id="uiGold" style="color:#f1c40f;">1000</b></p>
+  <!-- TOP TASKBAR -->
+  <div id="top-taskbar">
+    <button id="hamburger-btn" onclick="toggleMenu()">☰</button>
+    <button id="play-pause-btn" onclick="togglePlayPause()" disabled>▶ Play</button>
+    <div class="taskbar-gold">💰 Gold: <b id="uiGold" style="color:#f1c40f;">1000</b></div>
+    
+    <div id="dropdown-menu">
+      <div class="menu-item" onclick="toggleInfo()">ℹ️ Info</div>
+      <div id="info-content">
+        <p>🗺️ <b>Drag</b> to pan | 🔍 <b>Scroll</b> to zoom</p>
+        <p>⚓ <b>Click</b> an ocean tile to set a route.</p>
+        <p>▶ <b>Play</b> (or Spacebar) to start moving.</p>
+        <p>🏙️ <b>Click</b> a city to view the market.</p>
+        <p>🖱️ <b>Double-Click</b> city header to toggle compact view.</p>
+      </div>
+      <div class="menu-item" id="compact-btn" onclick="toggleCompactView()">🔍 Compact view</div>
+      <div class="menu-item" id="hide-windows-btn" onclick="toggleHideWindows()">👁️ Hide all Windows</div>
     </div>
+  </div>
 
+  <div id="ui-container">
     <div id="cargoUi" class="ui-panel">
-      <h3 id="cargoUiTitle">⚓ Ship Cargo</h3>
+      <h3 id="cargoUiTitle">⚓ Docked</h3>
       <div id="cargoList"></div>
       <div class="cargo-meter-bg">
         <div id="cargoMeterFill" class="cargo-meter-fill"></div>
@@ -279,16 +394,82 @@
 
   <script>
     // ==========================================
+    // --- UI MENU & PLAY/PAUSE LOGIC ---
+    // ==========================================
+    let isMenuOpen = false;
+    let isCompactView = false;
+    let areWindowsHidden = false;
+    let isPlaying = false;
+
+    function toggleMenu() {
+      isMenuOpen = !isMenuOpen;
+      document.getElementById('dropdown-menu').style.display = isMenuOpen ? 'flex' : 'none';
+    }
+
+    function toggleInfo() {
+      const content = document.getElementById('info-content');
+      content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+    }
+
+    function toggleCompactView() {
+      isCompactView = !isCompactView;
+      document.getElementById('compact-btn').innerText = isCompactView ? "🔍 Normal view" : "🔍 Compact view";
+      refreshAllTradeWindows();
+      if(isMenuOpen) toggleMenu();
+    }
+
+    function toggleHideWindows() {
+      areWindowsHidden = !areWindowsHidden;
+      document.getElementById('hide-windows-btn').innerText = areWindowsHidden ? "👁️ Show all Windows" : "👁️ Hide all Windows";
+      
+      for (const key in openWindows) {
+        openWindows[key].element.style.display = areWindowsHidden ? 'none' : 'block';
+      }
+      if(isMenuOpen) toggleMenu();
+    }
+
+    function togglePlayPause() {
+      if (ship.path.length === 0) return; // Cannot play without a route
+      isPlaying = !isPlaying;
+      updatePlayPauseUI();
+      updateShipStatus();
+      updateTradeDistances(true);
+    }
+
+    function updatePlayPauseUI() {
+      const btn = document.getElementById('play-pause-btn');
+      if (ship.path.length === 0) {
+        btn.disabled = true;
+        btn.innerText = "▶ Play";
+        btn.style.background = "#7f8c8d";
+        isPlaying = false;
+      } else {
+        btn.disabled = false;
+        if (isPlaying) {
+          btn.innerText = "⏸ Pause";
+          btn.style.background = "#e67e22";
+        } else {
+          btn.innerText = "▶ Play";
+          btn.style.background = "#27ae60";
+        }
+      }
+    }
+
+    // ==========================================
     // --- GAME CONFIGURATION ---
     // ==========================================
     const GAME_CONFIG = {
-      MAP_RADIUS: 36,
-      ISLAND_COUNT: 30,
-      CITY_SPAWN_CHANCE: 0.05,
+      MAP_RADIUS: 31,
+      ISLAND_COUNT: 36,
+      CITY_SPAWN_CHANCE: 0.03,
       MAX_CITIES: 40,
 
-      AI_TRADE_MIN_TURNS: 10,
-      AI_TRADE_MAX_TURNS: 22,
+      // Product distribution ranges
+      MIN_PRODUCED_GOODS: 2,
+      MAX_PRODUCED_GOODS: 4,
+
+      AI_TRADE_MIN_TURNS: 18,
+      AI_TRADE_MAX_TURNS: 31,
 
       AI_BUY_HIGH_STOCK: 100,
       AI_BUY_MED_STOCK: 40,
@@ -296,7 +477,7 @@
       AI_SELL_MED_STOCK: 50,
 
       AI_TRADE_AMT_HIGH_MIN: 6,
-      AI_TRADE_AMT_HIGH_MAX: 18,
+      AI_TRADE_AMT_HIGH_MAX: 12,
       AI_TRADE_AMT_LOW_MIN: 3,
       AI_TRADE_AMT_LOW_MAX: 7,
 
@@ -421,7 +602,13 @@
 
     function updateShipStatus() {
       const title = document.getElementById('cargoUiTitle');
-      if (title) title.innerText = ship.moving ? '🧭 Sailing...' : '⚓ Docked';
+      if (title) {
+        if (ship.moving) {
+          title.innerText = isPlaying ? '🧭 Sailing...' : '🧭 Route Planned';
+        } else {
+          title.innerText = '⚓ Docked';
+        }
+      }
     }
     updateCargoUI();
 
@@ -542,7 +729,6 @@
               hex.hasCity = true;
               hex.inventory = {};
 
-              // Assign City Name
               if (availableNames.length > 0) {
                 const nameIndex = Math.floor(Math.random() * availableNames.length);
                 hex.name = availableNames.splice(nameIndex, 1)[0];
@@ -552,7 +738,11 @@
 
               hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
-              const numGoodsProduced = Math.floor(Math.random() * 4) + 2;
+              // Use dynamic config bounds for produced goods quantity
+              const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
+              const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
+              const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
+              
               const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
               hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
 
@@ -563,6 +753,23 @@
             }
           }
         }
+      }
+
+      // Ensure every good is produced in at least one city
+      if (cities.length > 0) {
+        GOODS.forEach(good => {
+          const isProduced = cities.some(city => city.producedGoods.includes(good.id));
+          if (!isProduced) {
+            // Find eligible cities (preferably ones not yet at MAX_PRODUCED_GOODS)
+            let eligibleCities = cities.filter(c => c.producedGoods.length < GAME_CONFIG.MAX_PRODUCED_GOODS);
+            if (eligibleCities.length === 0) eligibleCities = cities; // Fallback if all are full
+            
+            const randomCity = eligibleCities[Math.floor(Math.random() * eligibleCities.length)];
+            if (!randomCity.producedGoods.includes(good.id)) {
+              randomCity.producedGoods.push(good.id);
+            }
+          }
+        });
       }
     }
     generateMap();
@@ -655,32 +862,39 @@
       return { buyPrice, sellPrice };
     }
 
-    // MODIFIED: makeDraggable now modifies the *world* position instead of CSS position
     function makeDraggable(element, header, cityHex, cityKey) {
       let pos3 = 0, pos4 = 0;
+      let lastClickTime = 0;
       header.onpointerdown = dragMouseDown;
 
       function dragMouseDown(e) {
         e.preventDefault();
+
+        // --- Double Click Detection ---
+        const currentTime = new Date().getTime();
+        if (currentTime - lastClickTime < 300) {
+          toggleCompactView();
+          lastClickTime = 0;
+          return; // Stop drag initiation on double click
+        }
+        lastClickTime = currentTime;
+        // ------------------------------
+
         element.style.zIndex = ++zIndexCounter;
         pos3 = e.clientX;
         pos4 = e.clientY;
         document.onpointerup = closeDragElement;
         document.onpointermove = elementDrag;
-
         addCityRipple(cityHex);
       }
 
       function elementDrag(e) {
         e.preventDefault();
-
-        // Calculate movement considering current zoom level
         const dx = (e.clientX - pos3) / camera.zoom;
         const dy = (e.clientY - pos4) / camera.zoom;
         pos3 = e.clientX;
         pos4 = e.clientY;
-
-        // Update the window's "world" anchor position
+        
         if (openWindows[cityKey]) {
           openWindows[cityKey].worldX += dx;
           openWindows[cityKey].worldY += dy;
@@ -693,14 +907,11 @@
       }
     }
 
-    // NEW FUNCTION: Updates DOM positions based on map camera state
     function updateWindowPositions() {
       for (const key in openWindows) {
         const winObj = openWindows[key];
-        // Convert the window's world coordinates to screen CSS coordinates
         const screenX = (winObj.worldX + camera.x) * camera.zoom + canvas.width / 2;
         const screenY = (winObj.worldY + camera.y) * camera.zoom + canvas.height / 2;
-
         winObj.element.style.left = screenX + 'px';
         winObj.element.style.top = screenY + 'px';
       }
@@ -732,7 +943,7 @@
         const titleEl = element.querySelector(`#title-${safeId}`);
         if (titleEl) {
           if (isMoving) {
-            titleEl.innerText = `${city.name} (Sailing...)`;
+            titleEl.innerText = `${city.name} (${isPlaying ? 'Sailing...' : 'Route Planned'})`;
           } else {
             const trueDist = getTrueDistance(city);
             const distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
@@ -748,6 +959,8 @@
     };
 
     function openTradeWindow(cityHex) {
+      if (areWindowsHidden) toggleHideWindows();
+
       const cityKey = getHexKey(cityHex.q, cityHex.r);
       const safeId = cityKey.replace(',', '_');
 
@@ -757,7 +970,6 @@
         win.classList.remove('pulse-anim');
         void win.offsetWidth;
         win.classList.add('pulse-anim');
-
         addCityRipple(cityHex);
         return;
       }
@@ -767,13 +979,11 @@
       win.id = 'window-' + safeId;
       win.style.zIndex = ++zIndexCounter;
 
-      // MODIFIED: Grab initial position from city's map hex, slightly offset
       const cityPos = hexToPixel(cityHex.q, cityHex.r);
-
       openWindows[cityKey] = {
         element: win,
         city: cityHex,
-        worldX: cityPos.x + 30, // 30px offset so it doesn't perfectly hide the city
+        worldX: cityPos.x + 30,
         worldY: cityPos.y - 30
       };
 
@@ -781,43 +991,19 @@
       if (!ship.moving) {
         const trueDist = getTrueDistance(cityHex);
         distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
+      } else if (!isPlaying) {
+        distText = "Route Planned";
       }
 
       win.innerHTML = `
-                <div class="trade-header" id="header-${safeId}">
-                    <h2 id="title-${safeId}">${cityHex.name} (${distText})</h2>
-                    <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
-                </div>
-                
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; gap:10px;">
-                    <button id="sailBtn-${safeId}" class="sail-btn" style="margin-bottom:0; flex-grow:1;" onclick="sailToCity('${cityKey}')">⚓ Set Sail for this City</button>
-                    
-                    <div style="background: #34495e; padding: 4px; border-radius: 5px; display:flex; gap:4px; align-items:center;">
-                        <span style="font-size:14px; color:#bdc3c7; padding:0 6px;">Qty:</span>
-                        <button id="btn-qty1-${safeId}" style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:#f39c12;" onclick="setTradeMultiplier(1)">x1</button>
-                        <button id="btn-qty10-${safeId}" style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:#7f8c8d;" onclick="setTradeMultiplier(10)">x10</button>
-                    </div>
-                </div>
-
-                <p id="warning-${safeId}" class="trade-warning">You must dock your ship at this city to trade!</p>
-                <table>
-                    <thead>
-                        <tr>
-                            <th style="text-align:left;">Good</th>
-                            <th>Stock</th>
-                            <th>Buy</th>
-                            <th>Sell</th>
-                            <th>Cargo</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-${safeId}"></tbody>
-                </table>
-            `;
+        <div class="trade-header" id="header-${safeId}">
+            <h2 id="title-${safeId}">${cityHex.name} (${distText})</h2>
+            <button class="close-btn" onclick="closeTradeWindow('${cityKey}')">X</button>
+        </div>
+        <div id="content-${safeId}"></div>
+      `;
 
       document.body.appendChild(win);
-
-      // Update makeDraggable call to pass cityKey
       makeDraggable(win, win.querySelector(`#header-${safeId}`), cityHex, cityKey);
       win.addEventListener('pointerdown', () => win.style.zIndex = ++zIndexCounter);
 
@@ -843,70 +1029,141 @@
         const dist = hexDistance(shipHex, city);
         const canTrade = (dist <= 1 && !ship.moving);
 
-        const warningEl = element.querySelector(`#warning-${safeId}`);
-        const sailBtn = element.querySelector(`#sailBtn-${safeId}`);
-        const tbody = element.querySelector(`#tbody-${safeId}`);
+        const contentContainer = element.querySelector(`#content-${safeId}`);
+        
+        if (isCompactView) {
+            element.classList.add('compact-window');
+            
+            let compactHtml = '';
+            
+            // --- Compact Sail Button ---
+            if (!canTrade) {
+              compactHtml += `<button class="sail-btn compact-sail" onclick="sailToCity('${key}')">⚓ Sail Here</button>`;
+            }
 
-        const btn1 = element.querySelector(`#btn-qty1-${safeId}`);
-        const btn10 = element.querySelector(`#btn-qty10-${safeId}`);
-        if (btn1 && btn10) {
-          btn1.style.background = mult === 1 ? '#f39c12' : '#7f8c8d';
-          btn10.style.background = mult === 10 ? '#f39c12' : '#7f8c8d';
-        }
+            // --- First Row: City Highlights (Produced or Red Stock) ---
+            compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:10px 5px 5px; font-size:18px; font-weight:bold; flex-wrap:wrap;">`;
+            let hasHighlights = false;
+            
+            GOODS.forEach(good => {
+                const isProduced = city.producedGoods.includes(good.id);
+                const cityStock = city.inventory[good.id];
+                const isRed = cityStock < 10;
+                
+                if (isProduced || isRed) {
+                    hasHighlights = true;
+                    // Changed to 3 letters
+                    const shortName = good.name.substring(0, 3);
+                    let colorStyle = 'color: #ecf0f1;';
+                    if (isRed) colorStyle = 'color: #e74c3c;';
+                    else if (isProduced) colorStyle = 'color: #2ecc71;';
+                    
+                    const arrow = isProduced ? '⬆ ' : '';
+                    compactHtml += `<span style="${colorStyle}">${arrow}${shortName}</span>`;
+                }
+            });
+            
+            if (!hasHighlights) compactHtml += `<span style="color: #7f8c8d; font-size: 14px; font-weight: normal;">No Highlights</span>`;
+            compactHtml += `</div>`;
+            
+            // --- Second Row: Player Cargo ---
+            compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:5px 5px 10px; font-size:16px; font-weight:bold; border-top: 1px solid #34495e; margin-top: 5px; flex-wrap:wrap;">`;
+            let hasCargo = false;
+            
+            GOODS.forEach(good => {
+                if (player.inventory[good.id].count > 0) {
+                    hasCargo = true;
+                    const cityStock = city.inventory[good.id];
+                    const isProduced = city.producedGoods.includes(good.id);
+                    const isRed = cityStock < 10;
+                    const { sellPrice } = getPrices(good, cityStock);
+                    
+                    // Changed to 3 letters
+                    const shortName = good.name.substring(0, 3);
+                    
+                    let colorStyle = 'color: #ecf0f1;';
+                    if (isRed) colorStyle = 'color: #e74c3c;';
+                    else if (isProduced) colorStyle = 'color: #2ecc71;';
+                    
+                    const arrow = isProduced ? '⬆ ' : '';
+                    compactHtml += `<span style="${colorStyle}">${arrow}${shortName} ${sellPrice}g</span>`;
+                }
+            });
+            
+            if (!hasCargo) {
+                compactHtml += `<span style="color: #7f8c8d; font-size: 14px; font-weight: normal;">No cargo to sell</span>`;
+            }
+            compactHtml += `</div>`;
+            
+            contentContainer.innerHTML = compactHtml;
 
-        if (canTrade) {
-          warningEl.style.display = 'none';
-          sailBtn.style.display = 'none';
         } else {
-          warningEl.style.display = 'block';
-          sailBtn.style.display = 'block';
+            element.classList.remove('compact-window');
+            let fullHtml = `
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; margin-bottom:15px; gap:10px;">
+                  <button id="sailBtn-${safeId}" class="sail-btn" style="margin-bottom:0; flex-grow:1; display:${canTrade ? 'none' : 'block'};" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
+                  <div style="background: #34495e; padding: 4px; border-radius: 5px; display:flex; gap:4px; align-items:center;">
+                      <span style="font-size:14px; color:#bdc3c7; padding:0 6px;">Qty:</span>
+                      <button style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:${mult === 1 ? '#f39c12' : '#7f8c8d'};" onclick="setTradeMultiplier(1)">x1</button>
+                      <button style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:${mult === 10 ? '#f39c12' : '#7f8c8d'};" onclick="setTradeMultiplier(10)">x10</button>
+                  </div>
+              </div>
+              <p class="trade-warning" style="display:${canTrade ? 'none' : 'block'}">You must dock your ship at this city to trade!</p>
+              <table>
+                  <thead>
+                      <tr>
+                          <th style="text-align:left;">Good</th>
+                          <th>Stock</th>
+                          <th>Buy</th>
+                          <th>Sell</th>
+                          <th>Cargo</th>
+                          <th>Action</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+            `;
+
+            GOODS.forEach(good => {
+              const cityStock = city.inventory[good.id];
+              const playerStock = player.inventory[good.id].count;
+              const playerAvgPrice = player.inventory[good.id].avgPrice;
+              const { buyPrice, sellPrice } = getPrices(good, cityStock);
+              const isProduced = city.producedGoods.includes(good.id);
+              const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
+              const spaceLeft = player.maxCargo - currentCargoSpace;
+
+              const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
+              const canSell = canTrade && playerStock >= 1;
+              const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
+              const buyText = `Buy ${mult}`;
+              const rowBg = cityStock < 10 ? 'background-color: rgba(231, 76, 60, 0.25);' : '';
+              const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
+
+              fullHtml += `
+                  <tr style="${rowBg}">
+                      <td class="item-name">${prodMarker} ${good.name}</td>
+                      <td>${cityStock}</td>
+                      <td>${buyPrice}g</td>
+                      <td>${sellPrice}g</td>
+                      <td style="color:#f39c12; font-weight:bold; line-height: 1.2;">
+                          ${playerStock}
+                          ${avgPriceHtml}
+                      </td>
+                      <td>
+                          <div class="btn-group">
+                              <button class="trade-btn" onclick="buyBuyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
+                              <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', ${mult})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
+                          </div>
+                      </td>
+                  </tr>
+              `;
+            });
+            fullHtml += `</tbody></table>`;
+            contentContainer.innerHTML = fullHtml;
         }
-
-        let html = '';
-        GOODS.forEach(good => {
-          const cityStock = city.inventory[good.id];
-          const playerStock = player.inventory[good.id].count;
-          const playerAvgPrice = player.inventory[good.id].avgPrice;
-          const { buyPrice, sellPrice } = getPrices(good, cityStock);
-
-          const isProduced = city.producedGoods.includes(good.id);
-          const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
-
-          const spaceLeft = player.maxCargo - currentCargoSpace;
-
-          const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
-          const canSell = canTrade && playerStock >= 1;
-
-          const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
-          const buyText = `Buy ${mult}`;
-
-          const rowBg = cityStock < 10 ? 'background-color: rgba(231, 76, 60, 0.25);' : '';
-          const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
-
-          html += `
-                        <tr style="${rowBg}">
-                            <td class="item-name">${prodMarker} ${good.name}</td>
-                            <td>${cityStock}</td>
-                            <td>${buyPrice}g</td>
-                            <td>${sellPrice}g</td>
-                            <td style="color:#f39c12; font-weight:bold; line-height: 1.2;">
-                                ${playerStock}
-                                ${avgPriceHtml}
-                            </td>
-                            <td>
-                                <div class="btn-group">
-                                    <button class="trade-btn" onclick="buyBuyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
-                                    <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', ${mult})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-        });
-        tbody.innerHTML = html;
       }
     }
 
-    // (Kept a slight rename on your existing bind variables just so it copies seamlessly)
     window.buyBuyGood = function (goodId, cityKey, quantity) {
       window.buyGood(goodId, cityKey, quantity);
     };
@@ -997,9 +1254,10 @@
         const calculatedPath = findPath(startTile, targetTile);
         if (calculatedPath.length > 0) {
           ship.path = calculatedPath;
-          ship.moving = true;
+          ship.moving = true; // In travel state (trades disabled)
           ship.targetTile = targetTile;
 
+          updatePlayPauseUI();
           updateShipStatus();
           updateTradeDistances(true);
           refreshAllTradeWindows();
@@ -1058,7 +1316,16 @@
     }
 
     // --- Input Handling ---
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        togglePlayPause();
+      }
+    });
+
     canvas.addEventListener('pointerdown', (e) => {
+      if (isMenuOpen) toggleMenu();
+
       isDragging = true;
       hasDragged = false;
       dragStart.x = e.clientX;
@@ -1110,9 +1377,10 @@
           const calculatedPath = findPath(startTile, targetTile);
           if (calculatedPath.length > 0) {
             ship.path = calculatedPath;
-            ship.moving = true;
+            ship.moving = true; // In travel state (trades disabled)
             ship.targetTile = targetTile;
 
+            updatePlayPauseUI();
             updateShipStatus();
             updateTradeDistances(true);
             refreshAllTradeWindows();
@@ -1192,7 +1460,7 @@
 
     // --- Game Loop ---
     function update(dt) {
-      if (ship.moving && ship.path.length > 0) {
+      if (isPlaying && ship.moving && ship.path.length > 0) {
         const targetNode = ship.path[0];
         const targetPos = hexToPixel(targetNode.q, targetNode.r);
         const dx = targetPos.x - ship.x;
@@ -1212,7 +1480,9 @@
           if (ship.path.length === 0) {
             ship.moving = false;
             ship.targetTile = null;
+            isPlaying = false; // Auto pause upon arrival
 
+            updatePlayPauseUI();
             updateShipStatus();
             updateTradeDistances(false);
             refreshAllTradeWindows();
@@ -1269,7 +1539,7 @@
       const safeDt = Math.min(dt, 0.1);
 
       update(safeDt);
-      updateWindowPositions(); // Added mapping function here!
+      updateWindowPositions(); 
       render();
       requestAnimationFrame(loop);
     }
