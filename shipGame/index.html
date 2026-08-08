@@ -133,6 +133,21 @@
       display: flex;
       flex-direction: column;
       gap: 15px;
+      height: calc(100vh - 80px);
+      overflow-y: auto;
+      padding-right: 10px; /* Scrollbar spacing */
+    }
+    
+    /* Scrollbar styling for container */
+    #ui-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    #ui-container::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.2); 
+    }
+    #ui-container::-webkit-scrollbar-thumb {
+      background: #7f8c8d; 
+      border-radius: 3px;
     }
 
     .ui-panel {
@@ -145,6 +160,13 @@
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
       width: 260px;
       box-sizing: border-box;
+      pointer-events: auto; /* Allows clicking on panels */
+      transition: border-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .ui-panel:hover {
+      border-color: #bdc3c7 !important;
     }
 
     .ui-panel h3 {
@@ -157,10 +179,6 @@
       margin: 4px 0;
       font-size: 15px;
       color: #ddd;
-    }
-
-    #cargoUiTitle {
-      color: #3498db;
     }
 
     .cargo-item {
@@ -376,20 +394,12 @@
       <div class="menu-item" id="compact-btn" onclick="toggleCompactView()">🔍 Compact view</div>
       <div class="menu-item" id="hide-windows-btn" onclick="toggleHideWindows()">👁️ Hide all Windows</div>
       <div class="menu-item" onclick="openAllCityWindows()">🏙️ Open all City windows</div>
+      <div class="menu-item" onclick="spawnNewShip()">🚢 Create a new ship</div>
     </div>
   </div>
 
   <div id="ui-container">
-    <div id="cargoUi" class="ui-panel">
-      <h3 id="cargoUiTitle">⚓ Docked</h3>
-      <div id="cargoList"></div>
-      <div class="cargo-meter-bg">
-        <div id="cargoMeterFill" class="cargo-meter-fill"></div>
-      </div>
-      <p style="text-align:center; font-size:13px; margin-top:5px; color:#aaa;">
-        <span id="cargoText">0 / 80</span> Space Used
-      </p>
-    </div>
+     <!-- Dynamic Ship Panels will be injected here -->
   </div>
 
   <canvas id="gameCanvas"></canvas>
@@ -431,24 +441,25 @@
     }
 
     function openAllCityWindows() {
-      // Loop through and open a window for every generated city
-      cities.forEach(city => {
-        openTradeWindow(city);
-      });
+      cities.forEach(city => openTradeWindow(city));
       if(isMenuOpen) toggleMenu();
     }
 
     function togglePlayPause() {
-      if (ship.path.length === 0) return; // Cannot play without a route
+      const anyPath = ships.some(s => s.path.length > 0);
+      if (!anyPath) return; // Cannot play without a route anywhere
+      
       isPlaying = !isPlaying;
       updatePlayPauseUI();
-      updateShipStatus();
+      updateCargoUI();
       updateTradeDistances(true);
     }
 
     function updatePlayPauseUI() {
       const btn = document.getElementById('play-pause-btn');
-      if (ship.path.length === 0) {
+      const anyPath = ships.some(s => s.path.length > 0);
+      
+      if (!anyPath) {
         btn.disabled = true;
         btn.innerText = "▶ Play";
         btn.style.background = "#7f8c8d";
@@ -475,7 +486,6 @@
       MIN_CITIES: 12,
       MAX_CITIES: 40,
 
-      // Product distribution ranges
       MIN_PRODUCED_GOODS: 2,
       MAX_PRODUCED_GOODS: 4,
 
@@ -568,60 +578,69 @@
       { id: 'rum', name: 'Rum', basePrice: 150 }
     ];
 
+    // Global Player state (Gold only, inventory moved to ships)
     let player = {
-      gold: GAME_CONFIG.STARTING_GOLD,
-      maxCargo: GAME_CONFIG.STARTING_CARGO,
-      inventory: {}
+      gold: GAME_CONFIG.STARTING_GOLD
     };
-    GOODS.forEach(g => player.inventory[g.id] = { count: 0, avgPrice: 0 });
 
     function updateUIGold() {
       document.getElementById('uiGold').innerText = player.gold;
     }
 
-    function getCurrentCargoSpace() {
+    function getCurrentCargoSpace(targetShip) {
       let total = 0;
-      for (let id in player.inventory) { total += player.inventory[id].count; }
+      for (let id in targetShip.inventory) { total += targetShip.inventory[id].count; }
       return total;
     }
 
     function updateCargoUI() {
-      const cargoList = document.getElementById('cargoList');
+      const container = document.getElementById('ui-container');
       let html = '';
-      let currentCargo = getCurrentCargoSpace();
 
-      GOODS.forEach(g => {
-        const inv = player.inventory[g.id];
-        if (inv.count > 0) {
-          html += `<div class="cargo-item"><span>${g.name} <b>x${inv.count}</b></span><span style="color:#aaa;">avg: ${Math.round(inv.avgPrice)}g</span></div>`;
+      ships.forEach((s, idx) => {
+        let currentCargo = getCurrentCargoSpace(s);
+        const pct = (currentCargo / s.maxCargo) * 100;
+        let bg = pct >= 100 ? '#e74c3c' : (pct >= 75 ? '#f39c12' : '#27ae60');
+        
+        let titleText = s.moving ? (isPlaying ? 'Sailing...' : 'Route Planned') : 'Docked';
+        // Highlight active ship panel
+        let borderStyle = (s === activeShip) ? 'border-color: #f1c40f;' : 'cursor: pointer;';
+        let cursorStyle = (s === activeShip) ? '' : 'cursor: pointer;';
+
+        let cargoHtml = '';
+        GOODS.forEach(g => {
+          const inv = s.inventory[g.id];
+          if (inv.count > 0) {
+            cargoHtml += `<div class="cargo-item"><span>${g.name} <b>x${inv.count}</b></span><span style="color:#aaa;">avg: ${Math.round(inv.avgPrice)}g</span></div>`;
+          }
+        });
+        
+        if (currentCargo === 0) {
+            cargoHtml = '<div style="color:#aaa; font-size:14px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
         }
+
+        html += `
+          <div class="ui-panel" style="${borderStyle} ${cursorStyle}" onclick="selectShip(${idx})">
+            <h3 style="margin-top:0;">Ship ${s.id} <span style="font-size:14px; color:#bdc3c7;">- ${titleText}</span></h3>
+            ${cargoHtml}
+            <div class="cargo-meter-bg">
+              <div class="cargo-meter-fill" style="width: ${pct}%; background: ${bg};"></div>
+            </div>
+            <p style="text-align:center; font-size:13px; margin-top:5px; color:#aaa;">
+              <span>${currentCargo} / ${s.maxCargo}</span> Space Used
+            </p>
+          </div>
+        `;
       });
-
-      if (currentCargo === 0) html = '<div style="color:#aaa; font-size:14px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
-
-      cargoList.innerHTML = html;
-      document.getElementById('cargoText').innerText = `${currentCargo} / ${player.maxCargo}`;
-
-      const fill = document.getElementById('cargoMeterFill');
-      const pct = (currentCargo / player.maxCargo) * 100;
-      fill.style.width = `${pct}%`;
-
-      if (pct >= 100) fill.style.background = '#e74c3c';
-      else if (pct >= 75) fill.style.background = '#f39c12';
-      else fill.style.background = '#27ae60';
+      container.innerHTML = html;
     }
 
-    function updateShipStatus() {
-      const title = document.getElementById('cargoUiTitle');
-      if (title) {
-        if (ship.moving) {
-          title.innerText = isPlaying ? '🧭 Sailing...' : '🧭 Route Planned';
-        } else {
-          title.innerText = '⚓ Docked';
-        }
-      }
+    window.selectShip = function(idx) {
+      activeShip = ships[idx];
+      updateCargoUI();
+      updateTradeDistances(activeShip.moving);
+      refreshAllTradeWindows();
     }
-    updateCargoUI();
 
     // --- Economy Simulation ---
     function simulateEconomy() {
@@ -773,7 +792,6 @@
         }
       }
 
-      // Shuffle the valid hexes for randomness
       validCityHexes.sort(() => 0.5 - Math.random());
       let availableNames = [...CARIBBEAN_CITY_NAMES];
 
@@ -808,14 +826,14 @@
         return false;
       }
 
-      // PASS 1: Natural probabilistic spawn based on chance
+      // PASS 1: Probabilistic
       for (let hex of validCityHexes) {
         if (Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
           trySpawnCity(hex);
         }
       }
 
-      // PASS 2: Force spawn until MIN_CITIES is reached
+      // PASS 2: Minimum enforcement
       for (let hex of validCityHexes) {
         if (cities.length >= GAME_CONFIG.MIN_CITIES) break;
         if (!hex.hasCity) {
@@ -823,7 +841,6 @@
         }
       }
 
-      // Ensure every good is produced in at least one city
       if (cities.length > 0) {
         GOODS.forEach(good => {
           const isProduced = cities.some(city => city.producedGoods.includes(good.id));
@@ -893,28 +910,68 @@
     }
     prerenderMap();
 
-    // --- Ship Setup ---
+    // --- Multi-Ship Setup ---
+    let ships = [];
+    let activeShip = null;
+
+    function createShip(q, r) {
+      let newShip = {
+        id: ships.length + 1,
+        q: q, r: r, x: 0, y: 0,
+        speed: 150.0, path: [], moving: false, targetTile: null,
+        maxCargo: GAME_CONFIG.STARTING_CARGO,
+        inventory: {}
+      };
+      GOODS.forEach(g => newShip.inventory[g.id] = { count: 0, avgPrice: 0 });
+      const pos = hexToPixel(q, r);
+      newShip.x = pos.x; 
+      newShip.y = pos.y;
+      return newShip;
+    }
+
+    // Spawn Initial Ship
     let spawnQ = 0, spawnR = 0;
     for (let [key, hex] of map) {
       if (hex.type === 'ocean' && hex.isMainOcean) { spawnQ = hex.q; spawnR = hex.r; break; }
     }
-
-    const ship = {
-      q: spawnQ, r: spawnR, x: 0, y: 0,
-      speed: 150.0, path: [], moving: false, targetTile: null
-    };
-    const startPos = hexToPixel(ship.q, ship.r);
-    ship.x = startPos.x; ship.y = startPos.y;
-    camera.x = -ship.x; camera.y = -ship.y;
+    ships.push(createShip(spawnQ, spawnR));
+    activeShip = ships[0];
+    camera.x = -activeShip.x; 
+    camera.y = -activeShip.y;
+    
     let clickIndicator = null;
-
     let cityRipples = [];
 
     function addCityRipple(cityHex) {
       cityRipples.push({ cityHex: cityHex, radius: HEX_SIZE, alpha: 1.0 });
     }
 
-    updateShipStatus();
+    window.spawnNewShip = function() {
+      // Find cities that don't have ANY ships physically on them
+      let availableCities = cities.filter(c => !ships.some(s => s.q === c.q && s.r === c.r));
+      
+      if (availableCities.length > 0) {
+        let randomCity = availableCities[Math.floor(Math.random() * availableCities.length)];
+        let newS = createShip(randomCity.q, randomCity.r);
+        ships.push(newS);
+        
+        // Auto-select the newly bought ship
+        activeShip = newS;
+        
+        // Pan camera to the new ship
+        camera.x = -activeShip.x; 
+        camera.y = -activeShip.y;
+        
+        updateCargoUI();
+        refreshAllTradeWindows();
+      } else {
+        alert("No empty cities available to spawn a new ship!");
+      }
+      
+      if (isMenuOpen) toggleMenu();
+    }
+
+    updateCargoUI();
 
     // ==========================================
     // --- Dynamic Window & Trading System ---
@@ -937,15 +994,13 @@
       function dragMouseDown(e) {
         e.preventDefault();
 
-        // --- Double Click Detection ---
         const currentTime = new Date().getTime();
         if (currentTime - lastClickTime < 300) {
           toggleCompactView();
           lastClickTime = 0;
-          return; // Stop drag initiation on double click
+          return; 
         }
         lastClickTime = currentTime;
-        // ------------------------------
 
         element.style.zIndex = ++zIndexCounter;
         pos3 = e.clientX;
@@ -985,17 +1040,18 @@
     }
 
     function getTrueDistance(cityHex) {
+      if (!activeShip) return -1;
       let targetTile = cityHex;
       const oceanNeighbors = getOceanNeighbors(targetTile);
 
       if (oceanNeighbors.length > 0) {
-        const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
-        if (oceanNeighbors.some(n => n.q === ship.q && n.r === ship.r)) return 0;
+        const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
+        if (oceanNeighbors.some(n => n.q === activeShip.q && n.r === activeShip.r)) return 0;
         oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
         targetTile = oceanNeighbors[0];
       }
 
-      let startTile = map.get(getHexKey(ship.q, ship.r));
+      let startTile = map.get(getHexKey(activeShip.q, activeShip.r));
       if (!startTile) return -1;
       if (startTile.q === targetTile.q && startTile.r === targetTile.r) return 0;
 
@@ -1046,7 +1102,6 @@
       win.id = 'window-' + safeId;
       win.style.zIndex = ++zIndexCounter;
       
-      // Remove animation class after it completes to prevent sticky glowing
       win.addEventListener('animationend', () => {
           win.classList.remove('pulse-anim');
       });
@@ -1060,7 +1115,7 @@
       };
 
       let distText = "Sailing...";
-      if (!ship.moving) {
+      if (!activeShip.moving) {
         const trueDist = getTrueDistance(cityHex);
         distText = trueDist >= 0 ? `Distance: ${trueDist}` : `Unreachable`;
       } else if (!isPlaying) {
@@ -1090,8 +1145,10 @@
     };
 
     function refreshAllTradeWindows() {
-      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
-      const currentCargoSpace = getCurrentCargoSpace();
+      if (!activeShip) return;
+
+      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
+      const currentCargoSpace = getCurrentCargoSpace(activeShip);
 
       for (const key in openWindows) {
         const { city, element } = openWindows[key];
@@ -1099,21 +1156,18 @@
         const mult = globalTradeMultiplier;
 
         const dist = hexDistance(shipHex, city);
-        const canTrade = (dist <= 1 && !ship.moving);
+        const canTrade = (dist <= 1 && !activeShip.moving);
 
         const contentContainer = element.querySelector(`#content-${safeId}`);
         
         if (isCompactView) {
             element.classList.add('compact-window');
-            
             let compactHtml = '';
             
-            // --- Compact Sail Button ---
             if (!canTrade) {
               compactHtml += `<button class="sail-btn compact-sail" onclick="sailToCity('${key}')">⚓ Sail Here</button>`;
             }
 
-            // --- First Row: City Highlights (Produced or Red Stock) ---
             compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:10px 5px 5px; font-size:18px; font-weight:bold; flex-wrap:wrap;">`;
             let hasHighlights = false;
             
@@ -1124,7 +1178,6 @@
                 
                 if (isProduced || isRed) {
                     hasHighlights = true;
-                    // Changed to 3 letters
                     const shortName = good.name.substring(0, 3);
                     let colorStyle = 'color: #ecf0f1;';
                     if (isRed) colorStyle = 'color: #e74c3c;';
@@ -1138,19 +1191,16 @@
             if (!hasHighlights) compactHtml += `<span style="color: #7f8c8d; font-size: 14px; font-weight: normal;">No Highlights</span>`;
             compactHtml += `</div>`;
             
-            // --- Second Row: Player Cargo ---
             compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:5px 5px 10px; font-size:16px; font-weight:bold; border-top: 1px solid #34495e; margin-top: 5px; flex-wrap:wrap;">`;
             let hasCargo = false;
             
             GOODS.forEach(good => {
-                if (player.inventory[good.id].count > 0) {
+                if (activeShip.inventory[good.id].count > 0) {
                     hasCargo = true;
                     const cityStock = city.inventory[good.id];
                     const isProduced = city.producedGoods.includes(good.id);
                     const isRed = cityStock < 10;
                     const { sellPrice } = getPrices(good, cityStock);
-                    
-                    // Changed to 3 letters
                     const shortName = good.name.substring(0, 3);
                     
                     let colorStyle = 'color: #ecf0f1;';
@@ -1180,7 +1230,7 @@
                       <button style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:${mult === 10 ? '#f39c12' : '#7f8c8d'};" onclick="setTradeMultiplier(10)">x10</button>
                   </div>
               </div>
-              <p class="trade-warning" style="display:${canTrade ? 'none' : 'block'}">You must dock your ship at this city to trade!</p>
+              <p class="trade-warning" style="display:${canTrade ? 'none' : 'block'}">Ship ${activeShip.id} must dock at this city to trade!</p>
               <table>
                   <thead>
                       <tr>
@@ -1197,12 +1247,12 @@
 
             GOODS.forEach(good => {
               const cityStock = city.inventory[good.id];
-              const playerStock = player.inventory[good.id].count;
-              const playerAvgPrice = player.inventory[good.id].avgPrice;
+              const playerStock = activeShip.inventory[good.id].count;
+              const playerAvgPrice = activeShip.inventory[good.id].avgPrice;
               const { buyPrice, sellPrice } = getPrices(good, cityStock);
               const isProduced = city.producedGoods.includes(good.id);
               const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
-              const spaceLeft = player.maxCargo - currentCargoSpace;
+              const spaceLeft = activeShip.maxCargo - currentCargoSpace;
 
               const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
               const canSell = canTrade && playerStock >= 1;
@@ -1241,13 +1291,14 @@
     };
 
     window.buyGood = function (goodId, cityKey, quantity) {
+      if (!activeShip) return;
       const city = openWindows[cityKey].city;
-      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
 
-      if (hexDistance(shipHex, city) > 1 || ship.moving) return;
+      if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
 
       let itemsPurchased = 0;
-      const spaceLeft = player.maxCargo - getCurrentCargoSpace();
+      const spaceLeft = activeShip.maxCargo - getCurrentCargoSpace(activeShip);
       const actualQuantityToBuy = Math.min(quantity, spaceLeft);
 
       for (let i = 0; i < actualQuantityToBuy; i++) {
@@ -1261,7 +1312,7 @@
         player.gold -= buyPrice;
         city.inventory[goodId]--;
 
-        const inv = player.inventory[goodId];
+        const inv = activeShip.inventory[goodId];
         inv.avgPrice = ((inv.avgPrice * inv.count) + buyPrice) / (inv.count + 1);
         inv.count++;
 
@@ -1276,16 +1327,17 @@
     };
 
     window.sellGood = function (goodId, cityKey, quantity) {
+      if (!activeShip) return;
       const city = openWindows[cityKey].city;
-      const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
 
-      if (hexDistance(shipHex, city) > 1 || ship.moving) return;
+      if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
 
       let itemsSold = 0;
-      const actualQuantityToSell = Math.min(quantity, player.inventory[goodId].count);
+      const actualQuantityToSell = Math.min(quantity, activeShip.inventory[goodId].count);
 
       for (let i = 0; i < actualQuantityToSell; i++) {
-        if (player.inventory[goodId].count <= 0) break;
+        if (activeShip.inventory[goodId].count <= 0) break;
 
         const good = GOODS.find(g => g.id === goodId);
         const cityStock = city.inventory[goodId];
@@ -1294,7 +1346,7 @@
         player.gold += sellPrice;
         city.inventory[goodId]++;
 
-        const inv = player.inventory[goodId];
+        const inv = activeShip.inventory[goodId];
         inv.count--;
         if (inv.count === 0) inv.avgPrice = 0;
 
@@ -1309,28 +1361,29 @@
     };
 
     window.sailToCity = function (cityKey) {
+      if (!activeShip) return;
       const city = openWindows[cityKey].city;
       let targetTile = city;
 
       const oceanNeighbors = getOceanNeighbors(targetTile);
       if (oceanNeighbors.length > 0) {
-        const shipHex = { q: ship.q, r: ship.r, s: -ship.q - ship.r };
+        const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
         oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
         targetTile = oceanNeighbors[0];
       }
 
-      let startTile = map.get(getHexKey(ship.moving ? pixelToHex(ship.x, ship.y).q : ship.q, ship.moving ? pixelToHex(ship.x, ship.y).r : ship.r));
-      if (!startTile) startTile = map.get(getHexKey(ship.q, ship.r));
+      let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
+      if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
 
       if (startTile && targetTile && targetTile.type === 'ocean') {
         const calculatedPath = findPath(startTile, targetTile);
         if (calculatedPath.length > 0) {
-          ship.path = calculatedPath;
-          ship.moving = true; // In travel state (trades disabled)
-          ship.targetTile = targetTile;
+          activeShip.path = calculatedPath;
+          activeShip.moving = true; 
+          activeShip.targetTile = targetTile;
 
           updatePlayPauseUI();
-          updateShipStatus();
+          updateCargoUI();
           updateTradeDistances(true);
           refreshAllTradeWindows();
         }
@@ -1433,6 +1486,26 @@
       clickX /= camera.zoom; clickY /= camera.zoom;
       clickX -= camera.x; clickY -= camera.y;
 
+      // 1. Check if we clicked on a specific ship
+      let clickedShip = null;
+      for (let s of ships) {
+          const dx = clickX - s.x;
+          const dy = clickY - s.y;
+          if (Math.sqrt(dx * dx + dy * dy) < HEX_SIZE) {
+              clickedShip = s;
+              break;
+          }
+      }
+
+      if (clickedShip) {
+          activeShip = clickedShip;
+          updateCargoUI();
+          updateTradeDistances(activeShip.moving);
+          refreshAllTradeWindows();
+          return; // Stop further click logic
+      }
+
+      // 2. Otherwise process hex clicking (routing / windows)
       const clickedHex = pixelToHex(clickX, clickY);
       const hexKey = getHexKey(clickedHex.q, clickedHex.r);
       let targetTile = map.get(hexKey);
@@ -1444,19 +1517,19 @@
 
       if (targetTile && targetTile.hasCity) {
         openTradeWindow(targetTile);
-      } else if (targetTile && targetTile.type === 'ocean') {
-        let startTile = map.get(getHexKey(ship.moving ? pixelToHex(ship.x, ship.y).q : ship.q, ship.moving ? pixelToHex(ship.x, ship.y).r : ship.r));
-        if (!startTile) startTile = map.get(getHexKey(ship.q, ship.r));
+      } else if (targetTile && targetTile.type === 'ocean' && activeShip) {
+        let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
+        if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
 
         if (startTile) {
           const calculatedPath = findPath(startTile, targetTile);
           if (calculatedPath.length > 0) {
-            ship.path = calculatedPath;
-            ship.moving = true; // In travel state (trades disabled)
-            ship.targetTile = targetTile;
+            activeShip.path = calculatedPath;
+            activeShip.moving = true; 
+            activeShip.targetTile = targetTile;
 
             updatePlayPauseUI();
-            updateShipStatus();
+            updateCargoUI();
             updateTradeDistances(true);
             refreshAllTradeWindows();
           }
@@ -1480,45 +1553,72 @@
       }
     }
 
-    function drawShip() {
-      ctx.save();
-      ctx.translate(ship.x, ship.y);
-      ctx.lineWidth = 1 / camera.zoom;
-      ctx.fillStyle = '#8B4513';
-      ctx.beginPath();
-      ctx.moveTo(-27, -9);
-      ctx.lineTo(27, -9);
-      ctx.lineTo(18, 9);
-      ctx.lineTo(-18, 9);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#5c2a07';
-      ctx.fillRect(-3, -30, 6, 30);
-      ctx.fillStyle = 'white';
-      ctx.beginPath();
-      ctx.moveTo(3, -6);
-      ctx.lineTo(3, -27);
-      ctx.lineTo(24, -6);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
+    function drawShips() {
+      ships.forEach(s => {
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          
+          // Draw selection halo for the active ship
+          if (s === activeShip) {
+              ctx.beginPath();
+              ctx.arc(0, 0, HEX_SIZE * 0.9, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(241, 196, 15, 0.3)';
+              ctx.fill();
+              ctx.strokeStyle = '#f1c40f';
+              ctx.lineWidth = 3 / camera.zoom;
+              ctx.stroke();
+          }
+
+          ctx.lineWidth = 1 / camera.zoom;
+          ctx.fillStyle = '#8B4513';
+          ctx.beginPath();
+          ctx.moveTo(-27, -9);
+          ctx.lineTo(27, -9);
+          ctx.lineTo(18, 9);
+          ctx.lineTo(-18, 9);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          
+          ctx.fillStyle = '#5c2a07';
+          ctx.fillRect(-3, -30, 6, 30);
+          
+          ctx.fillStyle = 'white';
+          ctx.beginPath();
+          ctx.moveTo(3, -6);
+          ctx.lineTo(3, -27);
+          ctx.lineTo(24, -6);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+      });
     }
 
-    function drawPath() {
-      if (!ship.moving || ship.path.length === 0) return;
-      ctx.beginPath();
-      ctx.moveTo(ship.x, ship.y);
-      for (let node of ship.path) {
-        const pos = hexToPixel(node.q, node.r);
-        ctx.lineTo(pos.x, pos.y);
-      }
-      ctx.strokeStyle = '#e74c3c';
-      ctx.lineWidth = 4 / camera.zoom;
-      ctx.setLineDash([8 / camera.zoom, 6 / camera.zoom]);
-      ctx.stroke();
-      ctx.setLineDash([]);
+    function drawPaths() {
+      // Draw all ship paths, highlighting the active one
+      ships.forEach(s => {
+          if (!s.moving || s.path.length === 0) return;
+          ctx.beginPath();
+          ctx.moveTo(s.x, s.y);
+          for (let node of s.path) {
+            const pos = hexToPixel(node.q, node.r);
+            ctx.lineTo(pos.x, pos.y);
+          }
+          
+          if (s === activeShip) {
+             ctx.strokeStyle = '#e74c3c';
+             ctx.lineWidth = 4 / camera.zoom;
+             ctx.setLineDash([8 / camera.zoom, 6 / camera.zoom]);
+          } else {
+             ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)'; // Faded red for other ships
+             ctx.lineWidth = 2 / camera.zoom;
+             ctx.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
+          }
+          
+          ctx.stroke();
+          ctx.setLineDash([]);
+      });
     }
 
     function drawClickIndicator() {
@@ -1535,37 +1635,52 @@
 
     // --- Game Loop ---
     function update(dt) {
-      if (isPlaying && ship.moving && ship.path.length > 0) {
-        const targetNode = ship.path[0];
-        const targetPos = hexToPixel(targetNode.q, targetNode.r);
-        const dx = targetPos.x - ship.x;
-        const dy = targetPos.y - ship.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const step = ship.speed * dt;
+      if (!isPlaying) return;
 
-        if (distance < step) {
-          ship.x = targetPos.x;
-          ship.y = targetPos.y;
-          ship.q = targetNode.q;
-          ship.r = targetNode.r;
-          ship.path.shift();
+      let anyArrived = false;
+      let movedThisFrame = false;
 
-          simulateEconomy();
+      ships.forEach(s => {
+          if (s.moving && s.path.length > 0) {
+            const targetNode = s.path[0];
+            const targetPos = hexToPixel(targetNode.q, targetNode.r);
+            const dx = targetPos.x - s.x;
+            const dy = targetPos.y - s.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const step = s.speed * dt;
 
-          if (ship.path.length === 0) {
-            ship.moving = false;
-            ship.targetTile = null;
-            isPlaying = false; // Auto pause upon arrival
+            if (distance < step) {
+              s.x = targetPos.x;
+              s.y = targetPos.y;
+              s.q = targetNode.q;
+              s.r = targetNode.r;
+              s.path.shift();
+              
+              movedThisFrame = true;
 
-            updatePlayPauseUI();
-            updateShipStatus();
-            updateTradeDistances(false);
-            refreshAllTradeWindows();
+              if (s.path.length === 0) {
+                s.moving = false;
+                s.targetTile = null;
+                anyArrived = true;
+              }
+            } else {
+              s.x += (dx / distance) * step;
+              s.y += (dy / distance) * step;
+            }
           }
-        } else {
-          ship.x += (dx / distance) * step;
-          ship.y += (dy / distance) * step;
-        }
+      });
+
+      // Advance economy once per frame movement to keep things balanced
+      if (movedThisFrame) {
+          simulateEconomy();
+      }
+
+      if (anyArrived) {
+          isPlaying = false; // Pause game if ANY ship arrives
+          updatePlayPauseUI();
+          updateCargoUI();
+          updateTradeDistances(false);
+          refreshAllTradeWindows();
       }
     }
 
@@ -1578,30 +1693,32 @@
 
       ctx.drawImage(bgCanvas, -mapOffsetX, -mapOffsetY);
 
-      if (ship.moving && ship.targetTile) {
-        if (Math.sin(Date.now() / 150) > 0) {
-          const pos = hexToPixel(ship.targetTile.q, ship.targetTile.r);
-          ctx.beginPath();
-          ctx.fillStyle = '#5dade2';
-          for (let i = 0; i < 6; i++) {
-            const angle = 2 * Math.PI / 6 * (i - 0.5);
-            const hx = pos.x + HEX_SIZE * Math.cos(angle);
-            const hy = pos.y + HEX_SIZE * Math.sin(angle);
-            if (i === 0) ctx.moveTo(hx, hy);
-            else ctx.lineTo(hx, hy);
+      ships.forEach(s => {
+          if (s.moving && s.targetTile) {
+            if (Math.sin(Date.now() / 150) > 0) {
+              const pos = hexToPixel(s.targetTile.q, s.targetTile.r);
+              ctx.beginPath();
+              ctx.fillStyle = s === activeShip ? '#5dade2' : 'rgba(93, 173, 226, 0.4)';
+              for (let i = 0; i < 6; i++) {
+                const angle = 2 * Math.PI / 6 * (i - 0.5);
+                const hx = pos.x + HEX_SIZE * Math.cos(angle);
+                const hy = pos.y + HEX_SIZE * Math.sin(angle);
+                if (i === 0) ctx.moveTo(hx, hy);
+                else ctx.lineTo(hx, hy);
+              }
+              ctx.closePath();
+              ctx.lineWidth = 1 / camera.zoom;
+              ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+              ctx.fill();
+              ctx.stroke();
+            }
           }
-          ctx.closePath();
-          ctx.lineWidth = 1 / camera.zoom;
-          ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-          ctx.fill();
-          ctx.stroke();
-        }
-      }
+      });
 
-      drawPath();
+      drawPaths();
       drawClickIndicator();
       drawCityRipples();
-      drawShip();
+      drawShips();
 
       ctx.restore();
     }
