@@ -461,7 +461,7 @@
     const GAME_CONFIG = {
       MAP_RADIUS: 31,
       ISLAND_COUNT: 36,
-      CITY_SPAWN_CHANCE: 0.03,
+      CITY_SPAWN_CHANCE: 0.05,
       MAX_CITIES: 40,
 
       // Product distribution ranges
@@ -714,16 +714,53 @@
           if (maxInfluence > 0) type = 'land';
           else if (maxInfluence === 0) type = 'beach';
 
-          map.set(getHexKey(q, r), { q, r, s, type, color: getRandomColor(type), hasCity: false });
+          map.set(getHexKey(q, r), { q, r, s, type, color: getRandomColor(type), hasCity: false, isMainOcean: false });
         }
       }
+
+      // --- FLOOD FILL: Find Main Ocean ---
+      const oceanRegions = [];
+      const visited = new Set();
+
+      for (let [key, hex] of map) {
+        if (hex.type === 'ocean' && !visited.has(key)) {
+          const currentRegion = [];
+          const queue = [hex];
+          visited.add(key);
+
+          while (queue.length > 0) {
+            const current = queue.shift();
+            currentRegion.push(current);
+
+            for (let neighbor of getAllNeighbors(current)) {
+              const neighborKey = getHexKey(neighbor.q, neighbor.r);
+              if (neighbor.type === 'ocean' && !visited.has(neighborKey)) {
+                visited.add(neighborKey);
+                queue.push(neighbor);
+              }
+            }
+          }
+          oceanRegions.push(currentRegion);
+        }
+      }
+
+      // Tag the largest continuous ocean body
+      oceanRegions.sort((a, b) => b.length - a.length);
+      if (oceanRegions.length > 0) {
+        oceanRegions[0].forEach(hex => {
+          hex.isMainOcean = true;
+        });
+      }
+      // -----------------------------------
 
       let availableNames = [...CARIBBEAN_CITY_NAMES];
 
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
-          const bordersOcean = getAllNeighbors(hex).some(n => n.type === 'ocean');
-          if (bordersOcean && Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
+          // Changed: Ensure city borders the MAIN ocean, not an isolated puddle
+          const bordersMainOcean = getAllNeighbors(hex).some(n => n.type === 'ocean' && n.isMainOcean);
+          
+          if (bordersMainOcean && Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
             const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
             if (!cityTooClose) {
               hex.hasCity = true;
@@ -738,7 +775,6 @@
 
               hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
-              // Use dynamic config bounds for produced goods quantity
               const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
               const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
               const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
@@ -760,9 +796,8 @@
         GOODS.forEach(good => {
           const isProduced = cities.some(city => city.producedGoods.includes(good.id));
           if (!isProduced) {
-            // Find eligible cities (preferably ones not yet at MAX_PRODUCED_GOODS)
             let eligibleCities = cities.filter(c => c.producedGoods.length < GAME_CONFIG.MAX_PRODUCED_GOODS);
-            if (eligibleCities.length === 0) eligibleCities = cities; // Fallback if all are full
+            if (eligibleCities.length === 0) eligibleCities = cities; 
             
             const randomCity = eligibleCities[Math.floor(Math.random() * eligibleCities.length)];
             if (!randomCity.producedGoods.includes(good.id)) {
@@ -829,7 +864,8 @@
     // --- Ship Setup ---
     let spawnQ = 0, spawnR = 0;
     for (let [key, hex] of map) {
-      if (hex.type === 'ocean') { spawnQ = hex.q; spawnR = hex.r; break; }
+      // Changed: Ensure the ship ONLY spawns in the main ocean
+      if (hex.type === 'ocean' && hex.isMainOcean) { spawnQ = hex.q; spawnR = hex.r; break; }
     }
 
     const ship = {
