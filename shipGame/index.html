@@ -390,6 +390,7 @@
         <p>🏙️ <b>Click</b> a city to view the market.</p>
         <p>🖱️ <b>Double-Click</b> city header to toggle compact view.</p>
         <p>👁️ <b>W</b> key to show/hide all windows.</p>
+        <p>🔄 <b>S</b> key to cycle through ships.</p>
       </div>
       <div class="menu-item" id="compact-btn" onclick="toggleCompactView()">🔍 Compact view</div>
       <div class="menu-item" id="hide-windows-btn" onclick="toggleHideWindows()">👁️ Hide all Windows</div>
@@ -486,6 +487,7 @@
       MIN_CITIES: 12,
       MAX_CITIES: 40,
 
+      // Product distribution ranges
       MIN_PRODUCED_GOODS: 2,
       MAX_PRODUCED_GOODS: 4,
 
@@ -936,6 +938,8 @@
     }
     ships.push(createShip(spawnQ, spawnR));
     activeShip = ships[0];
+    
+    // Initial camera initialization
     camera.x = -activeShip.x; 
     camera.y = -activeShip.y;
     
@@ -947,23 +951,24 @@
     }
 
     window.spawnNewShip = function() {
-      // Find cities that don't have ANY ships physically on them
-      let availableCities = cities.filter(c => !ships.some(s => s.q === c.q && s.r === c.r));
+      let availableCities = cities.filter(c => {
+        // Check if any ship is docked here
+        return !ships.some(s => hexDistance({q: s.q, r: s.r, s: -s.q - s.r}, c) <= 1);
+      });
       
       if (availableCities.length > 0) {
         let randomCity = availableCities[Math.floor(Math.random() * availableCities.length)];
-        let newS = createShip(randomCity.q, randomCity.r);
-        ships.push(newS);
+        let spawnHex = getOceanNeighbors(randomCity).find(n => n.isMainOcean);
         
-        // Auto-select the newly bought ship
-        activeShip = newS;
-        
-        // Pan camera to the new ship
-        camera.x = -activeShip.x; 
-        camera.y = -activeShip.y;
-        
-        updateCargoUI();
-        refreshAllTradeWindows();
+        if (spawnHex) {
+          let newS = createShip(spawnHex.q, spawnHex.r);
+          ships.push(newS);
+          
+          activeShip = newS;
+          
+          updateCargoUI();
+          refreshAllTradeWindows();
+        }
       } else {
         alert("No empty cities available to spawn a new ship!");
       }
@@ -1448,6 +1453,13 @@
       } else if (e.key.toLowerCase() === 'w') {
         e.preventDefault();
         toggleHideWindows();
+      } else if (e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (ships.length > 0) {
+            let currentIndex = ships.indexOf(activeShip);
+            let nextIndex = (currentIndex + 1) % ships.length;
+            selectShip(nextIndex);
+        }
       }
     });
 
@@ -1486,7 +1498,6 @@
       clickX /= camera.zoom; clickY /= camera.zoom;
       clickX -= camera.x; clickY -= camera.y;
 
-      // 1. Check if we clicked on a specific ship
       let clickedShip = null;
       for (let s of ships) {
           const dx = clickX - s.x;
@@ -1502,10 +1513,9 @@
           updateCargoUI();
           updateTradeDistances(activeShip.moving);
           refreshAllTradeWindows();
-          return; // Stop further click logic
+          return; 
       }
 
-      // 2. Otherwise process hex clicking (routing / windows)
       const clickedHex = pixelToHex(clickX, clickY);
       const hexKey = getHexKey(clickedHex.q, clickedHex.r);
       let targetTile = map.get(hexKey);
@@ -1558,17 +1568,6 @@
           ctx.save();
           ctx.translate(s.x, s.y);
           
-          // Draw selection halo for the active ship
-          if (s === activeShip) {
-              ctx.beginPath();
-              ctx.arc(0, 0, HEX_SIZE * 0.9, 0, Math.PI * 2);
-              ctx.fillStyle = 'rgba(241, 196, 15, 0.3)';
-              ctx.fill();
-              ctx.strokeStyle = '#f1c40f';
-              ctx.lineWidth = 3 / camera.zoom;
-              ctx.stroke();
-          }
-
           ctx.lineWidth = 1 / camera.zoom;
           ctx.fillStyle = '#8B4513';
           ctx.beginPath();
@@ -1596,9 +1595,8 @@
     }
 
     function drawPaths() {
-      // Draw all ship paths, highlighting the active one
       ships.forEach(s => {
-          if (!s.moving || s.path.length === 0) return;
+          if (s.path.length === 0) return;
           ctx.beginPath();
           ctx.moveTo(s.x, s.y);
           for (let node of s.path) {
@@ -1611,9 +1609,9 @@
              ctx.lineWidth = 4 / camera.zoom;
              ctx.setLineDash([8 / camera.zoom, 6 / camera.zoom]);
           } else {
-             ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)'; // Faded red for other ships
-             ctx.lineWidth = 2 / camera.zoom;
-             ctx.setLineDash([4 / camera.zoom, 4 / camera.zoom]);
+             ctx.strokeStyle = '#f39c12';
+             ctx.lineWidth = 3 / camera.zoom;
+             ctx.setLineDash([6 / camera.zoom, 6 / camera.zoom]);
           }
           
           ctx.stroke();
@@ -1639,6 +1637,7 @@
 
       let anyArrived = false;
       let movedThisFrame = false;
+      let arrivedShip = null;
 
       ships.forEach(s => {
           if (s.moving && s.path.length > 0) {
@@ -1662,6 +1661,7 @@
                 s.moving = false;
                 s.targetTile = null;
                 anyArrived = true;
+                arrivedShip = s;
               }
             } else {
               s.x += (dx / distance) * step;
@@ -1670,13 +1670,15 @@
           }
       });
 
-      // Advance economy once per frame movement to keep things balanced
       if (movedThisFrame) {
           simulateEconomy();
       }
 
       if (anyArrived) {
-          isPlaying = false; // Pause game if ANY ship arrives
+          isPlaying = false; 
+          if (arrivedShip) {
+              activeShip = arrivedShip;
+          }
           updatePlayPauseUI();
           updateCargoUI();
           updateTradeDistances(false);
@@ -1693,12 +1695,29 @@
 
       ctx.drawImage(bgCanvas, -mapOffsetX, -mapOffsetY);
 
+      // Highlight active ship's current hex
+      if (activeShip) {
+        const currentHex = pixelToHex(activeShip.x, activeShip.y);
+        const pos = hexToPixel(currentHex.q, currentHex.r);
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(133, 193, 233, 0.5)';
+        for (let i = 0; i < 6; i++) {
+          const angle = 2 * Math.PI / 6 * (i - 0.5);
+          const hx = pos.x + HEX_SIZE * Math.cos(angle);
+          const hy = pos.y + HEX_SIZE * Math.sin(angle);
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
       ships.forEach(s => {
-          if (s.moving && s.targetTile) {
+          if (s.path.length > 0 && s.targetTile) {
             if (Math.sin(Date.now() / 150) > 0) {
               const pos = hexToPixel(s.targetTile.q, s.targetTile.r);
               ctx.beginPath();
-              ctx.fillStyle = s === activeShip ? '#5dade2' : 'rgba(93, 173, 226, 0.4)';
+              ctx.fillStyle = s === activeShip ? 'rgba(231, 76, 60, 0.6)' : 'rgba(243, 156, 18, 0.4)';
               for (let i = 0; i < 6; i++) {
                 const angle = 2 * Math.PI / 6 * (i - 0.5);
                 const hx = pos.x + HEX_SIZE * Math.cos(angle);
