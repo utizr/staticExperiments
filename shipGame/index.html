@@ -371,9 +371,11 @@
         <p>▶ <b>Play</b> (or Spacebar) to start moving.</p>
         <p>🏙️ <b>Click</b> a city to view the market.</p>
         <p>🖱️ <b>Double-Click</b> city header to toggle compact view.</p>
+        <p>👁️ <b>W</b> key to show/hide all windows.</p>
       </div>
       <div class="menu-item" id="compact-btn" onclick="toggleCompactView()">🔍 Compact view</div>
       <div class="menu-item" id="hide-windows-btn" onclick="toggleHideWindows()">👁️ Hide all Windows</div>
+      <div class="menu-item" onclick="openAllCityWindows()">🏙️ Open all City windows</div>
     </div>
   </div>
 
@@ -428,6 +430,14 @@
       if(isMenuOpen) toggleMenu();
     }
 
+    function openAllCityWindows() {
+      // Loop through and open a window for every generated city
+      cities.forEach(city => {
+        openTradeWindow(city);
+      });
+      if(isMenuOpen) toggleMenu();
+    }
+
     function togglePlayPause() {
       if (ship.path.length === 0) return; // Cannot play without a route
       isPlaying = !isPlaying;
@@ -461,7 +471,8 @@
     const GAME_CONFIG = {
       MAP_RADIUS: 31,
       ISLAND_COUNT: 36,
-      CITY_SPAWN_CHANCE: 0.05,
+      CITY_SPAWN_CHANCE: 0.03,
+      MIN_CITIES: 12,
       MAX_CITIES: 40,
 
       // Product distribution ranges
@@ -744,50 +755,71 @@
         }
       }
 
-      // Tag the largest continuous ocean body
       oceanRegions.sort((a, b) => b.length - a.length);
       if (oceanRegions.length > 0) {
         oceanRegions[0].forEach(hex => {
           hex.isMainOcean = true;
         });
       }
-      // -----------------------------------
 
-      let availableNames = [...CARIBBEAN_CITY_NAMES];
-
+      // --- FIND ALL VALID COASTAL HEXES ---
+      let validCityHexes = [];
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
-          // Changed: Ensure city borders the MAIN ocean, not an isolated puddle
           const bordersMainOcean = getAllNeighbors(hex).some(n => n.type === 'ocean' && n.isMainOcean);
-          
-          if (bordersMainOcean && Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
-            const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
-            if (!cityTooClose) {
-              hex.hasCity = true;
-              hex.inventory = {};
-
-              if (availableNames.length > 0) {
-                const nameIndex = Math.floor(Math.random() * availableNames.length);
-                hex.name = availableNames.splice(nameIndex, 1)[0];
-              } else {
-                hex.name = "Unknown Port";
-              }
-
-              hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
-
-              const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
-              const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
-              const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
-              
-              const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
-              hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
-
-              GOODS.forEach(g => {
-                hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
-              });
-              cities.push(hex);
-            }
+          if (bordersMainOcean) {
+            validCityHexes.push(hex);
           }
+        }
+      }
+
+      // Shuffle the valid hexes for randomness
+      validCityHexes.sort(() => 0.5 - Math.random());
+      let availableNames = [...CARIBBEAN_CITY_NAMES];
+
+      function trySpawnCity(hex) {
+        const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
+        if (!cityTooClose) {
+          hex.hasCity = true;
+          hex.inventory = {};
+
+          if (availableNames.length > 0) {
+            const nameIndex = Math.floor(Math.random() * availableNames.length);
+            hex.name = availableNames.splice(nameIndex, 1)[0];
+          } else {
+            hex.name = "Unknown Port";
+          }
+
+          hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
+
+          const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
+          const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
+          const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
+          
+          const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
+          hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
+
+          GOODS.forEach(g => {
+            hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
+          });
+          cities.push(hex);
+          return true;
+        }
+        return false;
+      }
+
+      // PASS 1: Natural probabilistic spawn based on chance
+      for (let hex of validCityHexes) {
+        if (Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
+          trySpawnCity(hex);
+        }
+      }
+
+      // PASS 2: Force spawn until MIN_CITIES is reached
+      for (let hex of validCityHexes) {
+        if (cities.length >= GAME_CONFIG.MIN_CITIES) break;
+        if (!hex.hasCity) {
+          trySpawnCity(hex);
         }
       }
 
@@ -864,7 +896,6 @@
     // --- Ship Setup ---
     let spawnQ = 0, spawnR = 0;
     for (let [key, hex] of map) {
-      // Changed: Ensure the ship ONLY spawns in the main ocean
       if (hex.type === 'ocean' && hex.isMainOcean) { spawnQ = hex.q; spawnR = hex.r; break; }
     }
 
@@ -1014,6 +1045,11 @@
       win.className = 'tradeWindow';
       win.id = 'window-' + safeId;
       win.style.zIndex = ++zIndexCounter;
+      
+      // Remove animation class after it completes to prevent sticky glowing
+      win.addEventListener('animationend', () => {
+          win.classList.remove('pulse-anim');
+      });
 
       const cityPos = hexToPixel(cityHex.q, cityHex.r);
       openWindows[cityKey] = {
@@ -1356,6 +1392,9 @@
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         togglePlayPause();
+      } else if (e.key.toLowerCase() === 'w') {
+        e.preventDefault();
+        toggleHideWindows();
       }
     });
 
