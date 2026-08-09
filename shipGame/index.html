@@ -19,6 +19,53 @@
       display: block;
     }
 
+    /* --- UTILITY CLASSES --- */
+    .d-none {
+      display: none !important;
+    }
+
+    .d-block {
+      display: block !important;
+    }
+
+    .text-left {
+      text-align: left;
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    .invisible {
+      visibility: hidden;
+    }
+
+    .flex-grow {
+      flex-grow: 1;
+      margin-bottom: 0;
+    }
+
+    /* Text Colors */
+    .text-red {
+      color: #e74c3c;
+    }
+
+    .text-green {
+      color: #2ecc71;
+    }
+
+    .text-white {
+      color: #ecf0f1;
+    }
+
+    .text-muted {
+      color: #aaa;
+    }
+
+    .text-highlight {
+      color: #f1c40f;
+    }
+
     /* --- TOP TASKBAR & MENU --- */
     #top-taskbar {
       position: fixed;
@@ -65,6 +112,10 @@
       transition: background 0.2s, opacity 0.2s;
     }
 
+    #play-pause-btn.state-paused {
+      background: #e67e22;
+    }
+
     #play-pause-btn:disabled {
       background: #7f8c8d !important;
       cursor: not-allowed;
@@ -83,6 +134,10 @@
       padding-left: 15px;
     }
 
+    .gold-value {
+      color: #f1c40f;
+    }
+
     #dropdown-menu {
       display: none;
       position: absolute;
@@ -96,6 +151,10 @@
       width: 250px;
       box-shadow: 2px 5px 15px rgba(0, 0, 0, 0.5);
       overflow: hidden;
+    }
+
+    #dropdown-menu.show-menu {
+      display: flex;
     }
 
     .menu-item {
@@ -119,6 +178,10 @@
       border-bottom: 1px solid #1a252f;
     }
 
+    #info-content.show-info {
+      display: block;
+    }
+
     #info-content p {
       margin: 5px 0;
     }
@@ -136,7 +199,6 @@
       height: calc(100vh - 80px);
       overflow-y: auto;
       padding-right: 10px;
-      /* Scrollbar spacing */
     }
 
     /* Scrollbar styling for container */
@@ -153,6 +215,7 @@
       border-radius: 3px;
     }
 
+    /* SHIP PANELS */
     .ui-panel {
       color: white;
       font-family: sans-serif;
@@ -164,25 +227,28 @@
       width: 260px;
       box-sizing: border-box;
       pointer-events: auto;
-      /* Allows clicking on panels */
       transition: border-color 0.2s;
       flex-shrink: 0;
+      cursor: pointer;
     }
 
     .ui-panel:hover {
       border-color: #bdc3c7 !important;
     }
 
-    .ui-panel h3 {
+    .ui-panel.active-ship {
+      border-color: #f1c40f;
+    }
+
+    .ship-title {
       margin: 0 0 10px 0;
       font-size: 20px;
       color: #f1c40f;
     }
 
-    .ui-panel p {
-      margin: 4px 0;
-      font-size: 15px;
-      color: #ddd;
+    .ship-status {
+      font-size: 14px;
+      color: #bdc3c7;
     }
 
     .cargo-item {
@@ -190,6 +256,18 @@
       justify-content: space-between;
       font-size: 16px;
       margin-bottom: 6px;
+    }
+
+    .cargo-avg-price {
+      color: #aaa;
+    }
+
+    .empty-cargo {
+      color: #aaa;
+      font-size: 14px;
+      font-style: italic;
+      text-align: center;
+      padding: 10px 0;
     }
 
     .cargo-meter-bg {
@@ -203,11 +281,30 @@
 
     .cargo-meter-fill {
       height: 100%;
-      background: #27ae60;
       width: 0%;
       transition: width 0.3s, background-color 0.3s;
     }
 
+    .meter-safe {
+      background: #27ae60;
+    }
+
+    .meter-warn {
+      background: #f39c12;
+    }
+
+    .meter-danger {
+      background: #e74c3c;
+    }
+
+    .cargo-space-text {
+      text-align: center;
+      font-size: 13px;
+      margin-top: 5px;
+      color: #aaa;
+    }
+
+    /* TRADE WINDOW */
     .tradeWindow {
       position: absolute;
       background: #2c3e50;
@@ -219,7 +316,11 @@
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
       min-width: 480px;
       width: max-content;
-      transition: min-width 0.2s;
+      transition: min-width 0.2s, background-color 0.3s;
+    }
+
+    .tradeWindow.active-docked {
+      background: #244b75;
     }
 
     .tradeWindow.compact-window {
@@ -283,13 +384,21 @@
       background: #c0392b;
     }
 
+    .trade-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      margin-bottom: 15px;
+      gap: 10px;
+    }
+
     .trade-warning {
       color: #e74c3c;
       font-size: 14px;
       font-weight: bold;
       margin-bottom: 10px;
       text-align: center;
-      display: none;
     }
 
     table {
@@ -316,6 +425,16 @@
     .item-name {
       text-align: left;
       font-weight: bold;
+    }
+
+    .row-danger {
+      background-color: rgba(231, 76, 60, 0.4);
+    }
+
+    .player-stock {
+      color: #f39c12;
+      font-weight: bold;
+      line-height: 1.2;
     }
 
     .btn-group {
@@ -386,6 +505,75 @@
       margin-top: 2px;
       font-weight: normal;
     }
+
+    /* QUANTITY BUTTONS */
+    .quantity-container {
+      background: #34495e;
+      padding: 4px;
+      border-radius: 5px;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .qty-label {
+      font-size: 14px;
+      color: #bdc3c7;
+      padding: 0 6px;
+    }
+
+    .qty-btn {
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+      padding: 6px 14px;
+      font-size: 15px;
+      font-weight: bold;
+      color: white;
+      transition: filter 0.2s;
+    }
+
+    .qty-btn:hover {
+      filter: brightness(1.2);
+    }
+
+    .qty-btn.active {
+      background: #f39c12;
+    }
+
+    .qty-btn.inactive {
+      background: #7f8c8d;
+    }
+
+    /* COMPACT VIEW */
+    .compact-highlights {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 10px 5px 5px;
+      font-size: 18px;
+      font-weight: bold;
+      flex-wrap: wrap;
+    }
+
+    .no-highlights,
+    .no-cargo {
+      color: #7f8c8d;
+      font-size: 14px;
+      font-weight: normal;
+    }
+
+    .compact-cargo {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      padding: 5px 5px 10px;
+      font-size: 16px;
+      font-weight: bold;
+      border-top: 1px solid #34495e;
+      margin-top: 5px;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 
@@ -395,7 +583,7 @@
   <div id="top-taskbar">
     <button id="hamburger-btn" onclick="toggleMenu()">☰</button>
     <button id="play-pause-btn" onclick="togglePlayPause()" disabled>▶ Play</button>
-    <div class="taskbar-gold">💰 Gold: <b id="uiGold" style="color:#f1c40f;">1000</b></div>
+    <div class="taskbar-gold">💰 Gold: <b id="uiGold" class="gold-value">1000</b></div>
 
     <div id="dropdown-menu">
       <div class="menu-item" onclick="toggleInfo()">ℹ️ Info</div>
@@ -432,12 +620,17 @@
 
     function toggleMenu() {
       isMenuOpen = !isMenuOpen;
-      document.getElementById('dropdown-menu').style.display = isMenuOpen ? 'flex' : 'none';
+      const menu = document.getElementById('dropdown-menu');
+      if (isMenuOpen) {
+        menu.classList.add('show-menu');
+      } else {
+        menu.classList.remove('show-menu');
+      }
     }
 
     function toggleInfo() {
       const content = document.getElementById('info-content');
-      content.style.display = (content.style.display === 'block') ? 'none' : 'block';
+      content.classList.toggle('show-info');
     }
 
     function toggleCompactView() {
@@ -452,7 +645,11 @@
       document.getElementById('hide-windows-btn').innerText = areWindowsHidden ? "👁️ Show all Windows" : "👁️ Hide all Windows";
 
       for (const key in openWindows) {
-        openWindows[key].element.style.display = areWindowsHidden ? 'none' : 'block';
+        if (areWindowsHidden) {
+          openWindows[key].element.classList.add('d-none');
+        } else {
+          openWindows[key].element.classList.remove('d-none');
+        }
       }
       if (isMenuOpen) toggleMenu();
     }
@@ -479,16 +676,16 @@
       if (!anyPath) {
         btn.disabled = true;
         btn.innerText = "▶ Play";
-        btn.style.background = "#7f8c8d";
+        btn.classList.remove('state-paused');
         isPlaying = false;
       } else {
         btn.disabled = false;
         if (isPlaying) {
           btn.innerText = "⏸ Pause";
-          btn.style.background = "#e67e22";
+          btn.classList.add('state-paused');
         } else {
           btn.innerText = "▶ Play";
-          btn.style.background = "#27ae60";
+          btn.classList.remove('state-paused');
         }
       }
     }
@@ -525,7 +722,7 @@
 
       // --- NEW CONFIGS ---
       NEW_SHIP_COST: 1000,
-      GLOBAL_MOVE_THRESHOLD: 10,       // How many global tile moves before triggering cost
+      GLOBAL_MOVE_THRESHOLD: 20,       // How many global tile moves before triggering cost
       MAINTENANCE_COST_PER_SHIP: 8     // How much gold EACH ship costs per threshold
     };
 
@@ -625,33 +822,31 @@
       ships.forEach((s, idx) => {
         let currentCargo = getCurrentCargoSpace(s);
         const pct = (currentCargo / s.maxCargo) * 100;
-        let bg = pct >= 100 ? '#e74c3c' : (pct >= 75 ? '#f39c12' : '#27ae60');
+        let meterClass = pct >= 100 ? 'meter-danger' : (pct >= 75 ? 'meter-warn' : 'meter-safe');
 
         let titleText = s.moving ? (isPlaying ? 'Sailing...' : 'Route Planned') : 'Docked';
-        // Highlight active ship panel
-        let borderStyle = (s === activeShip) ? 'border-color: #f1c40f;' : 'cursor: pointer;';
-        let cursorStyle = (s === activeShip) ? '' : 'cursor: pointer;';
+        let activeClass = (s === activeShip) ? 'active-ship' : '';
 
         let cargoHtml = '';
         GOODS.forEach(g => {
           const inv = s.inventory[g.id];
           if (inv.count > 0) {
-            cargoHtml += `<div class="cargo-item"><span>${g.name} <b>x${inv.count}</b></span><span style="color:#aaa;">avg: ${Math.round(inv.avgPrice)}g</span></div>`;
+            cargoHtml += `<div class="cargo-item"><span>${g.name} <b>x${inv.count}</b></span><span class="cargo-avg-price">avg: ${Math.round(inv.avgPrice)}g</span></div>`;
           }
         });
 
         if (currentCargo === 0) {
-          cargoHtml = '<div style="color:#aaa; font-size:14px; font-style:italic; text-align:center; padding: 10px 0;">Cargo hold is empty.</div>';
+          cargoHtml = '<div class="empty-cargo">Cargo hold is empty.</div>';
         }
 
         html += `
-          <div class="ui-panel" style="${borderStyle} ${cursorStyle}" onclick="selectShip(${idx})">
-            <h3 style="margin-top:0;">Ship ${s.id} <span style="font-size:14px; color:#bdc3c7;">- ${titleText}</span></h3>
+          <div class="ui-panel ${activeClass}" onclick="selectShip(${idx})">
+            <h3 class="ship-title">Ship ${s.id} <span class="ship-status">- ${titleText}</span></h3>
             ${cargoHtml}
             <div class="cargo-meter-bg">
-              <div class="cargo-meter-fill" style="width: ${pct}%; background: ${bg};"></div>
+              <div class="cargo-meter-fill ${meterClass}" style="width: ${pct}%;"></div>
             </div>
-            <p style="text-align:center; font-size:13px; margin-top:5px; color:#aaa;">
+            <p class="cargo-space-text">
               <span>${currentCargo} / ${s.maxCargo}</span> Space Used
             </p>
           </div>
@@ -1197,6 +1392,13 @@
         const dist = hexDistance(shipHex, city);
         const canTrade = (dist <= 1 && !activeShip.moving);
 
+        // --- Highlight active docked city ---
+        if (canTrade) {
+          element.classList.add('active-docked');
+        } else {
+          element.classList.remove('active-docked');
+        }
+
         const contentContainer = element.querySelector(`#content-${safeId}`);
 
         if (isCompactView) {
@@ -1207,7 +1409,7 @@
             compactHtml += `<button class="sail-btn compact-sail" onclick="sailToCity('${key}')">⚓ Sail Here</button>`;
           }
 
-          compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:10px 5px 5px; font-size:18px; font-weight:bold; flex-wrap:wrap;">`;
+          compactHtml += `<div class="compact-highlights">`;
           let hasHighlights = false;
 
           GOODS.forEach(good => {
@@ -1218,19 +1420,19 @@
             if (isProduced || isRed) {
               hasHighlights = true;
               const shortName = good.name.substring(0, 3);
-              let colorStyle = 'color: #ecf0f1;';
-              if (isRed) colorStyle = 'color: #e74c3c;';
-              else if (isProduced) colorStyle = 'color: #2ecc71;';
+              let colorClass = 'text-white';
+              if (isRed) colorClass = 'text-red';
+              else if (isProduced) colorClass = 'text-green';
 
               const arrow = isProduced ? '⬆ ' : '';
-              compactHtml += `<span style="${colorStyle}">${arrow}${shortName}</span>`;
+              compactHtml += `<span class="${colorClass}">${arrow}${shortName}</span>`;
             }
           });
 
-          if (!hasHighlights) compactHtml += `<span style="color: #7f8c8d; font-size: 14px; font-weight: normal;">No Highlights</span>`;
+          if (!hasHighlights) compactHtml += `<span class="no-highlights">No Highlights</span>`;
           compactHtml += `</div>`;
 
-          compactHtml += `<div style="display:flex; justify-content:center; gap:15px; padding:5px 5px 10px; font-size:16px; font-weight:bold; border-top: 1px solid #34495e; margin-top: 5px; flex-wrap:wrap;">`;
+          compactHtml += `<div class="compact-cargo">`;
           let hasCargo = false;
 
           GOODS.forEach(good => {
@@ -1242,17 +1444,17 @@
               const { sellPrice } = getPrices(good, cityStock);
               const shortName = good.name.substring(0, 3);
 
-              let colorStyle = 'color: #ecf0f1;';
-              if (isRed) colorStyle = 'color: #e74c3c;';
-              else if (isProduced) colorStyle = 'color: #2ecc71;';
+              let colorClass = 'text-white';
+              if (isRed) colorClass = 'text-red';
+              else if (isProduced) colorClass = 'text-green';
 
               const arrow = isProduced ? '⬆ ' : '';
-              compactHtml += `<span style="${colorStyle}">${arrow}${shortName} ${sellPrice}g</span>`;
+              compactHtml += `<span class="${colorClass}">${arrow}${shortName} ${sellPrice}g</span>`;
             }
           });
 
           if (!hasCargo) {
-            compactHtml += `<span style="color: #7f8c8d; font-size: 14px; font-weight: normal;">No cargo to sell</span>`;
+            compactHtml += `<span class="no-cargo">No cargo to sell</span>`;
           }
           compactHtml += `</div>`;
 
@@ -1260,20 +1462,23 @@
 
         } else {
           element.classList.remove('compact-window');
+          let sailBtnDisplayClass = canTrade ? 'd-none' : 'd-block';
+          let warningDisplayClass = canTrade ? 'd-none' : 'd-block';
+
           let fullHtml = `
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; margin-bottom:15px; gap:10px;">
-                  <button id="sailBtn-${safeId}" class="sail-btn" style="margin-bottom:0; flex-grow:1; display:${canTrade ? 'none' : 'block'};" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
-                  <div style="background: #34495e; padding: 4px; border-radius: 5px; display:flex; gap:4px; align-items:center;">
-                      <span style="font-size:14px; color:#bdc3c7; padding:0 6px;">Qty:</span>
-                      <button style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:${mult === 1 ? '#f39c12' : '#7f8c8d'};" onclick="setTradeMultiplier(1)">x1</button>
-                      <button style="border:none; border-radius:3px; cursor:pointer; padding:6px 14px; font-size: 15px; font-weight:bold; color:white; background:${mult === 10 ? '#f39c12' : '#7f8c8d'};" onclick="setTradeMultiplier(10)">x10</button>
+              <div class="trade-actions">
+                  <button id="sailBtn-${safeId}" class="sail-btn flex-grow ${sailBtnDisplayClass}" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
+                  <div class="quantity-container">
+                      <span class="qty-label">Qty:</span>
+                      <button class="qty-btn ${mult === 1 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(1)">x1</button>
+                      <button class="qty-btn ${mult === 10 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(10)">x10</button>
                   </div>
               </div>
-              <p class="trade-warning" style="display:${canTrade ? 'none' : 'block'}">Ship ${activeShip.id} must dock at this city to trade!</p>
+              <p class="trade-warning ${warningDisplayClass}">Ship ${activeShip.id} must dock at this city to trade!</p>
               <table>
                   <thead>
                       <tr>
-                          <th style="text-align:left;">Good</th>
+                          <th class="text-left">Good</th>
                           <th>Stock</th>
                           <th>Buy</th>
                           <th>Sell</th>
@@ -1290,23 +1495,27 @@
             const playerAvgPrice = activeShip.inventory[good.id].avgPrice;
             const { buyPrice, sellPrice } = getPrices(good, cityStock);
             const isProduced = city.producedGoods.includes(good.id);
-            const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow" style="visibility:hidden">⬆</span>';
-            const spaceLeft = activeShip.maxCargo - currentCargoSpace;
 
+            const prodMarker = isProduced
+              ? '<span class="prod-arrow" title="Produced Here">⬆</span>'
+              : '<span class="prod-arrow invisible">⬆</span>';
+
+            const spaceLeft = activeShip.maxCargo - currentCargoSpace;
             const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
             const canSell = canTrade && playerStock >= 1;
             const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
             const buyText = `Buy ${mult}`;
-            const rowBg = cityStock < 10 ? 'background-color: rgba(231, 76, 60, 0.25);' : '';
+
+            const rowClass = cityStock < 10 ? 'row-danger' : '';
             const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
 
             fullHtml += `
-                  <tr style="${rowBg}">
+                  <tr class="${rowClass}">
                       <td class="item-name">${prodMarker} ${good.name}</td>
                       <td>${cityStock}</td>
                       <td>${buyPrice}g</td>
                       <td>${sellPrice}g</td>
-                      <td style="color:#f39c12; font-weight:bold; line-height: 1.2;">
+                      <td class="player-stock">
                           ${playerStock}
                           ${avgPriceHtml}
                       </td>
@@ -1691,14 +1900,13 @@
 
             movedThisFrame = true;
 
-            // --- NEW: Track movement and apply maintenance costs ---
+            // Track movement and apply maintenance costs
             globalTilesMoved++;
             if (globalTilesMoved >= GAME_CONFIG.GLOBAL_MOVE_THRESHOLD) {
-              globalTilesMoved = 0; // Reset counter
+              globalTilesMoved = 0;
               player.gold -= (ships.length * GAME_CONFIG.MAINTENANCE_COST_PER_SHIP);
               updateUIGold();
             }
-            // -------------------------------------------------------
 
             if (s.path.length === 0) {
               s.moving = false;
