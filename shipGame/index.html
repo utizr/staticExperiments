@@ -66,6 +66,10 @@
       color: #f1c40f;
     }
 
+    .text-orange {
+      color: #e67e22;
+    }
+
     /* --- TOP TASKBAR & MENU --- */
     #top-taskbar {
       position: fixed;
@@ -530,7 +534,6 @@
     }
 
     .prod-arrow {
-      color: #2ecc71;
       font-weight: bold;
       display: inline-block;
       width: 15px;
@@ -649,6 +652,61 @@
 
   <script>
     // ==========================================
+    // --- GAME CONFIGURATION ---
+    // ==========================================
+    const GAME_CONFIG = {
+      MAP_RADIUS: 31,
+      ISLAND_COUNT: 37,
+      CITY_SPAWN_CHANCE: 0.03,
+      MIN_CITIES: 12,
+      MAX_CITIES: 40,
+
+      // Product distribution ranges
+      MIN_PRODUCED_GOODS: 2,
+      MAX_PRODUCED_GOODS: 4,
+
+      // Consumption parameters
+      CITY_CONSUMPTION_MIN: 1,
+      CITY_CONSUMPTION_MAX: 3,
+
+      // High Consumption Modifiers
+      HIGH_CONSUMPTION_GOODS_MIN: 1,
+      HIGH_CONSUMPTION_GOODS_MAX: 2,
+      HIGH_CONSUMPTION_PERCENT_INCREASE: 40, // 100% = double consumption
+
+      // Production parameters
+      CITY_PRODUCTION_MIN: 1,
+      CITY_PRODUCTION_MAX: 3,
+
+      AI_TRADE_MIN_TURNS: 12,
+      AI_TRADE_MAX_TURNS: 24,
+
+      // --- Number of distinct goods a trader interacts with per visit ---
+      AI_TRADED_GOODS_MIN: 4,
+      AI_TRADED_GOODS_MAX: 5,
+
+      // Thresholds for when the AI decides to trade
+      AI_BUY_STOCK_THRESHOLD: 80,
+      AI_SELL_STOCK_THRESHOLD: 30,
+
+      // Volume of goods traded by AI
+      TRADER_BUY_MIN: 6,
+      TRADER_BUY_MAX: 13,
+      TRADER_SELL_MIN: 4,
+      TRADER_SELL_MAX: 16,
+
+      STARTING_GOLD: 1000,
+      STARTING_CARGO: 80,
+
+      // --- SHIP & MECHANICS ---
+      NEW_SHIP_COST: 1000,
+      GLOBAL_MOVE_THRESHOLD: 20,
+      ECONOMY_TICK_MOVES: 3,       // How many tile moves trigger an economy update
+      MAINTENANCE_COST_PER_SHIP: 12,
+      WAREHOUSE_COST: 5000
+    };
+
+    // ==========================================
     // --- UI MENU & PLAY/PAUSE LOGIC ---
     // ==========================================
     let isMenuOpen = false;
@@ -728,43 +786,6 @@
       }
     }
 
-    // ==========================================
-    // --- GAME CONFIGURATION ---
-    // ==========================================
-    const GAME_CONFIG = {
-      MAP_RADIUS: 31,
-      ISLAND_COUNT: 36,
-      CITY_SPAWN_CHANCE: 0.03,
-      MIN_CITIES: 12,
-      MAX_CITIES: 40,
-
-      // Product distribution ranges
-      MIN_PRODUCED_GOODS: 2,
-      MAX_PRODUCED_GOODS: 4,
-
-      AI_TRADE_MIN_TURNS: 18,
-      AI_TRADE_MAX_TURNS: 31,
-
-      AI_BUY_HIGH_STOCK: 100,
-      AI_BUY_MED_STOCK: 40,
-      AI_SELL_LOW_STOCK: 10,
-      AI_SELL_MED_STOCK: 50,
-
-      AI_TRADE_AMT_HIGH_MIN: 6,
-      AI_TRADE_AMT_HIGH_MAX: 12,
-      AI_TRADE_AMT_LOW_MIN: 3,
-      AI_TRADE_AMT_LOW_MAX: 7,
-
-      STARTING_GOLD: 1000,
-      STARTING_CARGO: 80,
-
-      // --- SHIP & MECHANICS ---
-      NEW_SHIP_COST: 1000,
-      GLOBAL_MOVE_THRESHOLD: 20,
-      MAINTENANCE_COST_PER_SHIP: 8,
-      WAREHOUSE_COST: 5000
-    };
-
     const CARIBBEAN_CITY_NAMES = [
       "Port Royal", "Tortuga", "Havana", "Nassau", "Santiago",
       "San Juan", "Cartagena", "Veracruz", "Santo Domingo", "Maracaibo",
@@ -843,6 +864,7 @@
     };
 
     let globalTilesMoved = 0;
+    let economyTilesMoved = 0;
 
     function updateUIGold() {
       document.getElementById('uiGold').innerText = player.gold;
@@ -906,11 +928,19 @@
       for (let city of cities) {
         GOODS.forEach(g => {
           if (city.inventory[g.id] > 0 && Math.random() < 0.20) {
-            city.inventory[g.id] -= 1;
+            let consumeAmt = Math.floor(Math.random() * (GAME_CONFIG.CITY_CONSUMPTION_MAX - GAME_CONFIG.CITY_CONSUMPTION_MIN + 1)) + GAME_CONFIG.CITY_CONSUMPTION_MIN;
+
+            // Apply percentage modifier if this is a high-consumption good for the city
+            if (city.highConsumptionGoods && city.highConsumptionGoods.includes(g.id)) {
+              consumeAmt = Math.floor(consumeAmt * (1 + (GAME_CONFIG.HIGH_CONSUMPTION_PERCENT_INCREASE / 100)));
+            }
+
+            city.inventory[g.id] = Math.max(0, city.inventory[g.id] - consumeAmt);
           }
           if (city.producedGoods.includes(g.id)) {
             if (city.inventory[g.id] < 120 && Math.random() < 0.40) {
-              city.inventory[g.id] += 1;
+              const produceAmt = Math.floor(Math.random() * (GAME_CONFIG.CITY_PRODUCTION_MAX - GAME_CONFIG.CITY_PRODUCTION_MIN + 1)) + GAME_CONFIG.CITY_PRODUCTION_MIN;
+              city.inventory[g.id] = Math.min(120, city.inventory[g.id] + produceAmt);
             }
           }
         });
@@ -925,29 +955,28 @@
     }
 
     function simulateAITrader(city) {
-      GOODS.forEach(g => {
-        if (Math.random() < 0.5) {
-          const isProduced = city.producedGoods.includes(g.id);
-          let stock = city.inventory[g.id];
+      const numGoodsToTrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADED_GOODS_MAX - GAME_CONFIG.AI_TRADED_GOODS_MIN + 1)) + GAME_CONFIG.AI_TRADED_GOODS_MIN;
 
-          const highTradeAmt = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_AMT_HIGH_MAX - GAME_CONFIG.AI_TRADE_AMT_HIGH_MIN + 1)) + GAME_CONFIG.AI_TRADE_AMT_HIGH_MIN;
-          const lowTradeAmt = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_AMT_LOW_MAX - GAME_CONFIG.AI_TRADE_AMT_LOW_MIN + 1)) + GAME_CONFIG.AI_TRADE_AMT_LOW_MIN;
+      const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
+      const selectedGoods = shuffledGoods.slice(0, Math.min(numGoodsToTrade, GOODS.length));
 
-          if (isProduced) {
-            if (stock > GAME_CONFIG.AI_BUY_HIGH_STOCK) {
-              stock -= highTradeAmt;
-            } else if (stock > GAME_CONFIG.AI_BUY_MED_STOCK) {
-              stock -= lowTradeAmt;
-            }
-            city.inventory[g.id] = Math.max(0, stock);
-          } else {
-            if (stock < GAME_CONFIG.AI_SELL_LOW_STOCK) {
-              stock += highTradeAmt;
-            } else if (stock < GAME_CONFIG.AI_SELL_MED_STOCK) {
-              stock += lowTradeAmt;
-            }
-            city.inventory[g.id] = Math.min(120, stock);
+      selectedGoods.forEach(g => {
+        const isProduced = city.producedGoods.includes(g.id);
+        let stock = city.inventory[g.id];
+
+        const traderBuyAmt = Math.floor(Math.random() * (GAME_CONFIG.TRADER_BUY_MAX - GAME_CONFIG.TRADER_BUY_MIN + 1)) + GAME_CONFIG.TRADER_BUY_MIN;
+        const traderSellAmt = Math.floor(Math.random() * (GAME_CONFIG.TRADER_SELL_MAX - GAME_CONFIG.TRADER_SELL_MIN + 1)) + GAME_CONFIG.TRADER_SELL_MIN;
+
+        if (isProduced) {
+          if (stock > GAME_CONFIG.AI_BUY_STOCK_THRESHOLD) {
+            stock -= traderBuyAmt;
           }
+          city.inventory[g.id] = Math.max(0, stock);
+        } else {
+          if (stock < GAME_CONFIG.AI_SELL_STOCK_THRESHOLD) {
+            stock += traderSellAmt;
+          }
+          city.inventory[g.id] = Math.min(120, stock);
         }
       });
     }
@@ -1069,12 +1098,21 @@
 
           hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
+          // Handle Produced Goods
           const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
           const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
           const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
 
-          const shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
+          let shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
           hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
+
+          // Handle High Consumption Goods
+          const minCons = GAME_CONFIG.HIGH_CONSUMPTION_GOODS_MIN;
+          const maxCons = GAME_CONFIG.HIGH_CONSUMPTION_GOODS_MAX;
+          const numGoodsConsumed = Math.floor(Math.random() * (maxCons - minCons + 1)) + minCons;
+
+          const availableForConsumption = shuffledGoods.filter(g => !hex.producedGoods.includes(g.id));
+          hex.highConsumptionGoods = availableForConsumption.slice(0, numGoodsConsumed).map(g => g.id);
 
           GOODS.forEach(g => {
             hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
@@ -1116,6 +1154,7 @@
             const randomCity = eligibleCities[Math.floor(Math.random() * eligibleCities.length)];
             if (!randomCity.producedGoods.includes(good.id)) {
               randomCity.producedGoods.push(good.id);
+              randomCity.highConsumptionGoods = randomCity.highConsumptionGoods.filter(id => id !== good.id);
             }
           }
         });
@@ -1561,13 +1600,15 @@
           let hasHighlights = false;
           GOODS.forEach(good => {
             const isProduced = city.producedGoods.includes(good.id);
+            const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
             const cityStock = city.inventory[good.id];
             const isRed = cityStock < 10;
 
-            if (isProduced || isRed) {
+            if (isProduced || isConsumed || isRed) {
               hasHighlights = true;
-              let colorClass = isRed ? 'text-red' : (isProduced ? 'text-green' : 'text-white');
-              compactHtml += `<span class="${colorClass}">${isProduced ? '⬆ ' : ''}${good.name.substring(0, 3)}</span>`;
+              let colorClass = isRed ? 'text-red' : (isProduced ? 'text-green' : (isConsumed ? 'text-orange' : 'text-white'));
+              let arrow = isProduced ? '⬆ ' : (isConsumed ? '⬇ ' : '');
+              compactHtml += `<span class="${colorClass}">${arrow}${good.name.substring(0, 3)}</span>`;
             }
           });
           if (!hasHighlights) compactHtml += `<span class="no-highlights">No Highlights</span>`;
@@ -1577,10 +1618,15 @@
           GOODS.forEach(good => {
             if (activeShip.inventory[good.id].count > 0) {
               hasCargo = true;
+              const isProduced = city.producedGoods.includes(good.id);
+              const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
               const cityStock = city.inventory[good.id];
               const { sellPrice } = getPrices(good, cityStock);
-              let colorClass = cityStock < 10 ? 'text-red' : (city.producedGoods.includes(good.id) ? 'text-green' : 'text-white');
-              compactHtml += `<span class="${colorClass}">${city.producedGoods.includes(good.id) ? '⬆ ' : ''}${good.name.substring(0, 3)} ${sellPrice}g</span>`;
+
+              let colorClass = cityStock < 10 ? 'text-red' : (isProduced ? 'text-green' : (isConsumed ? 'text-orange' : 'text-white'));
+              let arrow = isProduced ? '⬆ ' : (isConsumed ? '⬇ ' : '');
+
+              compactHtml += `<span class="${colorClass}">${arrow}${good.name.substring(0, 3)} ${sellPrice}g</span>`;
             }
           });
           if (!hasCargo) compactHtml += `<span class="no-cargo">No cargo to sell</span>`;
@@ -1646,8 +1692,16 @@
               const playerAvgPrice = isUsingWarehouse ? city.warehouseInventory[good.id].avgPrice : activeShip.inventory[good.id].avgPrice;
 
               const { buyPrice, sellPrice } = getPrices(good, cityStock);
+
               const isProduced = city.producedGoods.includes(good.id);
-              const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow invisible">⬆</span>';
+              const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
+
+              let prodMarker = '<span class="prod-arrow invisible">⬆</span>';
+              if (isProduced) {
+                prodMarker = '<span class="prod-arrow text-green" title="Produced Here">⬆</span>';
+              } else if (isConsumed) {
+                prodMarker = '<span class="prod-arrow text-orange" title="High Consumption">⬇</span>';
+              }
 
               const spaceLeft = isUsingWarehouse ? Infinity : (activeShip.maxCargo - currentCargoSpace);
               const canBuy = canActuallyTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
@@ -2037,6 +2091,8 @@
             movedThisFrame = true;
 
             globalTilesMoved++;
+            economyTilesMoved++;
+
             if (globalTilesMoved >= GAME_CONFIG.GLOBAL_MOVE_THRESHOLD) {
               globalTilesMoved = 0;
               player.gold -= (ships.length * GAME_CONFIG.MAINTENANCE_COST_PER_SHIP);
@@ -2056,7 +2112,9 @@
         }
       });
 
-      if (movedThisFrame) {
+      // --- Trigger economy based on tile moves ---
+      while (economyTilesMoved >= GAME_CONFIG.ECONOMY_TICK_MOVES) {
+        economyTilesMoved -= GAME_CONFIG.ECONOMY_TICK_MOVES;
         simulateEconomy();
       }
 
