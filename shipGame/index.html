@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hex Ocean Trader Prototype - Pinned Windows</title>
+  <title>Hex Ocean Trader Prototype - Warehouses & Fleets</title>
   <style>
     body {
       margin: 0;
@@ -384,6 +384,45 @@
       background: #c0392b;
     }
 
+    /* --- CITY TABS & WAREHOUSE UI --- */
+    .city-tabs {
+      display: flex;
+      border-bottom: 2px solid #34495e;
+      margin-bottom: 10px;
+    }
+
+    .city-tab {
+      background: none;
+      border: none;
+      color: #7f8c8d;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .city-tab:hover {
+      color: #bdc3c7;
+    }
+
+    .city-tab.active {
+      color: #f1c40f;
+      border-bottom-color: #f1c40f;
+    }
+
+    .trade-source-selector {
+      display: flex;
+      align-items: center;
+      background: #1a252f;
+      padding: 8px 12px;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      justify-content: center;
+    }
+
     .trade-actions {
       display: flex;
       justify-content: space-between;
@@ -428,11 +467,10 @@
     }
 
     .row-danger {
-      background-color: rgba(231, 76, 60, 0.4);
+      background-color: rgba(231, 76, 60, 0.25);
     }
 
     .player-stock {
-      color: #f39c12;
       font-weight: bold;
       line-height: 1.2;
     }
@@ -661,7 +699,7 @@
 
     function togglePlayPause() {
       const anyPath = ships.some(s => s.path.length > 0);
-      if (!anyPath) return; // Cannot play without a route anywhere
+      if (!anyPath) return;
 
       isPlaying = !isPlaying;
       updatePlayPauseUI();
@@ -720,10 +758,11 @@
       STARTING_GOLD: 1000,
       STARTING_CARGO: 80,
 
-      // --- NEW CONFIGS ---
+      // --- SHIP & MECHANICS ---
       NEW_SHIP_COST: 1000,
-      GLOBAL_MOVE_THRESHOLD: 20,       // How many global tile moves before triggering cost
-      MAINTENANCE_COST_PER_SHIP: 8     // How much gold EACH ship costs per threshold
+      GLOBAL_MOVE_THRESHOLD: 20,
+      MAINTENANCE_COST_PER_SHIP: 8,
+      WAREHOUSE_COST: 5000
     };
 
     const CARIBBEAN_CITY_NAMES = [
@@ -798,12 +837,12 @@
       { id: 'rum', name: 'Rum', basePrice: 150 }
     ];
 
-    // Global Player state (Gold only, inventory moved to ships)
+    // Global Player state
     let player = {
       gold: GAME_CONFIG.STARTING_GOLD
     };
 
-    let globalTilesMoved = 0; // Tracks total tile moves across all ships
+    let globalTilesMoved = 0;
 
     function updateUIGold() {
       document.getElementById('uiGold').innerText = player.gold;
@@ -1040,20 +1079,26 @@
           GOODS.forEach(g => {
             hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
           });
+
+          // Initialize Warehouse state
+          hex.hasWarehouse = false;
+          hex.warehouseInventory = {};
+          GOODS.forEach(g => {
+            hex.warehouseInventory[g.id] = { count: 0, avgPrice: 0 };
+          });
+
           cities.push(hex);
           return true;
         }
         return false;
       }
 
-      // PASS 1: Probabilistic
       for (let hex of validCityHexes) {
         if (Math.random() < GAME_CONFIG.CITY_SPAWN_CHANCE && cities.length < GAME_CONFIG.MAX_CITIES) {
           trySpawnCity(hex);
         }
       }
 
-      // PASS 2: Minimum enforcement
       for (let hex of validCityHexes) {
         if (cities.length >= GAME_CONFIG.MIN_CITIES) break;
         if (!hex.hasCity) {
@@ -1169,7 +1214,6 @@
     }
 
     window.spawnNewShip = function () {
-      // 1. Check if the player has enough gold
       if (player.gold < GAME_CONFIG.NEW_SHIP_COST) {
         alert(`Not enough gold! A new ship costs ${GAME_CONFIG.NEW_SHIP_COST}g.`);
         if (isMenuOpen) toggleMenu();
@@ -1177,7 +1221,6 @@
       }
 
       let availableCities = cities.filter(c => {
-        // Check if any ship is docked here
         return !ships.some(s => hexDistance({ q: s.q, r: s.r, s: -s.q - s.r }, c) <= 1);
       });
 
@@ -1186,7 +1229,6 @@
         let spawnHex = getOceanNeighbors(randomCity).find(n => n.isMainOcean);
 
         if (spawnHex) {
-          // 2. Deduct gold and update UI
           player.gold -= GAME_CONFIG.NEW_SHIP_COST;
           updateUIGold();
 
@@ -1315,6 +1357,113 @@
       refreshAllTradeWindows();
     };
 
+    window.switchCityTab = function (cityKey, tabName) {
+      if (openWindows[cityKey]) {
+        openWindows[cityKey].activeTab = tabName;
+        refreshAllTradeWindows();
+      }
+    };
+
+    window.switchMarketSource = function (cityKey, source) {
+      if (openWindows[cityKey]) {
+        openWindows[cityKey].marketSource = source;
+        refreshAllTradeWindows();
+      }
+    };
+
+    window.buildWarehouse = function (cityKey) {
+      if (player.gold >= GAME_CONFIG.WAREHOUSE_COST) {
+        player.gold -= GAME_CONFIG.WAREHOUSE_COST;
+        updateUIGold();
+
+        const city = openWindows[cityKey].city;
+        city.hasWarehouse = true;
+        openWindows[cityKey].activeTab = 'warehouse';
+        refreshAllTradeWindows();
+      } else {
+        alert(`Not enough gold! A warehouse costs ${GAME_CONFIG.WAREHOUSE_COST}g.`);
+      }
+    };
+
+    window.tradeMarket = function (goodId, cityKey, quantity, isBuy, isUsingWarehouse) {
+      const city = openWindows[cityKey].city;
+      const good = GOODS.find(g => g.id === goodId);
+      let targetInventory = isUsingWarehouse ? city.warehouseInventory[goodId] : activeShip.inventory[goodId];
+
+      if (!isUsingWarehouse) {
+        const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
+        if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
+      }
+
+      const spaceLeft = isUsingWarehouse ? Infinity : (activeShip.maxCargo - getCurrentCargoSpace(activeShip));
+      const limit = isBuy ? Math.min(quantity, spaceLeft) : Math.min(quantity, targetInventory.count);
+      let itemsProcessed = 0;
+
+      for (let i = 0; i < limit; i++) {
+        const cityStock = city.inventory[goodId];
+        if (isBuy && cityStock <= 0) break;
+        if (!isBuy && targetInventory.count <= 0) break;
+
+        const { buyPrice, sellPrice } = getPrices(good, cityStock);
+
+        if (isBuy) {
+          if (player.gold < buyPrice) break;
+          player.gold -= buyPrice;
+          city.inventory[goodId]--;
+
+          targetInventory.avgPrice = ((targetInventory.avgPrice * targetInventory.count) + buyPrice) / (targetInventory.count + 1);
+          targetInventory.count++;
+        } else {
+          player.gold += sellPrice;
+          city.inventory[goodId]++;
+
+          targetInventory.count--;
+          if (targetInventory.count === 0) targetInventory.avgPrice = 0;
+        }
+        itemsProcessed++;
+      }
+
+      if (itemsProcessed > 0) {
+        updateUIGold();
+        if (!isUsingWarehouse) updateCargoUI();
+        refreshAllTradeWindows();
+      }
+    };
+
+    window.transferCargo = function (goodId, cityKey, quantity, toShip) {
+      if (!activeShip) return;
+      const city = openWindows[cityKey].city;
+      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
+      if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
+
+      const spaceLeft = activeShip.maxCargo - getCurrentCargoSpace(activeShip);
+      let shipInv = activeShip.inventory[goodId];
+      let whInv = city.warehouseInventory[goodId];
+
+      let limit = toShip ? Math.min(quantity, whInv.count, spaceLeft) : Math.min(quantity, shipInv.count);
+      let itemsMoved = 0;
+
+      for (let i = 0; i < limit; i++) {
+        if (toShip) {
+          shipInv.avgPrice = ((shipInv.avgPrice * shipInv.count) + whInv.avgPrice) / (shipInv.count + 1);
+          shipInv.count++;
+          whInv.count--;
+          if (whInv.count === 0) whInv.avgPrice = 0;
+        } else {
+          whInv.avgPrice = ((whInv.avgPrice * whInv.count) + shipInv.avgPrice) / (whInv.count + 1);
+          whInv.count++;
+          shipInv.count--;
+          if (shipInv.count === 0) shipInv.avgPrice = 0;
+        }
+        itemsMoved++;
+      }
+
+      if (itemsMoved > 0) {
+        updateCargoUI();
+        refreshAllTradeWindows();
+      }
+    };
+
     function openTradeWindow(cityHex) {
       if (areWindowsHidden) toggleHideWindows();
 
@@ -1345,7 +1494,9 @@
         element: win,
         city: cityHex,
         worldX: cityPos.x + 30,
-        worldY: cityPos.y - 30
+        worldY: cityPos.y - 30,
+        activeTab: 'market',
+        marketSource: 'ship'
       };
 
       let distText = "Sailing...";
@@ -1385,14 +1536,14 @@
       const currentCargoSpace = getCurrentCargoSpace(activeShip);
 
       for (const key in openWindows) {
-        const { city, element } = openWindows[key];
+        const winObj = openWindows[key];
+        const { city, element } = winObj;
         const safeId = key.replace(',', '_');
         const mult = globalTradeMultiplier;
 
         const dist = hexDistance(shipHex, city);
         const canTrade = (dist <= 1 && !activeShip.moving);
 
-        // --- Highlight active docked city ---
         if (canTrade) {
           element.classList.add('active-docked');
         } else {
@@ -1404,14 +1555,10 @@
         if (isCompactView) {
           element.classList.add('compact-window');
           let compactHtml = '';
-
-          if (!canTrade) {
-            compactHtml += `<button class="sail-btn compact-sail" onclick="sailToCity('${key}')">⚓ Sail Here</button>`;
-          }
+          if (!canTrade) compactHtml += `<button class="sail-btn compact-sail" onclick="sailToCity('${key}')">⚓ Sail Here</button>`;
 
           compactHtml += `<div class="compact-highlights">`;
           let hasHighlights = false;
-
           GOODS.forEach(good => {
             const isProduced = city.producedGoods.includes(good.id);
             const cityStock = city.inventory[good.id];
@@ -1419,194 +1566,183 @@
 
             if (isProduced || isRed) {
               hasHighlights = true;
-              const shortName = good.name.substring(0, 3);
-              let colorClass = 'text-white';
-              if (isRed) colorClass = 'text-red';
-              else if (isProduced) colorClass = 'text-green';
-
-              const arrow = isProduced ? '⬆ ' : '';
-              compactHtml += `<span class="${colorClass}">${arrow}${shortName}</span>`;
+              let colorClass = isRed ? 'text-red' : (isProduced ? 'text-green' : 'text-white');
+              compactHtml += `<span class="${colorClass}">${isProduced ? '⬆ ' : ''}${good.name.substring(0, 3)}</span>`;
             }
           });
-
           if (!hasHighlights) compactHtml += `<span class="no-highlights">No Highlights</span>`;
-          compactHtml += `</div>`;
+          compactHtml += `</div><div class="compact-cargo">`;
 
-          compactHtml += `<div class="compact-cargo">`;
           let hasCargo = false;
-
           GOODS.forEach(good => {
             if (activeShip.inventory[good.id].count > 0) {
               hasCargo = true;
               const cityStock = city.inventory[good.id];
-              const isProduced = city.producedGoods.includes(good.id);
-              const isRed = cityStock < 10;
               const { sellPrice } = getPrices(good, cityStock);
-              const shortName = good.name.substring(0, 3);
-
-              let colorClass = 'text-white';
-              if (isRed) colorClass = 'text-red';
-              else if (isProduced) colorClass = 'text-green';
-
-              const arrow = isProduced ? '⬆ ' : '';
-              compactHtml += `<span class="${colorClass}">${arrow}${shortName} ${sellPrice}g</span>`;
+              let colorClass = cityStock < 10 ? 'text-red' : (city.producedGoods.includes(good.id) ? 'text-green' : 'text-white');
+              compactHtml += `<span class="${colorClass}">${city.producedGoods.includes(good.id) ? '⬆ ' : ''}${good.name.substring(0, 3)} ${sellPrice}g</span>`;
             }
           });
-
-          if (!hasCargo) {
-            compactHtml += `<span class="no-cargo">No cargo to sell</span>`;
-          }
+          if (!hasCargo) compactHtml += `<span class="no-cargo">No cargo to sell</span>`;
           compactHtml += `</div>`;
-
           contentContainer.innerHTML = compactHtml;
 
         } else {
           element.classList.remove('compact-window');
           let sailBtnDisplayClass = canTrade ? 'd-none' : 'd-block';
-          let warningDisplayClass = canTrade ? 'd-none' : 'd-block';
 
           let fullHtml = `
-              <div class="trade-actions">
-                  <button id="sailBtn-${safeId}" class="sail-btn flex-grow ${sailBtnDisplayClass}" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
-                  <div class="quantity-container">
-                      <span class="qty-label">Qty:</span>
-                      <button class="qty-btn ${mult === 1 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(1)">x1</button>
-                      <button class="qty-btn ${mult === 10 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(10)">x10</button>
-                  </div>
+              <div class="city-tabs">
+                <button class="city-tab ${winObj.activeTab === 'market' ? 'active' : ''}" onclick="switchCityTab('${key}', 'market')">Market</button>
+                <button class="city-tab ${winObj.activeTab === 'warehouse' ? 'active' : ''}" onclick="switchCityTab('${key}', 'warehouse')">Warehouse</button>
               </div>
-              <p class="trade-warning ${warningDisplayClass}">Ship ${activeShip.id} must dock at this city to trade!</p>
-              <table>
-                  <thead>
-                      <tr>
-                          <th class="text-left">Good</th>
-                          <th>Stock</th>
-                          <th>Buy</th>
-                          <th>Sell</th>
-                          <th>Cargo</th>
-                          <th>Action</th>
-                      </tr>
-                  </thead>
-                  <tbody>
             `;
 
-          GOODS.forEach(good => {
-            const cityStock = city.inventory[good.id];
-            const playerStock = activeShip.inventory[good.id].count;
-            const playerAvgPrice = activeShip.inventory[good.id].avgPrice;
-            const { buyPrice, sellPrice } = getPrices(good, cityStock);
-            const isProduced = city.producedGoods.includes(good.id);
-
-            const prodMarker = isProduced
-              ? '<span class="prod-arrow" title="Produced Here">⬆</span>'
-              : '<span class="prod-arrow invisible">⬆</span>';
-
-            const spaceLeft = activeShip.maxCargo - currentCargoSpace;
-            const canBuy = canTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
-            const canSell = canTrade && playerStock >= 1;
-            const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
-            const buyText = `Buy ${mult}`;
-
-            const rowClass = cityStock < 10 ? 'row-danger' : '';
-            const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
+          // ===== MARKET TAB =====
+          if (winObj.activeTab === 'market') {
+            let isUsingWarehouse = city.hasWarehouse && (!canTrade || winObj.marketSource === 'warehouse');
+            let canActuallyTrade = isUsingWarehouse || canTrade;
+            let warningDisplayClass = canActuallyTrade ? 'd-none' : 'd-block';
 
             fullHtml += `
-                  <tr class="${rowClass}">
-                      <td class="item-name">${prodMarker} ${good.name}</td>
-                      <td>${cityStock}</td>
-                      <td>${buyPrice}g</td>
-                      <td>${sellPrice}g</td>
-                      <td class="player-stock">
-                          ${playerStock}
-                          ${avgPriceHtml}
-                      </td>
-                      <td>
-                          <div class="btn-group">
-                              <button class="trade-btn" onclick="buyBuyGood('${good.id}', '${key}', ${mult})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
-                              <button class="trade-btn sell" onclick="sellGood('${good.id}', '${key}', ${mult})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
+                  <div class="trade-actions">
+                      <button id="sailBtn-${safeId}" class="sail-btn flex-grow ${sailBtnDisplayClass}" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
+                      <div class="quantity-container">
+                          <span class="qty-label">Qty:</span>
+                          <button class="qty-btn ${mult === 1 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(1)">x1</button>
+                          <button class="qty-btn ${mult === 10 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(10)">x10</button>
+                      </div>
+                  </div>
+                `;
+
+            if (city.hasWarehouse && canTrade) {
+              fullHtml += `
+                    <div class="trade-source-selector">
+                        <span style="color:#bdc3c7; font-size:14px; margin-right:10px;">Trading from:</span>
+                        <button class="qty-btn ${winObj.marketSource === 'ship' ? 'active' : 'inactive'}" style="margin-right:5px;" onclick="switchMarketSource('${key}', 'ship')">Ship Cargo</button>
+                        <button class="qty-btn ${winObj.marketSource === 'warehouse' ? 'active' : 'inactive'}" onclick="switchMarketSource('${key}', 'warehouse')">Warehouse</button>
+                    </div>`;
+            }
+
+            fullHtml += `
+                  <p class="trade-warning ${warningDisplayClass}">Ship ${activeShip.id} must dock at this city to trade (or build a warehouse!)</p>
+                  <table>
+                      <thead>
+                          <tr>
+                              <th class="text-left">Good</th>
+                              <th>City Stock</th>
+                              <th>Buy</th>
+                              <th>Sell</th>
+                              <th>${isUsingWarehouse ? 'Warehouse' : 'Ship Cargo'}</th>
+                              <th>Action</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                `;
+
+            GOODS.forEach(good => {
+              const cityStock = city.inventory[good.id];
+              const playerStock = isUsingWarehouse ? city.warehouseInventory[good.id].count : activeShip.inventory[good.id].count;
+              const playerAvgPrice = isUsingWarehouse ? city.warehouseInventory[good.id].avgPrice : activeShip.inventory[good.id].avgPrice;
+
+              const { buyPrice, sellPrice } = getPrices(good, cityStock);
+              const isProduced = city.producedGoods.includes(good.id);
+              const prodMarker = isProduced ? '<span class="prod-arrow" title="Produced Here">⬆</span>' : '<span class="prod-arrow invisible">⬆</span>';
+
+              const spaceLeft = isUsingWarehouse ? Infinity : (activeShip.maxCargo - currentCargoSpace);
+              const canBuy = canActuallyTrade && cityStock >= 1 && player.gold >= buyPrice && spaceLeft >= 1;
+              const canSell = canActuallyTrade && playerStock >= 1;
+
+              const sellText = (playerStock > 0 && playerStock < mult) ? `Sell ${playerStock}` : `Sell ${mult}`;
+              const buyText = `Buy ${mult}`;
+              const rowClass = cityStock < 10 ? 'row-danger' : '';
+              const avgPriceHtml = playerStock > 0 ? `<span class="avg-price">avg: ${Math.round(playerAvgPrice)}g</span>` : '';
+              const stockColor = isUsingWarehouse ? '#3498db' : '#f39c12';
+
+              fullHtml += `
+                      <tr class="${rowClass}">
+                          <td class="item-name">${prodMarker} ${good.name}</td>
+                          <td>${cityStock}</td>
+                          <td>${buyPrice}g</td>
+                          <td>${sellPrice}g</td>
+                          <td class="player-stock" style="color: ${stockColor}">
+                              ${playerStock}
+                              ${avgPriceHtml}
+                          </td>
+                          <td>
+                              <div class="btn-group">
+                                  <button class="trade-btn" onclick="tradeMarket('${good.id}', '${key}', ${mult}, true, ${isUsingWarehouse})" ${!canBuy ? 'disabled' : ''}>${buyText}</button>
+                                  <button class="trade-btn sell" onclick="tradeMarket('${good.id}', '${key}', ${mult}, false, ${isUsingWarehouse})" ${!canSell ? 'disabled' : ''}>${sellText}</button>
+                              </div>
+                          </td>
+                      </tr>
+                  `;
+            });
+            fullHtml += `</tbody></table>`;
+
+            // ===== WAREHOUSE TAB =====
+          } else if (winObj.activeTab === 'warehouse') {
+            if (!city.hasWarehouse) {
+              fullHtml += `
+                        <div style="text-align:center; padding: 30px 10px;">
+                            <p style="font-size:16px; margin-bottom:15px; color:#bdc3c7;">A warehouse allows you to buy and store goods here even when no ship is present.</p>
+                            <button class="trade-btn" style="padding:10px 20px; font-size:16px;" onclick="buildWarehouse('${key}')">🔨 Build Warehouse (${GAME_CONFIG.WAREHOUSE_COST}g)</button>
+                        </div>
+                    `;
+            } else {
+              fullHtml += `
+                      <div class="trade-actions">
+                          <button id="sailBtn-${safeId}" class="sail-btn flex-grow ${sailBtnDisplayClass}" onclick="sailToCity('${key}')">⚓ Set Sail for this City</button>
+                          <div class="quantity-container">
+                              <span class="qty-label">Qty:</span>
+                              <button class="qty-btn ${mult === 1 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(1)">x1</button>
+                              <button class="qty-btn ${mult === 10 ? 'active' : 'inactive'}" onclick="setTradeMultiplier(10)">x10</button>
                           </div>
-                      </td>
-                  </tr>
-              `;
-          });
-          fullHtml += `</tbody></table>`;
+                      </div>
+                      <p class="trade-warning ${canTrade ? 'd-none' : 'd-block'}">Dock a ship here to transfer goods.</p>
+                      <table>
+                          <thead>
+                              <tr>
+                                  <th class="text-left">Good</th>
+                                  <th style="color:#f39c12">Ship Cargo</th>
+                                  <th>Transfer</th>
+                                  <th style="color:#3498db">Warehouse</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                    `;
+              GOODS.forEach(good => {
+                const shipStock = activeShip.inventory[good.id].count;
+                const whStock = city.warehouseInventory[good.id].count;
+                const spaceLeft = activeShip.maxCargo - currentCargoSpace;
+
+                const canToShip = canTrade && whStock > 0 && spaceLeft > 0;
+                const canToWh = canTrade && shipStock > 0;
+
+                const moveRightText = (shipStock > 0 && shipStock < mult) ? `${shipStock} ▶` : `${mult} ▶`;
+                const moveLeftText = (whStock > 0 && whStock < mult) ? `◀ ${whStock}` : `◀ ${mult}`;
+
+                fullHtml += `
+                            <tr>
+                                <td class="item-name">${good.name}</td>
+                                <td class="player-stock" style="color:#f39c12;">${shipStock}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="trade-btn sell" onclick="transferCargo('${good.id}', '${key}', ${mult}, false)" ${!canToWh ? 'disabled' : ''}>${moveRightText}</button>
+                                        <button class="trade-btn" style="background:#8e44ad;" onclick="transferCargo('${good.id}', '${key}', ${mult}, true)" ${!canToShip ? 'disabled' : ''}>${moveLeftText}</button>
+                                    </div>
+                                </td>
+                                <td class="player-stock" style="color:#3498db;">${whStock}</td>
+                            </tr>
+                        `;
+              });
+              fullHtml += `</tbody></table>`;
+            }
+          }
           contentContainer.innerHTML = fullHtml;
         }
       }
     }
-
-    window.buyBuyGood = function (goodId, cityKey, quantity) {
-      window.buyGood(goodId, cityKey, quantity);
-    };
-
-    window.buyGood = function (goodId, cityKey, quantity) {
-      if (!activeShip) return;
-      const city = openWindows[cityKey].city;
-      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
-
-      if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
-
-      let itemsPurchased = 0;
-      const spaceLeft = activeShip.maxCargo - getCurrentCargoSpace(activeShip);
-      const actualQuantityToBuy = Math.min(quantity, spaceLeft);
-
-      for (let i = 0; i < actualQuantityToBuy; i++) {
-        const good = GOODS.find(g => g.id === goodId);
-        const cityStock = city.inventory[goodId];
-        if (cityStock <= 0) break;
-
-        const { buyPrice } = getPrices(good, cityStock);
-        if (player.gold < buyPrice) break;
-
-        player.gold -= buyPrice;
-        city.inventory[goodId]--;
-
-        const inv = activeShip.inventory[goodId];
-        inv.avgPrice = ((inv.avgPrice * inv.count) + buyPrice) / (inv.count + 1);
-        inv.count++;
-
-        itemsPurchased++;
-      }
-
-      if (itemsPurchased > 0) {
-        updateUIGold();
-        updateCargoUI();
-        refreshAllTradeWindows();
-      }
-    };
-
-    window.sellGood = function (goodId, cityKey, quantity) {
-      if (!activeShip) return;
-      const city = openWindows[cityKey].city;
-      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
-
-      if (hexDistance(shipHex, city) > 1 || activeShip.moving) return;
-
-      let itemsSold = 0;
-      const actualQuantityToSell = Math.min(quantity, activeShip.inventory[goodId].count);
-
-      for (let i = 0; i < actualQuantityToSell; i++) {
-        if (activeShip.inventory[goodId].count <= 0) break;
-
-        const good = GOODS.find(g => g.id === goodId);
-        const cityStock = city.inventory[goodId];
-        const { sellPrice } = getPrices(good, cityStock);
-
-        player.gold += sellPrice;
-        city.inventory[goodId]++;
-
-        const inv = activeShip.inventory[goodId];
-        inv.count--;
-        if (inv.count === 0) inv.avgPrice = 0;
-
-        itemsSold++;
-      }
-
-      if (itemsSold > 0) {
-        updateUIGold();
-        updateCargoUI();
-        refreshAllTradeWindows();
-      }
-    };
 
     window.sailToCity = function (cityKey) {
       if (!activeShip) return;
@@ -1900,7 +2036,6 @@
 
             movedThisFrame = true;
 
-            // Track movement and apply maintenance costs
             globalTilesMoved++;
             if (globalTilesMoved >= GAME_CONFIG.GLOBAL_MOVE_THRESHOLD) {
               globalTilesMoved = 0;
@@ -1946,7 +2081,6 @@
 
       ctx.drawImage(bgCanvas, -mapOffsetX, -mapOffsetY);
 
-      // Highlight active ship's current hex
       if (activeShip) {
         const currentHex = pixelToHex(activeShip.x, activeShip.y);
         const pos = hexToPixel(currentHex.q, currentHex.r);
