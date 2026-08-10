@@ -700,20 +700,21 @@
       STARTING_GOLD: 1000,
       STARTING_CARGO: 80,
 
-// --- SHIP & MECHANICS ---
+      // --- SHIP & MECHANICS ---
       NEW_SHIP_COST: 1000,
       GLOBAL_MOVE_THRESHOLD: 20,
       ECONOMY_TICK_MOVES: 9,       // How many tile moves trigger an economy update
       MAINTENANCE_COST_PER_SHIP: 12,
+      PORT_DOCKING_FEE: 25,        // Higher fee for sitting in a port
       WAREHOUSE_COST: 5000,
-      PLAYER_SHIP_SPEED: 150.0,    // NEW: Configurable player speed
+      PLAYER_SHIP_SPEED: 150.0,    // Configurable player speed
       
       // --- PIRATES ---
       PIRATE_COUNT: 3,
       PIRATE_STEAL_AMOUNT: 500,
       PIRATE_CHASE_DISTANCE: 5,
-      PIRATE_CRUISING_SPEED: 100.0, // NEW: Slower roaming speed
-      PIRATE_CHASING_SPEED: 180.0   // NEW: Fast chase speed
+      PIRATE_CRUISING_SPEED: 100.0, // Slower roaming speed
+      PIRATE_CHASING_SPEED: 180.0   // Fast chase speed
     };
 
     // ==========================================
@@ -1222,7 +1223,7 @@
       let newShip = {
         id: ships.length > 0 ? Math.max(...ships.map(s=>s.id)) + 1 : 1,
         q: q, r: r, x: 0, y: 0,
-        speed: GAME_CONFIG.PLAYER_SHIP_SPEED, // NEW: Uses config
+        speed: GAME_CONFIG.PLAYER_SHIP_SPEED,
         path: [], moving: false, targetTile: null,
         maxCargo: GAME_CONFIG.STARTING_CARGO,
         inventory: {},
@@ -1303,14 +1304,14 @@
         });
       }
     }
-     
+
     function handlePirateCatch(pirate, caughtShip) {
       pirate.state = 'roaming';
       pirate.targetShip = null;
       pirate.path = [];
       pirate.moving = false;
       
-      caughtShip.immuneToPirates = true; // NEW: Make the ship immune until it docks
+      caughtShip.immuneToPirates = true; // Make the ship immune until it docks
 
       alert(`Pirates intercepted Ship ${caughtShip.id}!`);
 
@@ -1375,7 +1376,6 @@
         if (pirate.path.length > 0) pirate.moving = true;
       }
     }
-
 
     updateCargoUI();
 
@@ -1895,17 +1895,24 @@
 
     window.sailToCity = function (cityKey) {
       if (!activeShip) return;
-      const city = openWindows[cityKey].city;
+      
+      // Look up the city directly from the map, because the trade window might be hidden!
+      const city = map.get(cityKey);
+      if (!city || !city.hasCity) return;
       
       const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
       
-      // NEW: If we are already at this city (distance <= 1), cancel the planned route
-      if (hexDistance(shipHex, city) <= 1) {
+      // Check if we are already heading to this city (our target tile is adjacent to it)
+      const isHeadingToCity = activeShip.targetTile && 
+                              getAllNeighbors(activeShip.targetTile).some(n => n.q === city.q && n.r === city.r);
+      
+      // If we are already at this city (distance <= 1) OR already heading to it -> Cancel route
+      if (hexDistance(shipHex, city) <= 1 || isHeadingToCity) {
         activeShip.path = [];
         activeShip.moving = false;
         activeShip.targetTile = null;
         
-        isPlaying = false; // Ensure game stays paused
+        isPlaying = false; 
         updatePlayPauseUI();
         updateCargoUI();
         updateTradeDistances(false);
@@ -1914,7 +1921,6 @@
       }
 
       let targetTile = city;
-
       const oceanNeighbors = getOceanNeighbors(targetTile);
       if (oceanNeighbors.length > 0) {
         oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
@@ -2072,31 +2078,42 @@
       if (targetTile && targetTile.hasCity) {
         openTradeWindow(targetTile);
       } else if (targetTile && targetTile.type === 'ocean' && activeShip) {
-        let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
-        if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
+        
+        // Check if the clicked ocean tile is adjacent to any city
+        let adjacentCity = getAllNeighbors(targetTile).find(n => n.hasCity);
+        
+        if (adjacentCity) {
+          // NEW: Just pulse the city on the map instead of forcing the trade window open
+          addCityRipple(adjacentCity);
+          const cityKey = getHexKey(adjacentCity.q, adjacentCity.r);
+          sailToCity(cityKey);
+        } else {
+          // Standard ocean pathing
+          let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
+          if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
 
-        if (startTile) {
-          const calculatedPath = findPath(startTile, targetTile);
-          if (calculatedPath.length > 0) {
-            activeShip.path = calculatedPath;
-            activeShip.moving = true;
-            activeShip.targetTile = targetTile;
+          if (startTile) {
+            const calculatedPath = findPath(startTile, targetTile);
+            if (calculatedPath.length > 0) {
+              activeShip.path = calculatedPath;
+              activeShip.moving = true;
+              activeShip.targetTile = targetTile;
 
-            updatePlayPauseUI();
-            updateCargoUI();
-            updateTradeDistances(true);
-            refreshAllTradeWindows();
-            
-          } else if (startTile.q === targetTile.q && startTile.r === targetTile.r) {
-            // NEW: If clicking on the exact tile we are standing on, cancel the route.
-            activeShip.path = [];
-            activeShip.moving = false;
-            activeShip.targetTile = null;
+              updatePlayPauseUI();
+              updateCargoUI();
+              updateTradeDistances(true);
+              refreshAllTradeWindows();
+              
+            } else if (startTile.q === targetTile.q && startTile.r === targetTile.r) {
+              activeShip.path = [];
+              activeShip.moving = false;
+              activeShip.targetTile = null;
 
-            updatePlayPauseUI();
-            updateCargoUI();
-            updateTradeDistances(false);
-            refreshAllTradeWindows();
+              updatePlayPauseUI();
+              updateCargoUI();
+              updateTradeDistances(false);
+              refreshAllTradeWindows();
+            }
           }
         }
       }
@@ -2225,7 +2242,6 @@
 
       // 1. Independent Economy Ticking based on elapsed time
       simulationTimer += dt;
-      // UPDATED: Calculate time based on player config speed
       let tileTime = (HEX_SIZE * SQRT_3) / GAME_CONFIG.PLAYER_SHIP_SPEED; 
       if (simulationTimer > tileTime) {
         simulationTimer -= tileTime;
@@ -2234,7 +2250,21 @@
 
         if (globalTilesMoved >= GAME_CONFIG.GLOBAL_MOVE_THRESHOLD) {
           globalTilesMoved = 0;
-          player.gold -= (ships.length * GAME_CONFIG.MAINTENANCE_COST_PER_SHIP);
+          
+          // Calculate dynamic maintenance based on docked status
+          let totalMaintenance = 0;
+          ships.forEach(s => {
+             let sHex = { q: s.q, r: s.r, s: -s.q - s.r };
+             let isDocked = !s.moving && cities.some(c => hexDistance(sHex, c) <= 1);
+             
+             if (isDocked) {
+                 totalMaintenance += GAME_CONFIG.PORT_DOCKING_FEE;
+             } else {
+                 totalMaintenance += GAME_CONFIG.MAINTENANCE_COST_PER_SHIP;
+             }
+          });
+
+          player.gold -= totalMaintenance;
           updateUIGold();
         }
 
@@ -2285,11 +2315,11 @@
       });
 
       if (anyArrived) {
-        isPlaying = false; 
-        updatePlayPauseUI(); 
+        isPlaying = false; // Auto-pause the game when a ship arrives
+        updatePlayPauseUI(); // Refresh the UI to show the "Play" button
 
         if (arrivedShip) {
-          activeShip = arrivedShip; 
+          activeShip = arrivedShip; // Automatically select the ship that just arrived
         }
         updateCargoUI();
         updateTradeDistances(false);
@@ -2325,6 +2355,7 @@
           let targetHex = map.get(getHexKey(closestShip.q, closestShip.r));
           
           if (targetHex && targetHex.type === 'ocean') {
+             // Optimizing A* - only repath if needed
              let needsRepath = false;
              if (p.path.length === 0) {
                  needsRepath = true;
@@ -2370,27 +2401,26 @@
             return; 
           }
 
-          // 2. Terminal guidance
+          // 2. Terminal guidance: If within ~3 hexes, ignore grid and fly direct to pixel coordinates
           if (exactDist < HEX_SIZE * 3) {
-            // UPDATED: Apply chasing speed
             const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
             p.x += (pdx / exactDist) * step;
             p.y += (pdy / exactDist) * step;
             
+            // Keep the grid coordinates updated while flying off-grid
             let currentHex = pixelToHex(p.x, p.y);
             p.q = currentHex.q;
             p.r = currentHex.r;
             
-            p.path = []; 
+            p.path = []; // Clear the grid path so we don't snap back to a center
             
           } else if (p.moving && p.path.length > 0) {
-            // 3. Grid movement while chasing
+            // 3. Grid movement: Follow hex paths if far away
             const targetNode = p.path[0];
             const targetPos = hexToPixel(targetNode.q, targetNode.r);
             const dx = targetPos.x - p.x;
             const dy = targetPos.y - p.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            // UPDATED: Apply chasing speed
             const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
 
             if (distance < step) {
@@ -2413,7 +2443,6 @@
           const dx = targetPos.x - p.x;
           const dy = targetPos.y - p.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          // UPDATED: Apply cruising speed
           const step = GAME_CONFIG.PIRATE_CRUISING_SPEED * dt;
 
           if (distance < step) {
