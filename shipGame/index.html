@@ -700,18 +700,20 @@
       STARTING_GOLD: 1000,
       STARTING_CARGO: 80,
 
-      // --- SHIP & MECHANICS ---
+// --- SHIP & MECHANICS ---
       NEW_SHIP_COST: 1000,
       GLOBAL_MOVE_THRESHOLD: 20,
       ECONOMY_TICK_MOVES: 9,       // How many tile moves trigger an economy update
       MAINTENANCE_COST_PER_SHIP: 12,
       WAREHOUSE_COST: 5000,
+      PLAYER_SHIP_SPEED: 150.0,    // NEW: Configurable player speed
       
       // --- PIRATES ---
       PIRATE_COUNT: 3,
       PIRATE_STEAL_AMOUNT: 500,
       PIRATE_CHASE_DISTANCE: 5,
-      PIRATE_SPEED: 180.0 // Faster than player's 150.0
+      PIRATE_CRUISING_SPEED: 100.0, // NEW: Slower roaming speed
+      PIRATE_CHASING_SPEED: 180.0   // NEW: Fast chase speed
     };
 
     // ==========================================
@@ -1220,10 +1222,11 @@
       let newShip = {
         id: ships.length > 0 ? Math.max(...ships.map(s=>s.id)) + 1 : 1,
         q: q, r: r, x: 0, y: 0,
-        speed: 150.0, path: [], moving: false, targetTile: null,
+        speed: GAME_CONFIG.PLAYER_SHIP_SPEED, // NEW: Uses config
+        path: [], moving: false, targetTile: null,
         maxCargo: GAME_CONFIG.STARTING_CARGO,
         inventory: {},
-        immuneToPirates: false // NEW: Track if they were just robbed
+        immuneToPirates: false
       };
       GOODS.forEach(g => newShip.inventory[g.id] = { count: 0, avgPrice: 0 });
       const pos = hexToPixel(q, r);
@@ -1295,12 +1298,12 @@
         let pos = hexToPixel(tile.q, tile.r);
         pirates.push({
           id: i, q: tile.q, r: tile.r, x: pos.x, y: pos.y,
-          speed: GAME_CONFIG.PIRATE_SPEED, path: [], moving: false,
+          path: [], moving: false,
           state: 'roaming', targetShip: null
         });
       }
     }
-
+     
     function handlePirateCatch(pirate, caughtShip) {
       pirate.state = 'roaming';
       pirate.targetShip = null;
@@ -1893,11 +1896,27 @@
     window.sailToCity = function (cityKey) {
       if (!activeShip) return;
       const city = openWindows[cityKey].city;
+      
+      const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
+      
+      // NEW: If we are already at this city (distance <= 1), cancel the planned route
+      if (hexDistance(shipHex, city) <= 1) {
+        activeShip.path = [];
+        activeShip.moving = false;
+        activeShip.targetTile = null;
+        
+        isPlaying = false; // Ensure game stays paused
+        updatePlayPauseUI();
+        updateCargoUI();
+        updateTradeDistances(false);
+        refreshAllTradeWindows();
+        return;
+      }
+
       let targetTile = city;
 
       const oceanNeighbors = getOceanNeighbors(targetTile);
       if (oceanNeighbors.length > 0) {
-        const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
         oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
         targetTile = oceanNeighbors[0];
       }
@@ -2067,6 +2086,17 @@
             updateCargoUI();
             updateTradeDistances(true);
             refreshAllTradeWindows();
+            
+          } else if (startTile.q === targetTile.q && startTile.r === targetTile.r) {
+            // NEW: If clicking on the exact tile we are standing on, cancel the route.
+            activeShip.path = [];
+            activeShip.moving = false;
+            activeShip.targetTile = null;
+
+            updatePlayPauseUI();
+            updateCargoUI();
+            updateTradeDistances(false);
+            refreshAllTradeWindows();
           }
         }
       }
@@ -2195,7 +2225,8 @@
 
       // 1. Independent Economy Ticking based on elapsed time
       simulationTimer += dt;
-      let tileTime = (HEX_SIZE * SQRT_3) / 150.0; // Time standard ship takes to cross 1 tile
+      // UPDATED: Calculate time based on player config speed
+      let tileTime = (HEX_SIZE * SQRT_3) / GAME_CONFIG.PLAYER_SHIP_SPEED; 
       if (simulationTimer > tileTime) {
         simulationTimer -= tileTime;
         globalTilesMoved++;
@@ -2239,7 +2270,7 @@
               anyArrived = true;
               arrivedShip = s;
 
-              // NEW: Remove Pirate Immunity if they successfully dock at a city
+              // Remove Pirate Immunity if they successfully dock at a city
               let sHex = { q: s.q, r: s.r, s: -s.q - s.r };
               let isDocked = cities.some(c => hexDistance(sHex, c) <= 1);
               if (isDocked) {
@@ -2254,11 +2285,11 @@
       });
 
       if (anyArrived) {
-        isPlaying = false; // Auto-pause the game when a ship arrives
-        updatePlayPauseUI(); // Refresh the UI to show the "Play" button
+        isPlaying = false; 
+        updatePlayPauseUI(); 
 
         if (arrivedShip) {
-          activeShip = arrivedShip; // Automatically select the ship that just arrived
+          activeShip = arrivedShip; 
         }
         updateCargoUI();
         updateTradeDistances(false);
@@ -2274,7 +2305,6 @@
         let closestDist = GAME_CONFIG.PIRATE_CHASE_DISTANCE + 1;
 
         ships.forEach(s => {
-          // NEW: Completely ignore immune ships when scanning for targets
           if (s.immuneToPirates) return;
 
           let sHex = { q: s.q, r: s.r, s: -s.q - s.r };
@@ -2295,7 +2325,6 @@
           let targetHex = map.get(getHexKey(closestShip.q, closestShip.r));
           
           if (targetHex && targetHex.type === 'ocean') {
-             // Optimizing A* - only repath if needed
              let needsRepath = false;
              if (p.path.length === 0) {
                  needsRepath = true;
@@ -2329,14 +2358,63 @@
           }
         }
 
-        // Move Pirate
-        if (p.moving && p.path.length > 0) {
+        // --- MOVEMENT LOGIC: Terminal Guidance & Dynamic Speed ---
+        if (p.state === 'chasing' && p.targetShip) {
+          let pdx = p.targetShip.x - p.x;
+          let pdy = p.targetShip.y - p.y;
+          let exactDist = Math.sqrt(pdx * pdx + pdy * pdy);
+
+          // 1. Catch condition
+          if (exactDist < 20) {
+            handlePirateCatch(p, p.targetShip);
+            return; 
+          }
+
+          // 2. Terminal guidance
+          if (exactDist < HEX_SIZE * 3) {
+            // UPDATED: Apply chasing speed
+            const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
+            p.x += (pdx / exactDist) * step;
+            p.y += (pdy / exactDist) * step;
+            
+            let currentHex = pixelToHex(p.x, p.y);
+            p.q = currentHex.q;
+            p.r = currentHex.r;
+            
+            p.path = []; 
+            
+          } else if (p.moving && p.path.length > 0) {
+            // 3. Grid movement while chasing
+            const targetNode = p.path[0];
+            const targetPos = hexToPixel(targetNode.q, targetNode.r);
+            const dx = targetPos.x - p.x;
+            const dy = targetPos.y - p.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            // UPDATED: Apply chasing speed
+            const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
+
+            if (distance < step) {
+              p.x = targetPos.x;
+              p.y = targetPos.y;
+              p.q = targetNode.q;
+              p.r = targetNode.r;
+              p.path.shift();
+              if (p.path.length === 0) p.moving = false;
+            } else {
+              p.x += (dx / distance) * step;
+              p.y += (dy / distance) * step;
+            }
+          }
+        } 
+        // Standard roaming movement (not chasing)
+        else if (p.moving && p.path.length > 0) {
           const targetNode = p.path[0];
           const targetPos = hexToPixel(targetNode.q, targetNode.r);
           const dx = targetPos.x - p.x;
           const dy = targetPos.y - p.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
-          const step = p.speed * dt;
+          // UPDATED: Apply cruising speed
+          const step = GAME_CONFIG.PIRATE_CRUISING_SPEED * dt;
 
           if (distance < step) {
             p.x = targetPos.x;
@@ -2344,21 +2422,10 @@
             p.q = targetNode.q;
             p.r = targetNode.r;
             p.path.shift();
-
             if (p.path.length === 0) p.moving = false;
           } else {
             p.x += (dx / distance) * step;
             p.y += (dy / distance) * step;
-          }
-
-          // Check for collision while chasing
-          if (p.state === 'chasing' && p.targetShip) {
-            let pdx = p.targetShip.x - p.x;
-            let pdy = p.targetShip.y - p.y;
-            // NEW: Generous static pixel radius (20px) to prevent tail-chasing math bugs
-            if (Math.sqrt(pdx*pdx + pdy*pdy) < 20) { 
-               handlePirateCatch(p, p.targetShip);
-            }
           }
         }
       });
