@@ -730,12 +730,27 @@
     </div>
     <div class="filter-content">
       <input type="text" id="filter-text" placeholder="Search goods (e.g. Rum)" oninput="updateFilters()">
+
       <label class="filter-label">
-        <input type="checkbox" id="filter-above100" onchange="updateFilters()"> City stock > 100
+        <input type="checkbox" id="filter-produced" onchange="updateFilters()"> Produced here (⬆)
       </label>
       <label class="filter-label">
-        <input type="checkbox" id="filter-below10" onchange="updateFilters()"> City stock &lt; 10 (Red)
+        <input type="checkbox" id="filter-consumed" onchange="updateFilters()"> Highly Consumed (⬇)
       </label>
+      <label class="filter-label">
+        <input type="checkbox" id="filter-on-ship" onchange="updateFilters()"> Products on active ship
+      </label>
+
+      <div style="display: flex; gap: 10px; align-items: center; margin-top: 5px; color: #ecf0f1;">
+        <label style="font-size: 14px;">Min Stock:</label>
+        <input type="number" id="filter-min-stock" min="0" placeholder="0" oninput="updateFilters()"
+          style="width: 60px; padding: 4px; border-radius: 4px; border: none; background: #34495e; color: white;">
+
+        <label style="font-size: 14px; margin-left: 5px;">Max Stock:</label>
+        <input type="number" id="filter-max-stock" min="0" placeholder="∞" oninput="updateFilters()"
+          style="width: 60px; padding: 4px; border-radius: 4px; border: none; background: #34495e; color: white;">
+      </div>
+
       <button class="trade-btn sell" style="margin-top: 15px; width: 100%;" onclick="clearFilters()">Clear All</button>
     </div>
   </div>
@@ -823,7 +838,14 @@
     let isPlaying = false;
 
     // --- FILTER STATE ---
-    let activeFilters = { text: '', above100: false, below10: false };
+    let activeFilters = {
+      text: '',
+      minStock: null,
+      maxStock: null,
+      produced: false,
+      consumed: false,
+      onShip: false
+    };
     let isFilterWindowOpen = false;
     let filterDragInitialized = false;
 
@@ -835,7 +857,6 @@
         win.classList.remove('d-none');
         win.style.zIndex = ++zIndexCounter;
 
-        // Initialize dragging only once
         if (!filterDragInitialized) {
           makeUIDraggable(win, document.getElementById('filter-header'));
           filterDragInitialized = true;
@@ -847,15 +868,27 @@
 
     function updateFilters() {
       activeFilters.text = document.getElementById('filter-text').value.toLowerCase();
-      activeFilters.above100 = document.getElementById('filter-above100').checked;
-      activeFilters.below10 = document.getElementById('filter-below10').checked;
+
+      let minVal = document.getElementById('filter-min-stock').value;
+      activeFilters.minStock = minVal !== '' ? parseInt(minVal) : null;
+
+      let maxVal = document.getElementById('filter-max-stock').value;
+      activeFilters.maxStock = maxVal !== '' ? parseInt(maxVal) : null;
+
+      activeFilters.produced = document.getElementById('filter-produced').checked;
+      activeFilters.consumed = document.getElementById('filter-consumed').checked;
+      activeFilters.onShip = document.getElementById('filter-on-ship').checked;
+
       refreshAllTradeWindows();
     }
 
     function clearFilters() {
       document.getElementById('filter-text').value = '';
-      document.getElementById('filter-above100').checked = false;
-      document.getElementById('filter-below10').checked = false;
+      document.getElementById('filter-min-stock').value = '';
+      document.getElementById('filter-max-stock').value = '';
+      document.getElementById('filter-produced').checked = false;
+      document.getElementById('filter-consumed').checked = false;
+      document.getElementById('filter-on-ship').checked = false;
       updateFilters();
     }
 
@@ -2033,16 +2066,19 @@
           let hasHighlights = false;
           GOODS.forEach(good => {
             const cityStock = city.inventory[good.id];
+            const isProduced = city.producedGoods.includes(good.id);
+            const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
 
             // --- FILTER CHECK ---
             let isFiltered = false;
             if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
-            if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
-            if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+            if (activeFilters.minStock !== null && cityStock < activeFilters.minStock) isFiltered = true;
+            if (activeFilters.maxStock !== null && cityStock > activeFilters.maxStock) isFiltered = true;
+            if (activeFilters.produced && !isProduced) isFiltered = true;
+            if (activeFilters.consumed && !isConsumed) isFiltered = true;
+            if (activeFilters.onShip && (!activeShip || activeShip.inventory[good.id].count <= 0)) isFiltered = true;
             if (isFiltered) return;
 
-            const isProduced = city.producedGoods.includes(good.id);
-            const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
             const isRed = cityStock < 10;
 
             if (isProduced || isConsumed || isRed) {
@@ -2058,18 +2094,21 @@
           let hasCargo = false;
           GOODS.forEach(good => {
             const cityStock = city.inventory[good.id];
+            const isProduced = city.producedGoods.includes(good.id);
+            const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
 
             // --- FILTER CHECK ---
             let isFiltered = false;
             if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
-            if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
-            if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+            if (activeFilters.minStock !== null && cityStock < activeFilters.minStock) isFiltered = true;
+            if (activeFilters.maxStock !== null && cityStock > activeFilters.maxStock) isFiltered = true;
+            if (activeFilters.produced && !isProduced) isFiltered = true;
+            if (activeFilters.consumed && !isConsumed) isFiltered = true;
+            if (activeFilters.onShip && (!activeShip || activeShip.inventory[good.id].count <= 0)) isFiltered = true;
             if (isFiltered) return;
 
             if (activeShip.inventory[good.id].count > 0) {
               hasCargo = true;
-              const isProduced = city.producedGoods.includes(good.id);
-              const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
               const { sellPrice } = getPrices(good, cityStock);
 
               let colorClass = cityStock < 10 ? 'text-red' : (isProduced ? 'text-green' : (isConsumed ? 'text-orange' : 'text-white'));
@@ -2137,21 +2176,23 @@
 
             GOODS.forEach(good => {
               const cityStock = city.inventory[good.id];
+              const isProduced = city.producedGoods.includes(good.id);
+              const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
 
               // --- FILTER CHECK ---
               let isFiltered = false;
               if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
-              if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
-              if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+              if (activeFilters.minStock !== null && cityStock < activeFilters.minStock) isFiltered = true;
+              if (activeFilters.maxStock !== null && cityStock > activeFilters.maxStock) isFiltered = true;
+              if (activeFilters.produced && !isProduced) isFiltered = true;
+              if (activeFilters.consumed && !isConsumed) isFiltered = true;
+              if (activeFilters.onShip && (!activeShip || activeShip.inventory[good.id].count <= 0)) isFiltered = true;
               if (isFiltered) return;
 
               const playerStock = isUsingWarehouse ? city.warehouseInventory[good.id].count : activeShip.inventory[good.id].count;
               const playerAvgPrice = isUsingWarehouse ? city.warehouseInventory[good.id].avgPrice : activeShip.inventory[good.id].avgPrice;
 
               const { buyPrice, sellPrice } = getPrices(good, cityStock);
-
-              const isProduced = city.producedGoods.includes(good.id);
-              const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
 
               let prodMarker = '<span class="prod-arrow invisible">⬆</span>';
               if (isProduced) {
@@ -2237,12 +2278,17 @@
                     `;
               GOODS.forEach(good => {
                 const cityStock = city.inventory[good.id];
+                const isProduced = city.producedGoods.includes(good.id);
+                const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
 
                 // --- FILTER CHECK ---
                 let isFiltered = false;
                 if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
-                if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
-                if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+                if (activeFilters.minStock !== null && cityStock < activeFilters.minStock) isFiltered = true;
+                if (activeFilters.maxStock !== null && cityStock > activeFilters.maxStock) isFiltered = true;
+                if (activeFilters.produced && !isProduced) isFiltered = true;
+                if (activeFilters.consumed && !isConsumed) isFiltered = true;
+                if (activeFilters.onShip && (!activeShip || activeShip.inventory[good.id].count <= 0)) isFiltered = true;
                 if (isFiltered) return;
 
                 const shipStock = activeShip.inventory[good.id].count;
@@ -2377,8 +2423,23 @@
 
     // --- Input Handling ---
     window.addEventListener('keydown', (e) => {
-      // Don't trigger game shortcuts if typing in the filter box
-      if (e.target.tagName.toLowerCase() === 'input') return;
+      // Don't trigger game shortcuts if typing in the filter boxes (text or number)
+      const isInput = e.target.tagName.toLowerCase() === 'input';
+      if (isInput && (e.target.type === 'text' || e.target.type === 'number')) return;
+
+      // Helper function to toggle checkboxes and provide visual feedback
+      const toggleCheckbox = (checkboxId) => {
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          updateFilters();
+
+          if (isFilterWindowOpen) {
+            checkbox.parentElement.style.color = '#f1c40f';
+            setTimeout(() => checkbox.parentElement.style.color = '#ecf0f1', 200);
+          }
+        }
+      };
 
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
@@ -2393,6 +2454,37 @@
           let nextIndex = (currentIndex + 1) % ships.length;
           selectShip(nextIndex);
         }
+      } else if (e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        toggleCheckbox('filter-on-ship');
+      } else if (e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        // Toggle the Max Stock input to 9 (filters for < 10)
+        const maxInput = document.getElementById('filter-max-stock');
+        if (maxInput) {
+          if (maxInput.value === '9') {
+            maxInput.value = ''; // Clear it if it's already set to 9
+          } else {
+            maxInput.value = '9'; // Set to 9 to show only red items
+          }
+          updateFilters();
+
+          // Visual cue for the number input
+          if (isFilterWindowOpen) {
+            maxInput.style.backgroundColor = '#f1c40f';
+            maxInput.style.color = '#2c3e50';
+            setTimeout(() => {
+              maxInput.style.backgroundColor = '#34495e';
+              maxInput.style.color = 'white';
+            }, 200);
+          }
+        }
+      } else if (e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        toggleCheckbox('filter-produced');
+      } else if (e.key.toLowerCase() === 'q') {
+        e.preventDefault();
+        toggleCheckbox('filter-consumed');
       }
     });
 
