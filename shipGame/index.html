@@ -686,8 +686,9 @@
     // --- GAME CONFIGURATION ---
     // ==========================================
     const GAME_CONFIG = {
+      MAP_TYPE: 'irregular', // Options: 'bigIsland', 'coastal', 'irregular', 'ring', 'twoContinents', 'poles' 
       MAP_RADIUS: 31,
-      ISLAND_COUNT: 37,
+      ISLAND_COUNT: 39,
       CITY_SPAWN_CHANCE: 0.03,
       MIN_CITIES: 12,
       MAX_CITIES: 40,
@@ -743,7 +744,7 @@
       // --- PIRATES ---
       PIRATE_COUNT: 3,
       PIRATE_STEAL_AMOUNT: 600,
-      PIRATE_CHASE_DISTANCE: 5,
+      PIRATE_CHASE_DISTANCE: 4,
       PIRATE_CRUISING_SPEED: 100.0, // Slower roaming speed
       PIRATE_CHASING_SPEED: 180.0   // Fast chase speed
     };
@@ -1031,12 +1032,74 @@
     const cities = [];
 
     function generateMap() {
+      // --- 1. GENERATE ISLAND CLUSTERS (METABALLS) ---
       const islands = [];
+
       for (let i = 0; i < GAME_CONFIG.ISLAND_COUNT; i++) {
-        const q = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
-        const r = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
-        const radius = Math.floor(Math.random() * 6) + 2;
-        islands.push({ q, r, radius });
+        let clusterQ, clusterR;
+
+        if (GAME_CONFIG.MAP_TYPE === 'bigIsland') {
+          // Constrain cluster seeds to the inner 40% to form a central continent
+          const limit = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.4);
+          clusterQ = Math.floor(Math.random() * (limit * 2)) - limit;
+          clusterR = Math.floor(Math.random() * (limit * 2)) - limit;
+
+        } else if (GAME_CONFIG.MAP_TYPE === 'coastal') {
+          // Push seeds to the far left and right edges (East/West coasts)
+          const side = Math.random() < 0.5 ? 1 : -1;
+          const innerEdge = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.5);
+          const outerEdge = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.9);
+          clusterQ = side * (Math.floor(Math.random() * (outerEdge - innerEdge + 1)) + innerEdge);
+
+          const rLimit = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.5);
+          clusterR = Math.floor(Math.random() * (rLimit * 2)) - rLimit;
+
+        } else if (GAME_CONFIG.MAP_TYPE === 'twoContinents') {
+          // Like coastal, but highly concentrated into two solid masses
+          const isLeft = Math.random() < 0.5;
+          const centerQ = isLeft ? -Math.floor(GAME_CONFIG.MAP_RADIUS * 0.6) : Math.floor(GAME_CONFIG.MAP_RADIUS * 0.6);
+          const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.25);
+
+          clusterQ = centerQ + (Math.floor(Math.random() * (variance * 2)) - variance);
+          clusterR = Math.floor(Math.random() * (variance * 2)) - variance;
+
+        } else if (GAME_CONFIG.MAP_TYPE === 'poles') {
+          // Push seeds to the extreme North and South
+          const isTop = Math.random() < 0.5;
+          const centerR = isTop ? -Math.floor(GAME_CONFIG.MAP_RADIUS * 0.75) : Math.floor(GAME_CONFIG.MAP_RADIUS * 0.75);
+
+          // To keep it horizontally centered in hex coordinates, Q must compensate for R
+          const centerQ = -Math.floor(centerR / 2);
+          const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.3);
+
+          clusterR = centerR + (Math.floor(Math.random() * (variance * 2)) - variance);
+          clusterQ = centerQ + (Math.floor(Math.random() * (variance * 2)) - variance);
+
+        } else if (GAME_CONFIG.MAP_TYPE === 'ring') {
+          // Generate a random angle and push the seed out to a fixed radius
+          const angle = Math.random() * Math.PI * 2;
+          const ringRadius = GAME_CONFIG.MAP_RADIUS * 0.65; // Distance from center
+          const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.15); // Wiggle room so it isn't a perfect circle
+
+          clusterQ = Math.round(Math.cos(angle) * ringRadius) + (Math.floor(Math.random() * variance) - variance / 2);
+          clusterR = Math.round(Math.sin(angle) * ringRadius) + (Math.floor(Math.random() * variance) - variance / 2);
+
+        } else {
+          // 'irregular' (Default) - Spread seeds everywhere randomly
+          clusterQ = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
+          clusterR = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
+        }
+
+        // Drop 3 to 6 overlapping circular blobs around the center to form a landmass
+        const numBlobs = Math.floor(Math.random() * 4) + 3;
+        for (let b = 0; b < numBlobs; b++) {
+          const q = clusterQ + (Math.floor(Math.random() * 7) - 3);
+          const r = clusterR + (Math.floor(Math.random() * 7) - 3);
+          const pos = hexToPixel(q, r);
+
+          const radius = (Math.random() * 2.5 + 1) * (HEX_SIZE * 1.732);
+          islands.push({ x: pos.x, y: pos.y, radius: radius });
+        }
       }
 
       function getRandomColor(type) {
@@ -1047,25 +1110,65 @@
         return 'black';
       }
 
+      // --- 2. EVALUATE MAP TILES ---
       for (let q = -GAME_CONFIG.MAP_RADIUS; q <= GAME_CONFIG.MAP_RADIUS; q++) {
         const r1 = Math.max(-GAME_CONFIG.MAP_RADIUS, -q - GAME_CONFIG.MAP_RADIUS);
         const r2 = Math.min(GAME_CONFIG.MAP_RADIUS, -q + GAME_CONFIG.MAP_RADIUS);
         for (let r = r1; r <= r2; r++) {
           const s = -q - r;
-          let type = 'ocean';
+          const pos = hexToPixel(q, r);
           let maxInfluence = -100;
 
           for (let isle of islands) {
-            const dist = hexDistance({ q, r, s }, { q: isle.q, r: isle.r, s: -isle.q - isle.r });
-            const influence = isle.radius - dist;
+            // Use Pixel Distance (Euclidean) instead of Hex Distance
+            const dx = pos.x - isle.x;
+            const dy = pos.y - isle.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Add noise to the edge for jagged coasts
+            const noise = Math.random() * (HEX_SIZE * 0.8);
+            const influence = isle.radius - dist - noise;
+
             if (influence > maxInfluence) maxInfluence = influence;
           }
 
-          if (maxInfluence > 0) type = 'land';
-          else if (maxInfluence === 0) type = 'beach';
-
-          map.set(getHexKey(q, r), { q, r, s, type, color: getRandomColor(type), hasCity: false, isMainOcean: false });
+          // Initial pass: just identify Land or Ocean
+          let type = maxInfluence > 0 ? 'land' : 'ocean';
+          map.set(getHexKey(q, r), { q, r, s, type, color: '', hasCity: false, isMainOcean: false });
         }
+      }
+
+      // --- 3. SMOOTHING PASS (Cellular Automata) ---
+      // Removes ugly isolated 1-hex islands or tiny 1-hex lakes
+      const smoothingUpdates = [];
+      for (let [key, hex] of map) {
+        const neighbors = getAllNeighbors(hex);
+        const landCount = neighbors.filter(n => n.type === 'land').length;
+
+        if (hex.type === 'land' && landCount <= 1) {
+          smoothingUpdates.push({ key, type: 'ocean' });
+        } else if (hex.type === 'ocean' && landCount >= 5) {
+          smoothingUpdates.push({ key, type: 'land' });
+        }
+      }
+      smoothingUpdates.forEach(u => map.get(u.key).type = u.type);
+
+      // --- 4. BEACH GENERATION ---
+      // Apply the yellow beach border strictly to ocean tiles touching land
+      const beachUpdates = [];
+      for (let [key, hex] of map) {
+        if (hex.type === 'ocean') {
+          const neighbors = getAllNeighbors(hex);
+          if (neighbors.some(n => n.type === 'land')) {
+            beachUpdates.push({ key, type: 'beach' });
+          }
+        }
+      }
+      beachUpdates.forEach(u => map.get(u.key).type = u.type);
+
+      // --- 5. ASSIGN COLORS ---
+      for (let [key, hex] of map) {
+        hex.color = getRandomColor(hex.type);
       }
 
       // --- FLOOD FILL: Find Main Ocean ---
