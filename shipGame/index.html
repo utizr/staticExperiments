@@ -687,8 +687,8 @@
     // ==========================================
     const GAME_CONFIG = {
       MAP_TYPE: 'irregular', // Options: 'bigIsland', 'coastal', 'irregular', 'ring', 'twoContinents', 'poles' 
-      MAP_RADIUS: 31,
-      ISLAND_COUNT: 39,
+      MAP_RADIUS: 51,
+      ISLAND_COUNT: 81,
       CITY_SPAWN_CHANCE: 0.03,
       MIN_CITIES: 12,
       MAX_CITIES: 40,
@@ -1031,72 +1031,53 @@
     const map = new Map();
     const cities = [];
 
+
     function generateMap() {
       // --- 1. GENERATE ISLAND CLUSTERS (METABALLS) ---
       const islands = [];
-
       for (let i = 0; i < GAME_CONFIG.ISLAND_COUNT; i++) {
         let clusterQ, clusterR;
 
         if (GAME_CONFIG.MAP_TYPE === 'bigIsland') {
-          // Constrain cluster seeds to the inner 40% to form a central continent
           const limit = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.4);
           clusterQ = Math.floor(Math.random() * (limit * 2)) - limit;
           clusterR = Math.floor(Math.random() * (limit * 2)) - limit;
-
         } else if (GAME_CONFIG.MAP_TYPE === 'coastal') {
-          // Push seeds to the far left and right edges (East/West coasts)
           const side = Math.random() < 0.5 ? 1 : -1;
           const innerEdge = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.5);
           const outerEdge = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.9);
           clusterQ = side * (Math.floor(Math.random() * (outerEdge - innerEdge + 1)) + innerEdge);
-
           const rLimit = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.5);
           clusterR = Math.floor(Math.random() * (rLimit * 2)) - rLimit;
-
         } else if (GAME_CONFIG.MAP_TYPE === 'twoContinents') {
-          // Like coastal, but highly concentrated into two solid masses
           const isLeft = Math.random() < 0.5;
           const centerQ = isLeft ? -Math.floor(GAME_CONFIG.MAP_RADIUS * 0.6) : Math.floor(GAME_CONFIG.MAP_RADIUS * 0.6);
           const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.25);
-
           clusterQ = centerQ + (Math.floor(Math.random() * (variance * 2)) - variance);
           clusterR = Math.floor(Math.random() * (variance * 2)) - variance;
-
         } else if (GAME_CONFIG.MAP_TYPE === 'poles') {
-          // Push seeds to the extreme North and South
           const isTop = Math.random() < 0.5;
           const centerR = isTop ? -Math.floor(GAME_CONFIG.MAP_RADIUS * 0.75) : Math.floor(GAME_CONFIG.MAP_RADIUS * 0.75);
-
-          // To keep it horizontally centered in hex coordinates, Q must compensate for R
           const centerQ = -Math.floor(centerR / 2);
           const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.3);
-
           clusterR = centerR + (Math.floor(Math.random() * (variance * 2)) - variance);
           clusterQ = centerQ + (Math.floor(Math.random() * (variance * 2)) - variance);
-
         } else if (GAME_CONFIG.MAP_TYPE === 'ring') {
-          // Generate a random angle and push the seed out to a fixed radius
           const angle = Math.random() * Math.PI * 2;
-          const ringRadius = GAME_CONFIG.MAP_RADIUS * 0.65; // Distance from center
-          const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.15); // Wiggle room so it isn't a perfect circle
-
+          const ringRadius = GAME_CONFIG.MAP_RADIUS * 0.65;
+          const variance = Math.floor(GAME_CONFIG.MAP_RADIUS * 0.15);
           clusterQ = Math.round(Math.cos(angle) * ringRadius) + (Math.floor(Math.random() * variance) - variance / 2);
           clusterR = Math.round(Math.sin(angle) * ringRadius) + (Math.floor(Math.random() * variance) - variance / 2);
-
         } else {
-          // 'irregular' (Default) - Spread seeds everywhere randomly
           clusterQ = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
           clusterR = Math.floor(Math.random() * (GAME_CONFIG.MAP_RADIUS * 2)) - GAME_CONFIG.MAP_RADIUS;
         }
 
-        // Drop 3 to 6 overlapping circular blobs around the center to form a landmass
         const numBlobs = Math.floor(Math.random() * 4) + 3;
         for (let b = 0; b < numBlobs; b++) {
           const q = clusterQ + (Math.floor(Math.random() * 7) - 3);
           const r = clusterR + (Math.floor(Math.random() * 7) - 3);
           const pos = hexToPixel(q, r);
-
           const radius = (Math.random() * 2.5 + 1) * (HEX_SIZE * 1.732);
           islands.push({ x: pos.x, y: pos.y, radius: radius });
         }
@@ -1120,26 +1101,21 @@
           let maxInfluence = -100;
 
           for (let isle of islands) {
-            // Use Pixel Distance (Euclidean) instead of Hex Distance
             const dx = pos.x - isle.x;
             const dy = pos.y - isle.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Add noise to the edge for jagged coasts
             const noise = Math.random() * (HEX_SIZE * 0.8);
             const influence = isle.radius - dist - noise;
 
             if (influence > maxInfluence) maxInfluence = influence;
           }
 
-          // Initial pass: just identify Land or Ocean
           let type = maxInfluence > 0 ? 'land' : 'ocean';
+
           map.set(getHexKey(q, r), { q, r, s, type, color: '', hasCity: false, isMainOcean: false });
         }
       }
-
       // --- 3. SMOOTHING PASS (Cellular Automata) ---
-      // Removes ugly isolated 1-hex islands or tiny 1-hex lakes
       const smoothingUpdates = [];
       for (let [key, hex] of map) {
         const neighbors = getAllNeighbors(hex);
@@ -1153,8 +1129,9 @@
       }
       smoothingUpdates.forEach(u => map.get(u.key).type = u.type);
 
-      // --- 4. BEACH GENERATION ---
-      // Apply the yellow beach border strictly to ocean tiles touching land
+      // --- 4. PRELIMINARY BEACH GENERATION ---
+      // We must generate beaches BEFORE the flood fill. 
+      // If a strait is so narrow that it becomes 100% beaches, it acts as a wall.
       const beachUpdates = [];
       for (let [key, hex] of map) {
         if (hex.type === 'ocean') {
@@ -1166,16 +1143,12 @@
       }
       beachUpdates.forEach(u => map.get(u.key).type = u.type);
 
-      // --- 5. ASSIGN COLORS ---
-      for (let [key, hex] of map) {
-        hex.color = getRandomColor(hex.type);
-      }
-
-      // --- FLOOD FILL: Find Main Ocean ---
+      // --- 5. FLOOD FILL: Find Navigable Deep Ocean ---
       const oceanRegions = [];
       const visited = new Set();
 
       for (let [key, hex] of map) {
+        // Only flood fill on true 'ocean' tiles (not beaches)
         if (hex.type === 'ocean' && !visited.has(key)) {
           const currentRegion = [];
           const queue = [hex];
@@ -1198,13 +1171,42 @@
       }
 
       oceanRegions.sort((a, b) => b.length - a.length);
+
       if (oceanRegions.length > 0) {
         oceanRegions[0].forEach(hex => {
           hex.isMainOcean = true;
         });
       }
 
-      // --- FIND ALL VALID COASTAL HEXES ---
+      // --- 6. FILL UNREACHABLE WATERS & ISOLATED BEACHES ---
+      // 1. Any ocean region that isn't the MainOcean becomes land (filling the lake)
+      if (oceanRegions.length > 1) {
+        for (let i = 1; i < oceanRegions.length; i++) {
+          oceanRegions[i].forEach(hex => {
+            hex.type = 'land';
+          });
+        }
+      }
+
+      // 2. Any beach that doesn't border the MainOcean is inside a filled lake, 
+      // so it must also become solid land.
+      const isolatedBeaches = [];
+      for (let [key, hex] of map) {
+        if (hex.type === 'beach') {
+          const neighbors = getAllNeighbors(hex);
+          const touchesMainOcean = neighbors.some(n => n.type === 'ocean' && n.isMainOcean);
+          if (!touchesMainOcean) {
+            isolatedBeaches.push(hex);
+          }
+        }
+      }
+      isolatedBeaches.forEach(hex => { hex.type = 'land'; });
+
+      // --- 7. ASSIGN COLORS ---
+      for (let [key, hex] of map) {
+        hex.color = getRandomColor(hex.type);
+      }
+      // --- 8. FIND ALL VALID COASTAL HEXES ---
       let validCityHexes = [];
       for (let [key, hex] of map) {
         if (hex.type === 'land' || hex.type === 'beach') {
@@ -1222,7 +1224,7 @@
         const cityTooClose = cities.some(c => hexDistance(c, hex) < 3);
         if (!cityTooClose) {
           hex.hasCity = true;
-          hex.reputation = 0; // <-- NEW: Start at neutral
+          hex.reputation = 0;
           hex.inventory = {};
 
           if (availableNames.length > 0) {
@@ -1234,7 +1236,6 @@
 
           hex.turnsUntilNextAITrade = Math.floor(Math.random() * (GAME_CONFIG.AI_TRADE_MAX_TURNS - GAME_CONFIG.AI_TRADE_MIN_TURNS + 1)) + GAME_CONFIG.AI_TRADE_MIN_TURNS;
 
-          // Handle Produced Goods
           const minProd = GAME_CONFIG.MIN_PRODUCED_GOODS;
           const maxProd = GAME_CONFIG.MAX_PRODUCED_GOODS;
           const numGoodsProduced = Math.floor(Math.random() * (maxProd - minProd + 1)) + minProd;
@@ -1242,7 +1243,6 @@
           let shuffledGoods = [...GOODS].sort(() => 0.5 - Math.random());
           hex.producedGoods = shuffledGoods.slice(0, numGoodsProduced).map(g => g.id);
 
-          // Handle High Consumption Goods
           const minCons = GAME_CONFIG.HIGH_CONSUMPTION_GOODS_MIN;
           const maxCons = GAME_CONFIG.HIGH_CONSUMPTION_GOODS_MAX;
           const numGoodsConsumed = Math.floor(Math.random() * (maxCons - minCons + 1)) + minCons;
@@ -1254,7 +1254,6 @@
             hex.inventory[g.id] = Math.floor(Math.random() * 100) + 10;
           });
 
-          // Initialize Warehouse state
           hex.hasWarehouse = false;
           hex.warehouseInventory = {};
           GOODS.forEach(g => {
@@ -1296,6 +1295,8 @@
         });
       }
     }
+
+
     generateMap();
 
     // --- Off-Screen Caching ---
@@ -1436,12 +1437,12 @@
       return newShip;
     }
 
-    // Spawn Initial Ship
-    let spawnQ = 0, spawnR = 0;
-    for (let [key, hex] of map) {
-      if (hex.type === 'ocean' && hex.isMainOcean) { spawnQ = hex.q; spawnR = hex.r; break; }
-    }
-    ships.push(createShip(spawnQ, spawnR));
+    // Spawn Initial Ship at a Harbor
+    const startCity = cities[Math.floor(Math.random() * cities.length)];
+    const oceanNeighbors = getAllNeighbors(startCity).filter(n => n.type === 'ocean' && n.isMainOcean);
+    const spawnHex = oceanNeighbors[0];
+
+    ships.push(createShip(spawnHex.q, spawnHex.r));
     activeShip = ships[0];
 
     // Initial camera initialization
