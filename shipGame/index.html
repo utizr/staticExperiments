@@ -741,7 +741,7 @@
       PLAYER_SHIP_SPEED: 150.0,    // Configurable player speed
 
       // --- PIRATES ---
-      PIRATE_COUNT: 5,
+      PIRATE_COUNT: 3,
       PIRATE_STEAL_AMOUNT: 600,
       PIRATE_CHASE_DISTANCE: 5,
       PIRATE_CRUISING_SPEED: 100.0, // Slower roaming speed
@@ -1208,54 +1208,54 @@
     // Place the helper function right above prerenderMap
     function drawCitySettlement(ctx, hexCenterX, hexCenterY) {
       ctx.save();
-      
+
       // Shift down slightly within the hex and apply the scale up
-      const yOffset = 4; 
+      const yOffset = 4;
       ctx.translate(hexCenterX, hexCenterY + yOffset);
-      ctx.scale(0.75, 0.75); 
+      ctx.scale(0.75, 0.75);
 
       // Global styling for the buildings
       ctx.lineWidth = 2;
-      ctx.strokeStyle = '#2c3e50'; 
+      ctx.strokeStyle = '#2c3e50';
       ctx.lineJoin = 'round';
 
       // --- RIGHT WAREHOUSE ---
       // A sturdy storage building for trade goods
-      ctx.fillStyle = '#ecf0f1'; 
+      ctx.fillStyle = '#ecf0f1';
       ctx.fillRect(10, -5, 18, 20);
       ctx.strokeRect(10, -5, 18, 20);
-      
+
       // Warehouse Roof (Darker terracotta)
       ctx.fillStyle = '#d35400';
       ctx.beginPath();
-      ctx.moveTo(8, -5); 
-      ctx.lineTo(19, -15); 
+      ctx.moveTo(8, -5);
+      ctx.lineTo(19, -15);
       ctx.lineTo(30, -5);
       ctx.closePath();
-      ctx.fill(); 
+      ctx.fill();
       ctx.stroke();
-      
+
       // Large Double Doors for cargo
       ctx.fillStyle = '#2c3e50';
       ctx.fillRect(14, 5, 10, 10);
-      
+
       // Line down the middle to define the double doors
       ctx.beginPath();
-      ctx.moveTo(19, 5); 
+      ctx.moveTo(19, 5);
       ctx.lineTo(19, 15);
       ctx.stroke();
 
       // --- LEFT HOUSE ---
-      ctx.fillStyle = '#ecf0f1'; 
+      ctx.fillStyle = '#ecf0f1';
       ctx.fillRect(-25, -5, 15, 20);
       ctx.strokeRect(-25, -5, 15, 20);
-      
+
       ctx.fillStyle = '#e67e22';
       ctx.beginPath();
       ctx.moveTo(-28, -5); ctx.lineTo(-17.5, -15); ctx.lineTo(-7, -5);
       ctx.closePath();
       ctx.fill(); ctx.stroke();
-      
+
       ctx.fillStyle = '#2c3e50';
       ctx.fillRect(-20, 5, 5, 10);
 
@@ -1263,13 +1263,13 @@
       ctx.fillStyle = '#ecf0f1';
       ctx.fillRect(-10, -20, 20, 35);
       ctx.strokeRect(-10, -20, 20, 35);
-      
+
       ctx.fillStyle = '#c0392b';
       ctx.beginPath();
       ctx.moveTo(-13, -20); ctx.lineTo(0, -35); ctx.lineTo(13, -20);
       ctx.closePath();
       ctx.fill(); ctx.stroke();
-      
+
       ctx.fillStyle = '#2c3e50';
       ctx.fillRect(-4, 0, 8, 15);
 
@@ -1302,7 +1302,7 @@
 
       for (let city of cities) {
         const pos = hexToPixel(city.q, city.r);
-        
+
         // Pass the background context (bgCtx) and the calculated X/Y positions
         drawCitySettlement(bgCtx, pos.x, pos.y);
       }
@@ -2329,7 +2329,7 @@
         // 3. Masts
         ctx.strokeStyle = '#5c2a07';
         ctx.lineWidth = 3 / (camera.zoom * scale);
-        
+
         // Mizzen (Back)
         ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-20, -35); ctx.stroke();
         // Main (Center)
@@ -2376,7 +2376,7 @@
       pirates.forEach(p => {
         ctx.save();
         ctx.translate(p.x, p.y + 8);
-        
+
         const scale = 0.75;
         ctx.scale(scale, scale);
 
@@ -2388,19 +2388,19 @@
         ctx.beginPath();
         ctx.moveTo(-35, -5); ctx.lineTo(-15, -5); ctx.lineTo(-15, -18); ctx.lineTo(-35, -18);
         ctx.closePath(); ctx.fill(); ctx.stroke();
-        
+
         ctx.fillStyle = '#c0392b'; // Dark red stripe
         ctx.fillRect(-35, -12, 20, 4);
 
         // Main Hull & Bowsprit
         ctx.fillStyle = '#111'; // Pitch black hull
         ctx.beginPath();
-        ctx.moveTo(-35, -5); 
-        ctx.lineTo(20, -5);  
-        ctx.quadraticCurveTo(30, -5, 35, -15); 
-        ctx.lineTo(25, 0);   
-        ctx.quadraticCurveTo(15, 15, -10, 15); 
-        ctx.quadraticCurveTo(-30, 15, -35, -5); 
+        ctx.moveTo(-35, -5);
+        ctx.lineTo(20, -5);
+        ctx.quadraticCurveTo(30, -5, 35, -15);
+        ctx.lineTo(25, 0);
+        ctx.quadraticCurveTo(15, 15, -10, 15);
+        ctx.quadraticCurveTo(-30, 15, -35, -5);
         ctx.closePath();
         ctx.fill(); ctx.stroke();
 
