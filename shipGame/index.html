@@ -1205,6 +1205,77 @@
     const mapOffsetX = mapPixelWidth / 2;
     const mapOffsetY = mapPixelHeight / 2;
 
+    // Place the helper function right above prerenderMap
+    function drawCitySettlement(ctx, hexCenterX, hexCenterY) {
+      ctx.save();
+      
+      // Shift down slightly within the hex and apply the scale up
+      const yOffset = 4; 
+      ctx.translate(hexCenterX, hexCenterY + yOffset);
+      ctx.scale(0.75, 0.75); 
+
+      // Global styling for the buildings
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#2c3e50'; 
+      ctx.lineJoin = 'round';
+
+      // --- RIGHT WAREHOUSE ---
+      // A sturdy storage building for trade goods
+      ctx.fillStyle = '#ecf0f1'; 
+      ctx.fillRect(10, -5, 18, 20);
+      ctx.strokeRect(10, -5, 18, 20);
+      
+      // Warehouse Roof (Darker terracotta)
+      ctx.fillStyle = '#d35400';
+      ctx.beginPath();
+      ctx.moveTo(8, -5); 
+      ctx.lineTo(19, -15); 
+      ctx.lineTo(30, -5);
+      ctx.closePath();
+      ctx.fill(); 
+      ctx.stroke();
+      
+      // Large Double Doors for cargo
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(14, 5, 10, 10);
+      
+      // Line down the middle to define the double doors
+      ctx.beginPath();
+      ctx.moveTo(19, 5); 
+      ctx.lineTo(19, 15);
+      ctx.stroke();
+
+      // --- LEFT HOUSE ---
+      ctx.fillStyle = '#ecf0f1'; 
+      ctx.fillRect(-25, -5, 15, 20);
+      ctx.strokeRect(-25, -5, 15, 20);
+      
+      ctx.fillStyle = '#e67e22';
+      ctx.beginPath();
+      ctx.moveTo(-28, -5); ctx.lineTo(-17.5, -15); ctx.lineTo(-7, -5);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(-20, 5, 5, 10);
+
+      // --- CENTER TOWER ---
+      ctx.fillStyle = '#ecf0f1';
+      ctx.fillRect(-10, -20, 20, 35);
+      ctx.strokeRect(-10, -20, 20, 35);
+      
+      ctx.fillStyle = '#c0392b';
+      ctx.beginPath();
+      ctx.moveTo(-13, -20); ctx.lineTo(0, -35); ctx.lineTo(13, -20);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+      
+      ctx.fillStyle = '#2c3e50';
+      ctx.fillRect(-4, 0, 8, 15);
+
+      ctx.restore();
+    }
+
     function prerenderMap() {
       bgCtx.fillStyle = '#1a1a1a';
       bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
@@ -1231,20 +1302,14 @@
 
       for (let city of cities) {
         const pos = hexToPixel(city.q, city.r);
-        bgCtx.fillStyle = '#ecf0f1';
-        bgCtx.fillRect(pos.x - 15, pos.y - 5, 30, 20);
-        bgCtx.fillStyle = '#c0392b';
-        bgCtx.beginPath();
-        bgCtx.moveTo(pos.x - 20, pos.y - 5);
-        bgCtx.lineTo(pos.x, pos.y - 22);
-        bgCtx.lineTo(pos.x + 20, pos.y - 5);
-        bgCtx.closePath();
-        bgCtx.fill();
-        bgCtx.fillStyle = '#8e44ad';
-        bgCtx.fillRect(pos.x - 4, pos.y + 5, 8, 10);
+        
+        // Pass the background context (bgCtx) and the calculated X/Y positions
+        drawCitySettlement(bgCtx, pos.x, pos.y);
       }
       bgCtx.restore();
     }
+
+
     prerenderMap();
 
     // --- Multi-Ship Setup ---
@@ -2214,30 +2279,95 @@
     function drawShips() {
       ships.forEach(s => {
         ctx.save();
-        ctx.translate(s.x, s.y);
+        ctx.translate(s.x, s.y + 8);
 
-        ctx.lineWidth = 1 / camera.zoom;
-        ctx.fillStyle = '#8B4513';
+        // Scale down slightly so the elaborate shape fits the hex grid
+        const scale = 0.75;
+        ctx.scale(scale, scale);
+
+        // // Active ship highlight ring
+        // if (s === activeShip) {
+        //   ctx.beginPath();
+        //   ctx.arc(0, -15, 45, 0, Math.PI * 2);
+        //   ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
+        //   ctx.fill();
+        //   ctx.strokeStyle = 'rgba(241, 196, 15, 0.8)';
+        //   ctx.lineWidth = 3 / (camera.zoom * scale);
+        //   ctx.stroke();
+        // }
+
+        ctx.lineWidth = 1.5 / (camera.zoom * scale);
+        ctx.strokeStyle = '#2c3e50';
+
+        // 1. Sterncastle (The high back deck with green/yellow stripes)
+        ctx.fillStyle = '#27ae60'; // Green accent
         ctx.beginPath();
-        ctx.moveTo(-27, -9);
-        ctx.lineTo(27, -9);
-        ctx.lineTo(18, 9);
-        ctx.lineTo(-18, 9);
+        ctx.moveTo(-35, -5);
+        ctx.lineTo(-15, -5);
+        ctx.lineTo(-15, -18);
+        ctx.lineTo(-35, -18);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#5c2a07';
-        ctx.fillRect(-3, -30, 6, 30);
+        ctx.fillStyle = '#f1c40f'; // Yellow stripe
+        ctx.fillRect(-35, -12, 20, 4);
 
-        ctx.fillStyle = 'white';
+        // 2. Main Hull & Bowsprit
+        ctx.fillStyle = '#d35400'; // Warm wood color
         ctx.beginPath();
-        ctx.moveTo(3, -6);
-        ctx.lineTo(3, -27);
-        ctx.lineTo(24, -6);
+        ctx.moveTo(-35, -5); // Stern top
+        ctx.lineTo(20, -5);  // Bow top
+        ctx.quadraticCurveTo(30, -5, 35, -15); // Bowsprit tip
+        ctx.lineTo(25, 0);   // Bow curve down
+        ctx.quadraticCurveTo(15, 15, -10, 15); // Keel bottom
+        ctx.quadraticCurveTo(-30, 15, -35, -5); // Stern curve up
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
+
+        // 3. Masts
+        ctx.strokeStyle = '#5c2a07';
+        ctx.lineWidth = 3 / (camera.zoom * scale);
+        
+        // Mizzen (Back)
+        ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-20, -35); ctx.stroke();
+        // Main (Center)
+        ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(0, -50); ctx.stroke();
+        // Fore (Front)
+        ctx.beginPath(); ctx.moveTo(15, -5); ctx.lineTo(15, -40); ctx.stroke();
+
+        // 4. Billowing Sails
+        ctx.fillStyle = 'rgba(236, 240, 241, 0.9)'; // Off-white canvas
+        ctx.strokeStyle = '#bdc3c7';
+        ctx.lineWidth = 1.5 / (camera.zoom * scale);
+
+        // Helper function to draw square-rigged sails bulging forward
+        function drawSail(mastX, topY, bottomY, width, billow) {
+          ctx.beginPath();
+          ctx.moveTo(mastX - width / 2, topY);
+          ctx.lineTo(mastX + width / 2, topY); // Top yardarm
+          ctx.quadraticCurveTo(mastX + width / 2 + billow, (topY + bottomY) / 2, mastX + width / 2, bottomY);
+          ctx.lineTo(mastX - width / 2, bottomY); // Bottom of sail
+          ctx.quadraticCurveTo(mastX - width / 2 + billow, (topY + bottomY) / 2, mastX - width / 2, topY);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        // Draw the sails from back to front
+        drawSail(-20, -30, -15, 16, 8); // Mizzen sail
+        drawSail(0, -45, -25, 24, 12);  // Main top sail
+        drawSail(0, -22, -2, 30, 15);   // Main bottom sail
+        drawSail(15, -35, -15, 20, 10); // Fore sail
+
+        // 5. Pennant Flag on main mast
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath();
+        ctx.moveTo(0, -50);
+        ctx.lineTo(-12, -45);
+        ctx.lineTo(0, -40);
+        ctx.fill();
+
         ctx.restore();
       });
     }
@@ -2245,32 +2375,70 @@
     function drawPirates() {
       pirates.forEach(p => {
         ctx.save();
-        ctx.translate(p.x, p.y);
+        ctx.translate(p.x, p.y + 8);
+        
+        const scale = 0.75;
+        ctx.scale(scale, scale);
 
-        ctx.lineWidth = 1 / camera.zoom;
-        ctx.fillStyle = '#111'; // Black hull
-        ctx.beginPath();
-        ctx.moveTo(-27, -9);
-        ctx.lineTo(27, -9);
-        ctx.lineTo(18, 9);
-        ctx.lineTo(-18, 9);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = 'white';
-        ctx.stroke();
-
-        ctx.fillStyle = '#222';
-        ctx.fillRect(-3, -30, 6, 30);
-
-        ctx.fillStyle = '#333'; // Dark grey sails
-        ctx.beginPath();
-        ctx.moveTo(3, -6);
-        ctx.lineTo(3, -27);
-        ctx.lineTo(24, -6);
-        ctx.closePath();
-        ctx.fill();
+        ctx.lineWidth = 1.5 / (camera.zoom * scale);
         ctx.strokeStyle = '#000';
-        ctx.stroke();
+
+        // Sterncastle
+        ctx.fillStyle = '#2c3e50'; // Dark steel blue
+        ctx.beginPath();
+        ctx.moveTo(-35, -5); ctx.lineTo(-15, -5); ctx.lineTo(-15, -18); ctx.lineTo(-35, -18);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = '#c0392b'; // Dark red stripe
+        ctx.fillRect(-35, -12, 20, 4);
+
+        // Main Hull & Bowsprit
+        ctx.fillStyle = '#111'; // Pitch black hull
+        ctx.beginPath();
+        ctx.moveTo(-35, -5); 
+        ctx.lineTo(20, -5);  
+        ctx.quadraticCurveTo(30, -5, 35, -15); 
+        ctx.lineTo(25, 0);   
+        ctx.quadraticCurveTo(15, 15, -10, 15); 
+        ctx.quadraticCurveTo(-30, 15, -35, -5); 
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+
+        // Masts
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3 / (camera.zoom * scale);
+        ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-20, -35); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(0, -50); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(15, -5); ctx.lineTo(15, -40); ctx.stroke();
+
+        // Dark Sails
+        ctx.fillStyle = '#222';
+        ctx.strokeStyle = '#555';
+        ctx.lineWidth = 1.5 / (camera.zoom * scale);
+
+        function drawSail(mastX, topY, bottomY, width, billow) {
+          ctx.beginPath();
+          ctx.moveTo(mastX - width / 2, topY);
+          ctx.lineTo(mastX + width / 2, topY);
+          ctx.quadraticCurveTo(mastX + width / 2 + billow, (topY + bottomY) / 2, mastX + width / 2, bottomY);
+          ctx.lineTo(mastX - width / 2, bottomY);
+          ctx.quadraticCurveTo(mastX - width / 2 + billow, (topY + bottomY) / 2, mastX - width / 2, topY);
+          ctx.fill(); ctx.stroke();
+        }
+
+        drawSail(-20, -30, -15, 16, 8);
+        drawSail(0, -45, -25, 24, 12);
+        drawSail(0, -22, -2, 30, 15);
+        drawSail(15, -35, -15, 20, 10);
+
+        // Jolly Roger Black Flag
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(0, -50);
+        ctx.lineTo(-12, -45);
+        ctx.lineTo(0, -40);
+        ctx.fill();
+
         ctx.restore();
       });
     }
