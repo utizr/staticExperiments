@@ -121,16 +121,23 @@
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
     }
 
-    #hamburger-btn {
+    #hamburger-btn,
+    #filter-btn {
       background: none;
       border: none;
       color: #ecf0f1;
-      font-size: 24px;
+      font-size: 16px;
+      font-weight: bold;
       cursor: pointer;
       padding: 0 15px 0 0;
     }
 
-    #hamburger-btn:hover {
+    #hamburger-btn {
+      font-size: 24px;
+    }
+
+    #hamburger-btn:hover,
+    #filter-btn:hover {
       color: #f1c40f;
     }
 
@@ -220,6 +227,45 @@
 
     #info-content p {
       margin: 5px 0;
+    }
+
+    /* FILTER UI */
+    #filter-window {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3000;
+      min-width: 280px;
+    }
+
+    .filter-content {
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #filter-text {
+      padding: 8px;
+      font-size: 16px;
+      background: #34495e;
+      color: white;
+      border: 1px solid #7f8c8d;
+      border-radius: 4px;
+    }
+
+    #filter-text::placeholder {
+      color: #95a5a6;
+    }
+
+    .filter-label {
+      cursor: pointer;
+      font-size: 16px;
+      color: #ecf0f1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     /* UI Container */
@@ -655,6 +701,7 @@
   <!-- TOP TASKBAR -->
   <div id="top-taskbar">
     <button id="hamburger-btn" onclick="toggleMenu()">☰</button>
+    <button id="filter-btn" onclick="toggleFilterWindow()">🔍 Filter</button>
     <button id="play-pause-btn" onclick="togglePlayPause()">▶ Play</button>
     <div class="taskbar-gold">💰 Gold: <b id="uiGold" class="gold-value">1000</b></div>
 
@@ -675,6 +722,24 @@
     </div>
   </div>
 
+  <!-- FILTER WINDOW -->
+  <div id="filter-window" class="tradeWindow d-none">
+    <div class="trade-header" id="filter-header">
+      <h2 style="pointer-events: none;">Market Filters</h2>
+      <button class="close-btn" onclick="toggleFilterWindow()">X</button>
+    </div>
+    <div class="filter-content">
+      <input type="text" id="filter-text" placeholder="Search goods (e.g. Rum)" oninput="updateFilters()">
+      <label class="filter-label">
+        <input type="checkbox" id="filter-above100" onchange="updateFilters()"> City stock > 100
+      </label>
+      <label class="filter-label">
+        <input type="checkbox" id="filter-below10" onchange="updateFilters()"> City stock &lt; 10 (Red)
+      </label>
+      <button class="trade-btn sell" style="margin-top: 15px; width: 100%;" onclick="clearFilters()">Clear All</button>
+    </div>
+  </div>
+
   <div id="ui-container">
     <!-- Dynamic Ship Panels will be injected here -->
   </div>
@@ -687,8 +752,8 @@
     // ==========================================
     const GAME_CONFIG = {
       MAP_TYPE: 'irregular', // Options: 'bigIsland', 'coastal', 'irregular', 'ring', 'twoContinents', 'poles' 
-      MAP_RADIUS: 51,
-      ISLAND_COUNT: 81,
+      MAP_RADIUS: 31,
+      ISLAND_COUNT: 39,
       CITY_SPAWN_CHANCE: 0.03,
       MIN_CITIES: 12,
       MAX_CITIES: 40,
@@ -756,6 +821,75 @@
     let isCompactView = false;
     let areWindowsHidden = false;
     let isPlaying = false;
+
+    // --- FILTER STATE ---
+    let activeFilters = { text: '', above100: false, below10: false };
+    let isFilterWindowOpen = false;
+    let filterDragInitialized = false;
+
+    function toggleFilterWindow() {
+      const win = document.getElementById('filter-window');
+      isFilterWindowOpen = !isFilterWindowOpen;
+
+      if (isFilterWindowOpen) {
+        win.classList.remove('d-none');
+        win.style.zIndex = ++zIndexCounter;
+
+        // Initialize dragging only once
+        if (!filterDragInitialized) {
+          makeUIDraggable(win, document.getElementById('filter-header'));
+          filterDragInitialized = true;
+        }
+      } else {
+        win.classList.add('d-none');
+      }
+    }
+
+    function updateFilters() {
+      activeFilters.text = document.getElementById('filter-text').value.toLowerCase();
+      activeFilters.above100 = document.getElementById('filter-above100').checked;
+      activeFilters.below10 = document.getElementById('filter-below10').checked;
+      refreshAllTradeWindows();
+    }
+
+    function clearFilters() {
+      document.getElementById('filter-text').value = '';
+      document.getElementById('filter-above100').checked = false;
+      document.getElementById('filter-below10').checked = false;
+      updateFilters();
+    }
+
+    // A separate drag logic for UI elements fixed to the screen (avoids camera zoom translation)
+    function makeUIDraggable(element, header) {
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      header.onpointerdown = dragMouseDown;
+
+      function dragMouseDown(e) {
+        e.preventDefault();
+        element.style.zIndex = ++zIndexCounter;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onpointerup = closeDragElement;
+        document.onpointermove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        // Fix position if it was centered via transform
+        element.style.transform = 'none';
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+      }
+
+      function closeDragElement() {
+        document.onpointerup = null;
+        document.onpointermove = null;
+      }
+    }
 
     function toggleMenu() {
       isMenuOpen = !isMenuOpen;
@@ -1031,7 +1165,6 @@
     const map = new Map();
     const cities = [];
 
-
     function generateMap() {
       // --- 1. GENERATE ISLAND CLUSTERS (METABALLS) ---
       const islands = [];
@@ -1115,6 +1248,7 @@
           map.set(getHexKey(q, r), { q, r, s, type, color: '', hasCity: false, isMainOcean: false });
         }
       }
+
       // --- 3. SMOOTHING PASS (Cellular Automata) ---
       const smoothingUpdates = [];
       for (let [key, hex] of map) {
@@ -1130,8 +1264,6 @@
       smoothingUpdates.forEach(u => map.get(u.key).type = u.type);
 
       // --- 4. PRELIMINARY BEACH GENERATION ---
-      // We must generate beaches BEFORE the flood fill. 
-      // If a strait is so narrow that it becomes 100% beaches, it acts as a wall.
       const beachUpdates = [];
       for (let [key, hex] of map) {
         if (hex.type === 'ocean') {
@@ -1148,7 +1280,6 @@
       const visited = new Set();
 
       for (let [key, hex] of map) {
-        // Only flood fill on true 'ocean' tiles (not beaches)
         if (hex.type === 'ocean' && !visited.has(key)) {
           const currentRegion = [];
           const queue = [hex];
@@ -1179,7 +1310,6 @@
       }
 
       // --- 6. FILL UNREACHABLE WATERS & ISOLATED BEACHES ---
-      // 1. Any ocean region that isn't the MainOcean becomes land (filling the lake)
       if (oceanRegions.length > 1) {
         for (let i = 1; i < oceanRegions.length; i++) {
           oceanRegions[i].forEach(hex => {
@@ -1188,8 +1318,6 @@
         }
       }
 
-      // 2. Any beach that doesn't border the MainOcean is inside a filled lake, 
-      // so it must also become solid land.
       const isolatedBeaches = [];
       for (let [key, hex] of map) {
         if (hex.type === 'beach') {
@@ -1206,6 +1334,7 @@
       for (let [key, hex] of map) {
         hex.color = getRandomColor(hex.type);
       }
+
       // --- 8. FIND ALL VALID COASTAL HEXES ---
       let validCityHexes = [];
       for (let [key, hex] of map) {
@@ -1296,7 +1425,6 @@
       }
     }
 
-
     generateMap();
 
     // --- Off-Screen Caching ---
@@ -1309,27 +1437,21 @@
     const mapOffsetX = mapPixelWidth / 2;
     const mapOffsetY = mapPixelHeight / 2;
 
-    // Place the helper function right above prerenderMap
     function drawCitySettlement(ctx, hexCenterX, hexCenterY) {
       ctx.save();
-
-      // Shift down slightly within the hex and apply the scale up
       const yOffset = 4;
       ctx.translate(hexCenterX, hexCenterY + yOffset);
       ctx.scale(0.75, 0.75);
 
-      // Global styling for the buildings
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#2c3e50';
       ctx.lineJoin = 'round';
 
       // --- RIGHT WAREHOUSE ---
-      // A sturdy storage building for trade goods
       ctx.fillStyle = '#ecf0f1';
       ctx.fillRect(10, -5, 18, 20);
       ctx.strokeRect(10, -5, 18, 20);
 
-      // Warehouse Roof (Darker terracotta)
       ctx.fillStyle = '#d35400';
       ctx.beginPath();
       ctx.moveTo(8, -5);
@@ -1339,11 +1461,8 @@
       ctx.fill();
       ctx.stroke();
 
-      // Large Double Doors for cargo
       ctx.fillStyle = '#2c3e50';
       ctx.fillRect(14, 5, 10, 10);
-
-      // Line down the middle to define the double doors
       ctx.beginPath();
       ctx.moveTo(19, 5);
       ctx.lineTo(19, 15);
@@ -1406,13 +1525,10 @@
 
       for (let city of cities) {
         const pos = hexToPixel(city.q, city.r);
-
-        // Pass the background context (bgCtx) and the calculated X/Y positions
         drawCitySettlement(bgCtx, pos.x, pos.y);
       }
       bgCtx.restore();
     }
-
 
     prerenderMap();
 
@@ -1512,7 +1628,7 @@
       pirate.path = [];
       pirate.moving = false;
 
-      caughtShip.immuneToPirates = true; // Make the ship immune until it docks
+      caughtShip.immuneToPirates = true;
 
       alert(`Pirates intercepted Ship ${caughtShip.id}!`);
 
@@ -1569,7 +1685,6 @@
       updateCargoUI();
       refreshAllTradeWindows();
 
-      // Make pirate flee immediately
       let mainOceanTiles = Array.from(map.values()).filter(h => h.type === 'ocean' && h.isMainOcean);
       if (mainOceanTiles.length > 0) {
         let fleeTile = mainOceanTiles[Math.floor(Math.random() * mainOceanTiles.length)];
@@ -1736,7 +1851,7 @@
       const limit = isBuy ? Math.min(quantity, spaceLeft) : Math.min(quantity, targetInventory.count);
       let itemsProcessed = 0;
 
-      const initialCityStock = city.inventory[goodId]; // <-- Track before trading
+      const initialCityStock = city.inventory[goodId];
 
       for (let i = 0; i < limit; i++) {
         const cityStock = city.inventory[goodId];
@@ -1762,17 +1877,12 @@
         itemsProcessed++;
       }
 
-      // --- NEW REPUTATION LOGIC ---
       if (itemsProcessed > 0) {
         if (!isBuy) {
           const finalCityStock = city.inventory[goodId];
-
-          // Gain: Brought a red item (below 10) to 10 or above
           if (initialCityStock < 10 && finalCityStock >= 10) {
             city.reputation = Math.min(5, city.reputation + 1);
           }
-
-          // Loss: Sold an item produced in this city
           if (city.producedGoods.includes(goodId)) {
             city.reputation -= 1;
           }
@@ -1781,7 +1891,7 @@
         updateUIGold();
         if (!isUsingWarehouse) updateCargoUI();
 
-        updateTradeDistances(activeShip.moving); // Ensure the header updates immediately
+        updateTradeDistances(activeShip.moving);
         refreshAllTradeWindows();
       }
     };
@@ -1859,7 +1969,6 @@
       let distText = "Sailing...";
       if (!activeShip.moving) {
         const trueDist = getTrueDistance(cityHex);
-        // Replaced "Distance: " with a compass emoji
         distText = trueDist >= 0 ? `🧭 ${trueDist}` : `Unreachable`;
       } else if (!isPlaying) {
         distText = "Route Planned";
@@ -1923,9 +2032,17 @@
           compactHtml += `<div class="compact-highlights">`;
           let hasHighlights = false;
           GOODS.forEach(good => {
+            const cityStock = city.inventory[good.id];
+
+            // --- FILTER CHECK ---
+            let isFiltered = false;
+            if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
+            if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
+            if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+            if (isFiltered) return;
+
             const isProduced = city.producedGoods.includes(good.id);
             const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
-            const cityStock = city.inventory[good.id];
             const isRed = cityStock < 10;
 
             if (isProduced || isConsumed || isRed) {
@@ -1940,11 +2057,19 @@
 
           let hasCargo = false;
           GOODS.forEach(good => {
+            const cityStock = city.inventory[good.id];
+
+            // --- FILTER CHECK ---
+            let isFiltered = false;
+            if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
+            if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
+            if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+            if (isFiltered) return;
+
             if (activeShip.inventory[good.id].count > 0) {
               hasCargo = true;
               const isProduced = city.producedGoods.includes(good.id);
               const isConsumed = city.highConsumptionGoods && city.highConsumptionGoods.includes(good.id);
-              const cityStock = city.inventory[good.id];
               const { sellPrice } = getPrices(good, cityStock);
 
               let colorClass = cityStock < 10 ? 'text-red' : (isProduced ? 'text-green' : (isConsumed ? 'text-orange' : 'text-white'));
@@ -2012,6 +2137,14 @@
 
             GOODS.forEach(good => {
               const cityStock = city.inventory[good.id];
+
+              // --- FILTER CHECK ---
+              let isFiltered = false;
+              if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
+              if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
+              if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+              if (isFiltered) return;
+
               const playerStock = isUsingWarehouse ? city.warehouseInventory[good.id].count : activeShip.inventory[good.id].count;
               const playerAvgPrice = isUsingWarehouse ? city.warehouseInventory[good.id].avgPrice : activeShip.inventory[good.id].avgPrice;
 
@@ -2061,8 +2194,6 @@
             // ===== WAREHOUSE TAB =====
           } else if (winObj.activeTab === 'warehouse') {
             if (!city.hasWarehouse) {
-
-              // --- NEW WAREHOUSE LOCK LOGIC ---
               const repReq = 5;
               const hasEnoughRep = city.reputation >= repReq;
               const hasEnoughGold = player.gold >= GAME_CONFIG.WAREHOUSE_COST;
@@ -2105,6 +2236,15 @@
                           <tbody>
                     `;
               GOODS.forEach(good => {
+                const cityStock = city.inventory[good.id];
+
+                // --- FILTER CHECK ---
+                let isFiltered = false;
+                if (activeFilters.text && !good.name.toLowerCase().includes(activeFilters.text)) isFiltered = true;
+                if (activeFilters.above100 && cityStock <= 100) isFiltered = true;
+                if (activeFilters.below10 && cityStock >= 10) isFiltered = true;
+                if (isFiltered) return;
+
                 const shipStock = activeShip.inventory[good.id].count;
                 const whStock = city.warehouseInventory[good.id].count;
                 const spaceLeft = activeShip.maxCargo - currentCargoSpace;
@@ -2140,17 +2280,13 @@
     window.sailToCity = function (cityKey) {
       if (!activeShip) return;
 
-      // Look up the city directly from the map, because the trade window might be hidden!
       const city = map.get(cityKey);
       if (!city || !city.hasCity) return;
 
       const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
-
-      // Check if we are already heading to this city (our target tile is adjacent to it)
       const isHeadingToCity = activeShip.targetTile &&
         getAllNeighbors(activeShip.targetTile).some(n => n.q === city.q && n.r === city.r);
 
-      // If we are already at this city (distance <= 1) OR already heading to it -> Cancel route
       if (hexDistance(shipHex, city) <= 1 || isHeadingToCity) {
         activeShip.path = [];
         activeShip.moving = false;
@@ -2241,6 +2377,9 @@
 
     // --- Input Handling ---
     window.addEventListener('keydown', (e) => {
+      // Don't trigger game shortcuts if typing in the filter box
+      if (e.target.tagName.toLowerCase() === 'input') return;
+
       if (e.code === 'Space' || e.key === ' ') {
         e.preventDefault();
         togglePlayPause();
@@ -2324,16 +2463,13 @@
         openTradeWindow(targetTile);
       } else if (targetTile && targetTile.type === 'ocean' && activeShip) {
 
-        // Check if the clicked ocean tile is adjacent to any city
         let adjacentCity = getAllNeighbors(targetTile).find(n => n.hasCity);
 
         if (adjacentCity) {
-          // NEW: Just pulse the city on the map instead of forcing the trade window open
           addCityRipple(adjacentCity);
           const cityKey = getHexKey(adjacentCity.q, adjacentCity.r);
           sailToCity(cityKey);
         } else {
-          // Standard ocean pathing
           let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
           if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
 
@@ -2385,26 +2521,13 @@
         ctx.save();
         ctx.translate(s.x, s.y + 8);
 
-        // Scale down slightly so the elaborate shape fits the hex grid
         const scale = 0.75;
         ctx.scale(scale, scale);
-
-        // // Active ship highlight ring
-        // if (s === activeShip) {
-        //   ctx.beginPath();
-        //   ctx.arc(0, -15, 45, 0, Math.PI * 2);
-        //   ctx.fillStyle = 'rgba(241, 196, 15, 0.2)';
-        //   ctx.fill();
-        //   ctx.strokeStyle = 'rgba(241, 196, 15, 0.8)';
-        //   ctx.lineWidth = 3 / (camera.zoom * scale);
-        //   ctx.stroke();
-        // }
 
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
         ctx.strokeStyle = '#2c3e50';
 
-        // 1. Sterncastle (The high back deck with green/yellow stripes)
-        ctx.fillStyle = '#27ae60'; // Green accent
+        ctx.fillStyle = '#27ae60';
         ctx.beginPath();
         ctx.moveTo(-35, -5);
         ctx.lineTo(-15, -5);
@@ -2414,57 +2537,48 @@
         ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#f1c40f'; // Yellow stripe
+        ctx.fillStyle = '#f1c40f';
         ctx.fillRect(-35, -12, 20, 4);
 
-        // 2. Main Hull & Bowsprit
-        ctx.fillStyle = '#d35400'; // Warm wood color
+        ctx.fillStyle = '#d35400';
         ctx.beginPath();
-        ctx.moveTo(-35, -5); // Stern top
-        ctx.lineTo(20, -5);  // Bow top
-        ctx.quadraticCurveTo(30, -5, 35, -15); // Bowsprit tip
-        ctx.lineTo(25, 0);   // Bow curve down
-        ctx.quadraticCurveTo(15, 15, -10, 15); // Keel bottom
-        ctx.quadraticCurveTo(-30, 15, -35, -5); // Stern curve up
+        ctx.moveTo(-35, -5);
+        ctx.lineTo(20, -5);
+        ctx.quadraticCurveTo(30, -5, 35, -15);
+        ctx.lineTo(25, 0);
+        ctx.quadraticCurveTo(15, 15, -10, 15);
+        ctx.quadraticCurveTo(-30, 15, -35, -5);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // 3. Masts
         ctx.strokeStyle = '#5c2a07';
         ctx.lineWidth = 3 / (camera.zoom * scale);
 
-        // Mizzen (Back)
         ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-20, -35); ctx.stroke();
-        // Main (Center)
         ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(0, -50); ctx.stroke();
-        // Fore (Front)
         ctx.beginPath(); ctx.moveTo(15, -5); ctx.lineTo(15, -40); ctx.stroke();
 
-        // 4. Billowing Sails
-        ctx.fillStyle = 'rgba(236, 240, 241, 0.9)'; // Off-white canvas
+        ctx.fillStyle = 'rgba(236, 240, 241, 0.9)';
         ctx.strokeStyle = '#bdc3c7';
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
 
-        // Helper function to draw square-rigged sails bulging forward
         function drawSail(mastX, topY, bottomY, width, billow) {
           ctx.beginPath();
           ctx.moveTo(mastX - width / 2, topY);
-          ctx.lineTo(mastX + width / 2, topY); // Top yardarm
+          ctx.lineTo(mastX + width / 2, topY);
           ctx.quadraticCurveTo(mastX + width / 2 + billow, (topY + bottomY) / 2, mastX + width / 2, bottomY);
-          ctx.lineTo(mastX - width / 2, bottomY); // Bottom of sail
+          ctx.lineTo(mastX - width / 2, bottomY);
           ctx.quadraticCurveTo(mastX - width / 2 + billow, (topY + bottomY) / 2, mastX - width / 2, topY);
           ctx.fill();
           ctx.stroke();
         }
 
-        // Draw the sails from back to front
-        drawSail(-20, -30, -15, 16, 8); // Mizzen sail
-        drawSail(0, -45, -25, 24, 12);  // Main top sail
-        drawSail(0, -22, -2, 30, 15);   // Main bottom sail
-        drawSail(15, -35, -15, 20, 10); // Fore sail
+        drawSail(-20, -30, -15, 16, 8);
+        drawSail(0, -45, -25, 24, 12);
+        drawSail(0, -22, -2, 30, 15);
+        drawSail(15, -35, -15, 20, 10);
 
-        // 5. Pennant Flag on main mast
         ctx.fillStyle = '#e74c3c';
         ctx.beginPath();
         ctx.moveTo(0, -50);
@@ -2487,17 +2601,15 @@
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
         ctx.strokeStyle = '#000';
 
-        // Sterncastle
-        ctx.fillStyle = '#2c3e50'; // Dark steel blue
+        ctx.fillStyle = '#2c3e50';
         ctx.beginPath();
         ctx.moveTo(-35, -5); ctx.lineTo(-15, -5); ctx.lineTo(-15, -18); ctx.lineTo(-35, -18);
         ctx.closePath(); ctx.fill(); ctx.stroke();
 
-        ctx.fillStyle = '#c0392b'; // Dark red stripe
+        ctx.fillStyle = '#c0392b';
         ctx.fillRect(-35, -12, 20, 4);
 
-        // Main Hull & Bowsprit
-        ctx.fillStyle = '#111'; // Pitch black hull
+        ctx.fillStyle = '#111';
         ctx.beginPath();
         ctx.moveTo(-35, -5);
         ctx.lineTo(20, -5);
@@ -2508,14 +2620,12 @@
         ctx.closePath();
         ctx.fill(); ctx.stroke();
 
-        // Masts
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 3 / (camera.zoom * scale);
         ctx.beginPath(); ctx.moveTo(-20, -5); ctx.lineTo(-20, -35); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(0, -50); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(15, -5); ctx.lineTo(15, -40); ctx.stroke();
 
-        // Dark Sails
         ctx.fillStyle = '#222';
         ctx.strokeStyle = '#555';
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
@@ -2535,7 +2645,6 @@
         drawSail(0, -22, -2, 30, 15);
         drawSail(15, -35, -15, 20, 10);
 
-        // Jolly Roger Black Flag
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.moveTo(0, -50);
@@ -2588,7 +2697,6 @@
     function update(dt) {
       if (!isPlaying) return;
 
-      // 1. Independent Economy Ticking based on elapsed time
       simulationTimer += dt;
       let tileTime = (HEX_SIZE * SQRT_3) / GAME_CONFIG.PLAYER_SHIP_SPEED;
       if (simulationTimer > tileTime) {
@@ -2599,7 +2707,6 @@
         if (globalTilesMoved >= GAME_CONFIG.GLOBAL_MOVE_THRESHOLD) {
           globalTilesMoved = 0;
 
-          // Calculate dynamic maintenance based on docked status
           let totalMaintenance = 0;
           ships.forEach(s => {
             let sHex = { q: s.q, r: s.r, s: -s.q - s.r };
@@ -2622,7 +2729,6 @@
         }
       }
 
-      // 2. Player Ships Movement
       let anyArrived = false;
       let arrivedShip = null;
 
@@ -2648,7 +2754,6 @@
               anyArrived = true;
               arrivedShip = s;
 
-              // Remove Pirate Immunity if they successfully dock at a city
               let sHex = { q: s.q, r: s.r, s: -s.q - s.r };
               let isDocked = cities.some(c => hexDistance(sHex, c) <= 1);
               if (isDocked) {
@@ -2663,22 +2768,20 @@
       });
 
       if (anyArrived) {
-        isPlaying = false; // Auto-pause the game when a ship arrives
-        updatePlayPauseUI(); // Refresh the UI to show the "Play" button
+        isPlaying = false;
+        updatePlayPauseUI();
 
         if (arrivedShip) {
-          activeShip = arrivedShip; // Automatically select the ship that just arrived
+          activeShip = arrivedShip;
         }
         updateCargoUI();
         updateTradeDistances(false);
         refreshAllTradeWindows();
       }
 
-      // 3. Pirate Logic
       pirates.forEach(p => {
         let pHex = { q: p.q, r: p.r, s: -p.q - p.r };
 
-        // Check for targets
         let closestShip = null;
         let closestDist = GAME_CONFIG.PIRATE_CHASE_DISTANCE + 1;
 
@@ -2703,7 +2806,6 @@
           let targetHex = map.get(getHexKey(closestShip.q, closestShip.r));
 
           if (targetHex && targetHex.type === 'ocean') {
-            // Optimizing A* - only repath if needed
             let needsRepath = false;
             if (p.path.length === 0) {
               needsRepath = true;
@@ -2726,7 +2828,6 @@
         } else {
           p.state = 'roaming';
           p.targetShip = null;
-          // Pick a random tile to roam if sitting still
           if (p.path.length === 0) {
             let mainOceanTiles = Array.from(map.values()).filter(h => h.type === 'ocean' && h.isMainOcean);
             if (mainOceanTiles.length > 0) {
@@ -2737,33 +2838,27 @@
           }
         }
 
-        // --- MOVEMENT LOGIC: Terminal Guidance & Dynamic Speed ---
         if (p.state === 'chasing' && p.targetShip) {
           let pdx = p.targetShip.x - p.x;
           let pdy = p.targetShip.y - p.y;
           let exactDist = Math.sqrt(pdx * pdx + pdy * pdy);
 
-          // 1. Catch condition
           if (exactDist < 20) {
             handlePirateCatch(p, p.targetShip);
             return;
           }
 
-          // 2. Terminal guidance: If within ~3 hexes, ignore grid and fly direct to pixel coordinates
           if (exactDist < HEX_SIZE * 3) {
             const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
             p.x += (pdx / exactDist) * step;
             p.y += (pdy / exactDist) * step;
 
-            // Keep the grid coordinates updated while flying off-grid
             let currentHex = pixelToHex(p.x, p.y);
             p.q = currentHex.q;
             p.r = currentHex.r;
-
-            p.path = []; // Clear the grid path so we don't snap back to a center
+            p.path = [];
 
           } else if (p.moving && p.path.length > 0) {
-            // 3. Grid movement: Follow hex paths if far away
             const targetNode = p.path[0];
             const targetPos = hexToPixel(targetNode.q, targetNode.r);
             const dx = targetPos.x - p.x;
@@ -2784,7 +2879,6 @@
             }
           }
         }
-        // Standard roaming movement (not chasing)
         else if (p.moving && p.path.length > 0) {
           const targetNode = p.path[0];
           const targetPos = hexToPixel(targetNode.q, targetNode.r);
@@ -2864,7 +2958,6 @@
       ctx.restore();
     }
 
-    // Call init for pirates right before game loop starts
     initPirates();
 
     let lastTime = 0;
