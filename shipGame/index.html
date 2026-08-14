@@ -2521,7 +2521,7 @@
       }
     }
 
-    window.sailToCity = function (cityKey) {
+    window.sailToCity = function (cityKey, isMapClick = false, specificTargetTile = null) {
       if (!activeShip) return;
 
       const city = map.get(cityKey);
@@ -2531,7 +2531,9 @@
       const isHeadingToCity = activeShip.targetTile &&
         getAllNeighbors(activeShip.targetTile).some(n => n.q === city.q && n.r === city.r);
 
-      if (hexDistance(shipHex, city) <= 1 || isHeadingToCity) {
+      // If clicked from the UI button, allow it to toggle/cancel the route.
+      // If clicked from the map, DO NOT cancel the route (so multi-clicking the map works).
+      if (!isMapClick && (hexDistance(shipHex, city) <= 1 || isHeadingToCity)) {
         activeShip.path = [];
         activeShip.moving = false;
         activeShip.targetTile = null;
@@ -2543,12 +2545,24 @@
         refreshAllTradeWindows();
         return;
       }
+      
+      // If clicking the map while already docked at this city, just ignore it.
+      if (isMapClick && hexDistance(shipHex, city) <= 1 && !activeShip.moving) {
+          return;
+      }
 
       let targetTile = city;
-      const oceanNeighbors = getOceanNeighbors(targetTile);
-      if (oceanNeighbors.length > 0) {
-        oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
-        targetTile = oceanNeighbors[0];
+      
+      // If the user clicked a specific water tile next to the city, go exactly there.
+      // Otherwise (like when clicking the UI button), auto-calculate the closest water tile.
+      if (specificTargetTile) {
+        targetTile = specificTargetTile;
+      } else {
+        const oceanNeighbors = getOceanNeighbors(targetTile);
+        if (oceanNeighbors.length > 0) {
+          oceanNeighbors.sort((a, b) => hexDistance(shipHex, a) - hexDistance(shipHex, b));
+          targetTile = oceanNeighbors[0];
+        }
       }
 
       let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
@@ -2758,7 +2772,8 @@
         if (adjacentCity) {
           addCityRipple(adjacentCity);
           const cityKey = getHexKey(adjacentCity.q, adjacentCity.r);
-          sailToCity(cityKey);
+          // Pass true for isMapClick, and pass the exact targetTile the user clicked
+          sailToCity(cityKey, true, targetTile);
         } else {
           let startTile = map.get(getHexKey(activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).q : activeShip.q, activeShip.moving ? pixelToHex(activeShip.x, activeShip.y).r : activeShip.r));
           if (!startTile) startTile = map.get(getHexKey(activeShip.q, activeShip.r));
