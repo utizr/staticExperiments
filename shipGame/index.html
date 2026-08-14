@@ -1178,6 +1178,9 @@
     });
 
     function handlePointerUp(e) {
+      // PREVENT GHOST DOUBLE-CLICKS: If we don't know this pointer, ignore it!
+      if (!activePointers.has(e.pointerId)) return; 
+      
       activePointers.delete(e.pointerId);
       
       if (activePointers.size < 2) {
@@ -1185,13 +1188,16 @@
       }
 
       if (activePointers.size === 0) {
+        const didDrag = hasDragged; 
         isDragging = false;
-        if (!hasDragged) {
+        hasDragged = false; // Reset drag state for the next interaction
+        
+        // Only register a click if we didn't drag/pinch
+        if (!didDrag) {
           handleMapClick(e.clientX, e.clientY);
         }
       } else if (activePointers.size === 1) {
         // If a user lifts one finger but keeps the other down, reset drag anchor 
-        // so the map doesn't violently jump to the remaining finger's position
         const remainingEvent = Array.from(activePointers.values())[0];
         dragStart.x = remainingEvent.clientX;
         dragStart.y = remainingEvent.clientY;
@@ -2528,17 +2534,21 @@
       if (!city || !city.hasCity) return;
 
       const shipHex = { q: activeShip.q, r: activeShip.r, s: -activeShip.q - activeShip.r };
-      const isHeadingToCity = activeShip.targetTile &&
+      
+      // Check if the ship is actively moving AND en route to THIS specific city
+      const isHeadingToCity = activeShip.moving && activeShip.targetTile &&
         getAllNeighbors(activeShip.targetTile).some(n => n.q === city.q && n.r === city.r);
+        
+      // Check if the ship is already securely docked at THIS city
+      const isDockedAtCity = !activeShip.moving && hexDistance(shipHex, city) <= 1;
 
-      // If clicked from the UI button, allow it to toggle/cancel the route.
-      // If clicked from the map, DO NOT cancel the route (so multi-clicking the map works).
-      if (!isMapClick && (hexDistance(shipHex, city) <= 1 || isHeadingToCity)) {
+      // TOGGLE BEHAVIOR: If we are already heading to this city, clicking again cancels the route.
+      if (isHeadingToCity) {
         activeShip.path = [];
         activeShip.moving = false;
         activeShip.targetTile = null;
 
-        isPlaying = false;
+        isPlaying = false; // Pauses the game if it was running
         updatePlayPauseUI();
         updateCargoUI();
         updateTradeDistances(false);
@@ -2546,9 +2556,9 @@
         return;
       }
       
-      // If clicking the map while already docked at this city, just ignore it.
-      if (isMapClick && hexDistance(shipHex, city) <= 1 && !activeShip.moving) {
-          return;
+      // If we are already safely docked at this city, do nothing.
+      if (isDockedAtCity) {
+        return;
       }
 
       let targetTile = city;
@@ -2700,34 +2710,34 @@
       }
     });
 
-    canvas.addEventListener('pointerdown', (e) => {
-      if (isMenuOpen) toggleMenu();
+    // canvas.addEventListener('pointerdown', (e) => {
+    //   if (isMenuOpen) toggleMenu();
 
-      isDragging = true;
-      hasDragged = false;
-      dragStart.x = e.clientX;
-      dragStart.y = e.clientY;
-      cameraStart.x = camera.x;
-      cameraStart.y = camera.y;
-    });
+    //   isDragging = true;
+    //   hasDragged = false;
+    //   dragStart.x = e.clientX;
+    //   dragStart.y = e.clientY;
+    //   cameraStart.x = camera.x;
+    //   cameraStart.y = camera.y;
+    // });
 
-    canvas.addEventListener('pointermove', (e) => {
-      if (isDragging) {
-        const dx = (e.clientX - dragStart.x) / camera.zoom;
-        const dy = (e.clientY - dragStart.y) / camera.zoom;
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
+    // canvas.addEventListener('pointermove', (e) => {
+    //   if (isDragging) {
+    //     const dx = (e.clientX - dragStart.x) / camera.zoom;
+    //     const dy = (e.clientY - dragStart.y) / camera.zoom;
+    //     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
 
-        camera.x = cameraStart.x + dx;
-        camera.y = cameraStart.y + dy;
-      }
-    });
+    //     camera.x = cameraStart.x + dx;
+    //     camera.y = cameraStart.y + dy;
+    //   }
+    // });
 
-    canvas.addEventListener('pointerup', (e) => {
-      isDragging = false;
-      if (!hasDragged) {
-        handleMapClick(e.clientX, e.clientY);
-      }
-    });
+    // canvas.addEventListener('pointerup', (e) => {
+    //   isDragging = false;
+    //   if (!hasDragged) {
+    //     handleMapClick(e.clientX, e.clientY);
+    //   }
+    // });
 
     function handleMapClick(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
