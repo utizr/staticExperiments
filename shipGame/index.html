@@ -1169,8 +1169,8 @@
         const dx = (e.clientX - dragStart.x) / camera.zoom;
         const dy = (e.clientY - dragStart.y) / camera.zoom;
         
-        // Threshold to distinguish a click from a drag
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
+        // Threshold to distinguish a click from a drag (Using raw screen pixels to avoid zoom hypersensitivity)
+        if (Math.abs(e.clientX - dragStart.x) > 5 || Math.abs(e.clientY - dragStart.y) > 5) hasDragged = true;
 
         camera.x = cameraStart.x + dx;
         camera.y = cameraStart.y + dy;
@@ -1188,7 +1188,7 @@
       }
 
       if (activePointers.size === 0) {
-        const didDrag = hasDragged; 
+        const didDrag = hasDragged;
         isDragging = false;
         hasDragged = false; // Reset drag state for the next interaction
         
@@ -1739,6 +1739,7 @@
       let newShip = {
         id: ships.length > 0 ? Math.max(...ships.map(s => s.id)) + 1 : 1,
         q: q, r: r, x: 0, y: 0,
+        flipX: 1, pitch: 0,
         speed: GAME_CONFIG.PLAYER_SHIP_SPEED,
         path: [], moving: false, targetTile: null,
         maxCargo: GAME_CONFIG.STARTING_CARGO,
@@ -1834,6 +1835,7 @@
         let pos = hexToPixel(tile.q, tile.r);
         pirates.push({
           id: i, q: tile.q, r: tile.r, x: pos.x, y: pos.y,
+          flipX: 1, pitch: 0,
           path: [], moving: false,
           state: 'roaming', targetShip: null
         });
@@ -2710,35 +2712,6 @@
       }
     });
 
-    // canvas.addEventListener('pointerdown', (e) => {
-    //   if (isMenuOpen) toggleMenu();
-
-    //   isDragging = true;
-    //   hasDragged = false;
-    //   dragStart.x = e.clientX;
-    //   dragStart.y = e.clientY;
-    //   cameraStart.x = camera.x;
-    //   cameraStart.y = camera.y;
-    // });
-
-    // canvas.addEventListener('pointermove', (e) => {
-    //   if (isDragging) {
-    //     const dx = (e.clientX - dragStart.x) / camera.zoom;
-    //     const dy = (e.clientY - dragStart.y) / camera.zoom;
-    //     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
-
-    //     camera.x = cameraStart.x + dx;
-    //     camera.y = cameraStart.y + dy;
-    //   }
-    // });
-
-    // canvas.addEventListener('pointerup', (e) => {
-    //   isDragging = false;
-    //   if (!hasDragged) {
-    //     handleMapClick(e.clientX, e.clientY);
-    //   }
-    // });
-
     function handleMapClick(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
       let clickX = (clientX - rect.left) - (canvas.width / 2);
@@ -2837,7 +2810,10 @@
         ctx.translate(s.x, s.y + 8);
 
         const scale = 0.75;
-        ctx.scale(scale, scale);
+        // 1st: Face Left or Right
+        ctx.scale(scale * s.flipX, scale);
+        // 2nd: Tilt nose Up or Down
+        ctx.rotate(s.pitch);
 
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
         ctx.strokeStyle = '#2c3e50';
@@ -2911,7 +2887,10 @@
         ctx.translate(p.x, p.y + 8);
 
         const scale = 0.75;
-        ctx.scale(scale, scale);
+        // 1st: Face Left or Right
+        ctx.scale(scale * p.flipX, scale);
+        // 2nd: Tilt nose Up or Down
+        ctx.rotate(p.pitch);
 
         ctx.lineWidth = 1.5 / (camera.zoom * scale);
         ctx.strokeStyle = '#000';
@@ -3053,6 +3032,11 @@
           const targetPos = hexToPixel(targetNode.q, targetNode.r);
           const dx = targetPos.x - s.x;
           const dy = targetPos.y - s.y;
+          
+          if (dx > 0.1) s.flipX = 1;
+          else if (dx < -0.1) s.flipX = -1;
+          s.pitch = Math.atan2(dy, Math.abs(dx)) * 0.4;
+
           const distance = Math.sqrt(dx * dx + dy * dy);
           const step = s.speed * dt;
 
@@ -3164,6 +3148,10 @@
           }
 
           if (exactDist < HEX_SIZE * 3) {
+            if (pdx > 0.1) p.flipX = 1;
+            else if (pdx < -0.1) p.flipX = -1;
+            p.pitch = Math.atan2(pdy, Math.abs(pdx)) * 0.4; 
+
             const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
             p.x += (pdx / exactDist) * step;
             p.y += (pdy / exactDist) * step;
@@ -3178,6 +3166,11 @@
             const targetPos = hexToPixel(targetNode.q, targetNode.r);
             const dx = targetPos.x - p.x;
             const dy = targetPos.y - p.y;
+
+            if (dx > 0.1) p.flipX = 1;
+            else if (dx < -0.1) p.flipX = -1;
+            p.pitch = Math.atan2(dy, Math.abs(dx)) * 0.4; 
+
             const distance = Math.sqrt(dx * dx + dy * dy);
             const step = GAME_CONFIG.PIRATE_CHASING_SPEED * dt;
 
@@ -3199,6 +3192,11 @@
           const targetPos = hexToPixel(targetNode.q, targetNode.r);
           const dx = targetPos.x - p.x;
           const dy = targetPos.y - p.y;
+
+          if (dx > 0.1) p.flipX = 1;
+          else if (dx < -0.1) p.flipX = -1;
+          p.pitch = Math.atan2(dy, Math.abs(dx)) * 0.4; 
+
           const distance = Math.sqrt(dx * dx + dy * dy);
           const step = GAME_CONFIG.PIRATE_CRUISING_SPEED * dt;
 
