@@ -692,6 +692,65 @@
       margin-top: 5px;
       flex-wrap: wrap;
     }
+
+    /* --- MODAL WINDOW --- */
+    #modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 5000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #message-modal {
+      background: #2c3e50;
+      color: white;
+      padding: 20px 25px;
+      border-radius: 8px;
+      border: 2px solid #e74c3c;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.9);
+      max-width: 420px;
+      font-family: sans-serif;
+      text-align: center;
+    }
+
+    #message-modal h2 {
+      margin-top: 0;
+      color: #e74c3c;
+      font-size: 24px;
+      border-bottom: 1px solid #7f8c8d;
+      padding-bottom: 10px;
+    }
+
+    #modal-content p {
+      margin: 12px 0;
+      font-size: 15px;
+      line-height: 1.5;
+      text-align: left;
+    }
+
+    .modal-btn {
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 15px;
+      width: 100%;
+      transition: filter 0.2s;
+    }
+
+    .modal-btn:hover {
+      filter: brightness(1.2);
+    }
   </style>
 </head>
 
@@ -756,6 +815,17 @@
 
   <div id="ui-container">
     <!-- Dynamic Ship Panels will be injected here -->
+  </div>
+
+  <!-- MESSAGE MODAL -->
+  <div id="modal-overlay" class="d-none">
+    <div id="message-modal">
+      <h2 id="modal-title">Title</h2>
+      <div id="modal-content">
+        <!-- Dynamic paragraphs go here -->
+      </div>
+      <button class="modal-btn" onclick="closeModal()">Understood</button>
+    </div>
   </div>
 
   <canvas id="gameCanvas"></canvas>
@@ -1638,6 +1708,25 @@
       if (isMenuOpen) toggleMenu();
     }
 
+    let modalCloseCallback = null;
+
+    window.showModal = function (title, htmlContent, onClose = null) {
+      document.getElementById('modal-title').innerHTML = title;
+      document.getElementById('modal-content').innerHTML = htmlContent;
+      document.getElementById('modal-overlay').classList.remove('d-none');
+      modalCloseCallback = onClose;
+
+      // Automatically pause the game when a critical modal opens
+      if (isPlaying) togglePlayPause();
+    };
+
+    window.closeModal = function () {
+      document.getElementById('modal-overlay').classList.add('d-none');
+      if (modalCloseCallback) {
+        modalCloseCallback();
+        modalCloseCallback = null;
+      }
+    };
     // --- Pirates Setup ---
     let pirates = [];
 
@@ -1662,7 +1751,8 @@
 
       caughtShip.immuneToPirates = true;
 
-      alert(`Pirates intercepted Ship ${caughtShip.id}!`);
+      // Start building the notification message
+      let messageHtml = `<p>Pirates have intercepted and boarded <b>Ship ${caughtShip.id}</b>!</p>`;
 
       let goodsWorth = 0;
       GOODS.forEach(g => {
@@ -1670,6 +1760,7 @@
       });
 
       let stealGoal = GAME_CONFIG.PIRATE_STEAL_AMOUNT;
+      let isGameOver = false;
 
       if (goodsWorth > stealGoal) {
         let stolenGoodsValue = 0;
@@ -1684,27 +1775,33 @@
             if (inv.count === 0) inv.avgPrice = 0;
           }
         }
-        alert(`Pirates plundered ${stolenGoodsValue}g worth of goods from Ship ${caughtShip.id}.`);
+        messageHtml += `<p>They ransacked your cargo holds and plundered <b>${stolenGoodsValue}g</b> worth of goods.</p>
+                        <p>Consider yourself lucky they left your vessel intact before fleeing.</p>`;
       } else {
+        // Pirates empty the cargo
         GOODS.forEach(g => {
           caughtShip.inventory[g.id].count = 0;
           caughtShip.inventory[g.id].avgPrice = 0;
         });
 
         let goldToSteal = stealGoal - goodsWorth;
+        let goodsMsg = goodsWorth > 0 ? `all of your goods (${goodsWorth}g)` : `an entirely empty cargo hold`;
+
         if (player.gold >= goldToSteal) {
           player.gold -= goldToSteal;
-          alert(`Pirates took all your goods (${goodsWorth}g) and ${goldToSteal}g from your treasury!`);
+          messageHtml += `<p>They found ${goodsMsg}, which wasn't nearly enough to satisfy their demands.</p>
+                          <p>They forced your captain to pay the difference in cash, extracting <b>${goldToSteal}g</b> directly from your treasury!</p>`;
         } else {
-          alert(`You couldn't pay the pirates! They took Ship ${caughtShip.id}!`);
+          messageHtml += `<p>They found ${goodsMsg}, and you lacked the gold to pay the rest of their ransom.</p>
+                          <p style="color: #e74c3c; font-weight: bold; font-size: 16px; text-align: center;">They have commandeered Ship ${caughtShip.id}!</p>`;
 
           let idx = ships.indexOf(caughtShip);
           if (idx > -1) ships.splice(idx, 1);
 
           if (ships.length === 0) {
-            alert("GAME OVER! You lost your last ship.");
-            isPlaying = false;
-            updatePlayPauseUI();
+            messageHtml += `<h3 style="color: #e74c3c; text-align: center; margin-bottom: 5px;">GAME OVER</h3>
+                            <p style="text-align: center;">You have lost your final ship to the pirate scourge.</p>`;
+            isGameOver = true;
           } else {
             if (activeShip === caughtShip) {
               selectShip(0);
@@ -1713,10 +1810,21 @@
         }
       }
 
+      // Display the final accumulated message
+      showModal("🏴‍☠️ Pirate Attack!", messageHtml, () => {
+        if (isGameOver) {
+          // Keep the game paused permanently if it's game over
+          isPlaying = false;
+          updatePlayPauseUI();
+        }
+      });
+
+      // Update UI components
       updateUIGold();
       updateCargoUI();
       refreshAllTradeWindows();
 
+      // Make the pirate flee
       let mainOceanTiles = Array.from(map.values()).filter(h => h.type === 'ocean' && h.isMainOcean);
       if (mainOceanTiles.length > 0) {
         let fleeTile = mainOceanTiles[Math.floor(Math.random() * mainOceanTiles.length)];
