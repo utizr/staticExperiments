@@ -1102,17 +1102,108 @@
     function hexDistance(a, b) {
       return (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.s - b.s)) / 2;
     }
-
+    
+    // --- Camera & Pointer State ---
     let camera = { x: 0, y: 0, zoom: 1.0 };
     let isDragging = false, hasDragged = false;
     let dragStart = { x: 0, y: 0 }, cameraStart = { x: 0, y: 0 };
+    
+    let activePointers = new Map();
+    let initialPinchDistance = null;
+    let initialZoom = 1.0;
 
+    // --- Scroll / Trackpad Zoom ---
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const zoomSensitivity = 0.1;
-      if (e.deltaY < 0) camera.zoom = Math.min(3.0, camera.zoom + zoomSensitivity);
-      else camera.zoom = Math.max(0.15, camera.zoom - zoomSensitivity);
+      
+      // Handle different scroll modes (pixels vs lines)
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) delta *= 15;
+      
+      // Scale the zoom change based on delta to make trackpads smoother
+      const zoomSensitivity = 0.002;
+      camera.zoom -= delta * zoomSensitivity;
+      camera.zoom = Math.max(0.15, Math.min(3.0, camera.zoom));
     }, { passive: false });
+
+    // --- Touch & Mouse Interaction ---
+    canvas.addEventListener('pointerdown', (e) => {
+      if (isMenuOpen) toggleMenu();
+      
+      activePointers.set(e.pointerId, e);
+
+      if (activePointers.size === 2) {
+        // Two fingers detected: Start pinch-to-zoom
+        const pts = Array.from(activePointers.values());
+        initialPinchDistance = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        initialZoom = camera.zoom;
+        isDragging = false; 
+        hasDragged = true; // Prevent triggering a click after a pinch
+      } else if (activePointers.size === 1) {
+        // One finger/mouse: Start panning
+        isDragging = true;
+        hasDragged = false;
+        dragStart.x = e.clientX;
+        dragStart.y = e.clientY;
+        cameraStart.x = camera.x;
+        cameraStart.y = camera.y;
+      }
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, e); // Update pointer coordinates
+      }
+
+      if (activePointers.size === 2) {
+        // Handle pinching
+        const pts = Array.from(activePointers.values());
+        const currentDistance = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        
+        if (initialPinchDistance) {
+          const scale = currentDistance / initialPinchDistance;
+          camera.zoom = Math.max(0.15, Math.min(3.0, initialZoom * scale));
+        }
+      } else if (activePointers.size === 1 && isDragging) {
+        // Handle dragging
+        const dx = (e.clientX - dragStart.x) / camera.zoom;
+        const dy = (e.clientY - dragStart.y) / camera.zoom;
+        
+        // Threshold to distinguish a click from a drag
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasDragged = true;
+
+        camera.x = cameraStart.x + dx;
+        camera.y = cameraStart.y + dy;
+      }
+    });
+
+    function handlePointerUp(e) {
+      activePointers.delete(e.pointerId);
+      
+      if (activePointers.size < 2) {
+        initialPinchDistance = null;
+      }
+
+      if (activePointers.size === 0) {
+        isDragging = false;
+        if (!hasDragged) {
+          handleMapClick(e.clientX, e.clientY);
+        }
+      } else if (activePointers.size === 1) {
+        // If a user lifts one finger but keeps the other down, reset drag anchor 
+        // so the map doesn't violently jump to the remaining finger's position
+        const remainingEvent = Array.from(activePointers.values())[0];
+        dragStart.x = remainingEvent.clientX;
+        dragStart.y = remainingEvent.clientY;
+        cameraStart.x = camera.x;
+        cameraStart.y = camera.y;
+        isDragging = true;
+      }
+    }
+
+    canvas.addEventListener('pointerup', handlePointerUp);
+    canvas.addEventListener('pointercancel', handlePointerUp);
+    canvas.addEventListener('pointerout', handlePointerUp);
 
     const GOODS = [
       { id: 'grain', name: 'Grain', basePrice: 15 },
